@@ -1,0 +1,18 @@
+/// 8-point grid spacing system
+abstract final class AppSpacing {
+  static const double xxs = 4.0;
+  static const double xs = 8.0;
+  static const double sm = 12.0;
+  static const double md = 16.0;
+  static const double lg = 24.0;
+  static const double xl = 32.0;
+  static const double xxl = 48.0;
+
+  static const double minTouchTarget = 48.0;
+  static const double borderRadius = 12.0;
+  static const double borderRadiusSm = 8.0;
+  static const double borderRadiusLg = 16.0;
+  static const double iconSize = 24.0;
+  static const double iconSizeSm = 20.0;
+  static const double iconSizeLg = 32.0;
+}
