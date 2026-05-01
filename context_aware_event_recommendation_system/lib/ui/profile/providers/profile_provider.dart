@@ -1,22 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../domain/models/persona_model.dart';
 
-/// Persona provider - manages user persona data
-final personaProvider = FutureProvider<PersonaModel>((ref) async {
-  // TODO: Load from actual data source
-  await Future.delayed(const Duration(milliseconds: 500));
-  return PersonaModel(
-    traits: ['Adventurous', 'Social', 'Foodie', 'Active', 'Culture Enthusiast'],
-    preferences: {},
-    lastUpdated: DateTime.now(),
-  );
-});
-
-/// Profile provider - manages profile and user settings state
-final profileProvider = StateNotifierProvider<ProfileNotifier, ProfileState>((ref) {
-  return ProfileNotifier();
-});
-
+/// User-controlled tracking + privacy switches.
 class ProfileSettings {
   final bool locationTrackingEnabled;
   final bool activityRecognitionEnabled;
@@ -110,3 +94,8 @@ class ProfileNotifier extends StateNotifier<ProfileState> {
     state = state.copyWith(settings: settings);
   }
 }
+
+final profileProvider =
+    StateNotifierProvider<ProfileNotifier, ProfileState>((ref) {
+  return ProfileNotifier();
+});

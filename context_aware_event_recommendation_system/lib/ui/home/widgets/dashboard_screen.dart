@@ -5,357 +5,229 @@ import 'package:go_router/go_router.dart';
 import '../../../config/constants/app_colors.dart';
 import '../../../config/constants/app_spacing.dart';
 import '../../../config/constants/app_strings.dart';
+import '../../auth/providers/auth_provider.dart';
+import '../../core/ui/app_snackbar.dart';
 import '../../core/ui/error_state_widget.dart';
 import '../../core/ui/shimmer_loading.dart';
-import '../../auth/providers/auth_provider.dart';
 import '../providers/context_provider.dart';
 import 'context_header_card.dart';
+import 'empty_dashboard.dart';
+import 'home_drawer.dart';
 import 'recommendation_card.dart';
+import 'section_label.dart';
 
-/// Dashboard Screen
+/// Dashboard — context hero, today's suggestions, drawer.
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
 
+  Future<void> _refresh(WidgetRef ref) async {
+    ref.read(suggestionRepositoryProvider).invalidateCache();
+    ref.read(contextRepositoryProvider).invalidateContext();
+    await ref.read(dismissedSuggestionsProvider.notifier).clear();
+    ref.invalidate(suggestionProvider);
+    ref.invalidate(contextProvider);
+    await ref.read(suggestionProvider.future);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final suggestionsAsync = ref.watch(suggestionProvider);
+    final visibleAsync = ref.watch(visibleSuggestionsProvider);
     final contextAsync = ref.watch(contextProvider);
     final user = ref.watch(authProvider).user;
 
     return Scaffold(
       appBar: AppBar(
+        title: const Text('Today'),
         leading: Builder(
-          builder: (context) => IconButton(
+          builder: (ctx) => IconButton(
             icon: const Icon(Icons.menu),
-            onPressed: () => Scaffold.of(context).openDrawer(),
             tooltip: 'Open menu',
+            onPressed: () => Scaffold.of(ctx).openDrawer(),
           ),
         ),
-        title: Text(AppStrings.appName),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () {
-              ref.invalidate(suggestionProvider);
-              ref.invalidate(contextProvider);
-            },
             tooltip: AppStrings.refreshContext,
+            onPressed: () async {
+              await _refresh(ref);
+              if (context.mounted) {
+                AppSnackbar.show(
+                  context,
+                  message: 'Context refreshed',
+                  kind: SnackKind.success,
+                );
+              }
+            },
           ),
         ],
       ),
-      drawer: AppDrawer(userName: user?.name ?? 'User'),
+      drawer: const HomeDrawer(),
       body: RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(suggestionProvider);
-          ref.invalidate(contextProvider);
-        },
-        child: CustomScrollView(
-          slivers: [
-            // Context header
-            SliverToBoxAdapter(
-              child: contextAsync.when(
-                data: (context) => ContextHeaderCard(contextState: context),
-                loading: () => const _ContextHeaderShimmer(),
-                error: (_, _) => const SizedBox.shrink(),
+        onRefresh: () => _refresh(ref),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.md,
+            AppSpacing.lg,
+            AppSpacing.xxl,
+          ),
+          children: [
+            // Context hero
+            contextAsync.when(
+              data: (ctx) => ContextHeaderCard(
+                contextState: ctx,
+                userName: user?.name.split(' ').first ?? 'there',
               ),
+              loading: () => const _HeroShimmer(),
+              error: (_, _) => const SizedBox.shrink(),
             ),
-            const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.md)),
+            const SizedBox(height: AppSpacing.lg),
             // Suggestions
-            suggestionsAsync.when(
+            visibleAsync.when(
               data: (suggestions) {
                 if (suggestions.isEmpty) {
-                  return SliverFillRemaining(
-                    child: ErrorStateWidget.empty(),
-                  );
+                  return EmptyDashboard(onRefresh: () => _refresh(ref));
                 }
-                return SliverPadding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final suggestion = suggestions[index];
-                        return Padding(
-                          padding:
-                              const EdgeInsets.only(bottom: AppSpacing.md),
-                          child: Dismissible(
-                            key: Key(suggestion.id),
-                            direction: DismissDirection.endToStart,
-                            background: Container(
-                              alignment: Alignment.centerRight,
-                              padding:
-                                  const EdgeInsets.only(right: AppSpacing.lg),
-                              decoration: BoxDecoration(
-                                color: AppColors.error.withValues(alpha: 0.1),
-                                borderRadius:
-                                    BorderRadius.circular(AppSpacing.borderRadius),
-                              ),
-                              child: const Icon(
-                                Icons.close,
-                                color: AppColors.error,
-                              ),
-                            ),
-                            onDismissed: (_) {
-                              // TODO: Handle dismiss feedback
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Suggestion dismissed'),
-                                  duration: Duration(seconds: 2),
-                                ),
-                              );
-                            },
-                            child: RecommendationCard(
-                              suggestion: suggestion,
-                              onTap: () =>
-                                  context.pushNamed('suggestion', pathParameters: {
-                                'id': suggestion.id,
-                              }),
-                            ),
-                          ),
-                        );
-                      },
-                      childCount: suggestions.length,
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SectionLabel(
+                      label: 'For you, right now',
+                      count: suggestions.length,
                     ),
-                  ),
+                    const SizedBox(height: AppSpacing.md),
+                    for (var i = 0; i < suggestions.length; i++) ...[
+                      Dismissible(
+                        key: ValueKey(suggestions[i].id),
+                        direction: DismissDirection.endToStart,
+                        background: const _DismissBackground(),
+                        onDismissed: (_) {
+                          ref
+                              .read(dismissedSuggestionsProvider.notifier)
+                              .dismiss(suggestions[i].id);
+                          AppSnackbar.show(
+                            context,
+                            message:
+                                "Got it — we'll suggest fewer like that",
+                            kind: SnackKind.info,
+                          );
+                        },
+                        child: RecommendationCard(
+                          suggestion: suggestions[i],
+                          priority: i == 0,
+                          onTap: () => context.pushNamed(
+                            'suggestion',
+                            pathParameters: {'id': suggestions[i].id},
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                    ],
+                    const _SwipeHint(),
+                  ],
                 );
               },
-              loading: () => SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (_, _) => const Padding(
-                      padding: EdgeInsets.only(bottom: AppSpacing.md),
-                      child: _RecommendationCardShimmer(),
-                    ),
-                    childCount: 3,
-                  ),
-                ),
-              ),
-              error: (error, _) => SliverFillRemaining(
+              loading: () => const _SuggestionListShimmer(),
+              error: (_, _) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
                 child: ErrorStateWidget.error(
                   onRetry: () => ref.invalidate(suggestionProvider),
                 ),
               ),
             ),
-            const SliverToBoxAdapter(
-                child: SizedBox(height: AppSpacing.xxl)),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          ref.invalidate(suggestionProvider);
-          ref.invalidate(contextProvider);
-        },
-        tooltip: AppStrings.refreshContext,
-        child: const Icon(Icons.refresh),
-      ),
-    );
-  }
-}
-
-/// App Drawer
-class AppDrawer extends ConsumerWidget {
-  final String userName;
-
-  const AppDrawer({super.key, required this.userName});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-
-    return Drawer(
-      child: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  CircleAvatar(
-                    radius: 32,
-                    backgroundColor: AppColors.primary,
-                    child: Text(
-                      userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
-                      style: theme.textTheme.headlineMedium
-                          ?.copyWith(color: Colors.white),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Text(
-                    userName,
-                    style: theme.textTheme.titleLarge,
-                  ),
-                ],
-              ),
-            ),
-            const Divider(),
-            // Navigation items
-            Expanded(
-              child: ListView(
-                padding: EdgeInsets.zero,
-                children: [
-                  _DrawerItem(
-                    icon: Icons.home_outlined,
-                    title: AppStrings.home,
-                    onTap: () {
-                      Navigator.pop(context);
-                    },
-                  ),
-                  _DrawerItem(
-                    icon: Icons.person_outlined,
-                    title: AppStrings.profile,
-                    onTap: () {
-                      Navigator.pop(context);
-                      context.pushNamed('profile');
-                    },
-                  ),
-                  _DrawerItem(
-                    icon: Icons.settings_outlined,
-                    title: AppStrings.settings,
-                    onTap: () {
-                      Navigator.pop(context);
-                      context.pushNamed('profile');
-                    },
-                  ),
-                ],
-              ),
-            ),
-            const Divider(),
-            _DrawerItem(
-              icon: Icons.logout,
-              title: AppStrings.logOut,
-              onTap: () {
-                _showLogoutDialog(context, ref);
-              },
-            ),
-            const SizedBox(height: AppSpacing.md),
           ],
         ),
       ),
     );
   }
-
-  void _showLogoutDialog(BuildContext context, WidgetRef ref) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text(AppStrings.logOut),
-        content: const Text(AppStrings.confirmLogout),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(AppStrings.cancel),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ref.read(authProvider.notifier).signOut();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-            ),
-            child: const Text(AppStrings.logOut),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
-class _DrawerItem extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final VoidCallback onTap;
-
-  const _DrawerItem({
-    required this.icon,
-    required this.title,
-    required this.onTap,
-  });
+class _DismissBackground extends StatelessWidget {
+  const _DismissBackground();
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: title,
-      child: ListTile(
-        leading: Icon(icon),
-        title: Text(title),
-        onTap: onTap,
-        minVerticalPadding: AppSpacing.sm,
+    return Container(
+      alignment: Alignment.centerRight,
+      padding: const EdgeInsets.only(right: AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: AppColors.error50,
+        borderRadius: BorderRadius.circular(AppSpacing.borderRadiusLg),
       ),
-    );
-  }
-}
-
-class _ContextHeaderShimmer extends StatelessWidget {
-  const _ContextHeaderShimmer();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ShimmerLoading(width: 200, height: 28),
-              const SizedBox(height: AppSpacing.xs),
-              ShimmerLoading(width: double.infinity, height: 20),
-              const SizedBox(height: AppSpacing.sm),
-              ShimmerLoading(width: 100, height: 16),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RecommendationCardShimmer extends StatelessWidget {
-  const _RecommendationCardShimmer();
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          ShimmerLoading(
-            width: double.infinity,
-            height: 140,
-            borderRadius: 0,
-          ),
-          Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ShimmerLoading(width: 200, height: 20),
-                const SizedBox(height: AppSpacing.xs),
-                ShimmerLoading(width: double.infinity, height: 16),
-                const SizedBox(height: AppSpacing.xxs),
-                ShimmerLoading(width: 150, height: 16),
-                const SizedBox(height: AppSpacing.sm),
-                Row(
-                  children: [
-                    ShimmerLoading(width: 60, height: 24),
-                    const SizedBox(width: AppSpacing.xs),
-                    ShimmerLoading(width: 60, height: 24),
-                  ],
+          const Icon(Icons.close, color: AppColors.error),
+          const SizedBox(width: AppSpacing.xs),
+          Text(
+            'Dismiss',
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: AppColors.error,
                 ),
-              ],
-            ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SwipeHint extends StatelessWidget {
+  const _SwipeHint();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.swipe_left, size: 14, color: theme.colorScheme.onSurfaceVariant),
+          const SizedBox(width: 6),
+          Text(
+            'Swipe a card to dismiss · Pull down to refresh',
+            style: theme.textTheme.labelSmall
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeroShimmer extends StatelessWidget {
+  const _HeroShimmer();
+
+  @override
+  Widget build(BuildContext context) {
+    return ShimmerLoading(
+      width: double.infinity,
+      height: 156,
+      borderRadius: AppSpacing.borderRadiusLg,
+    );
+  }
+}
+
+class _SuggestionListShimmer extends StatelessWidget {
+  const _SuggestionListShimmer();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: List.generate(3, (i) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.md),
+          child: Opacity(
+            opacity: 1 - i * 0.2,
+            child: ShimmerLoading(
+              width: double.infinity,
+              height: 240,
+              borderRadius: AppSpacing.borderRadiusLg,
+            ),
+          ),
+        );
+      }),
     );
   }
 }

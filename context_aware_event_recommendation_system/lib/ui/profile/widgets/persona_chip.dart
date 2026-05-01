@@ -1,50 +1,51 @@
 import 'package:flutter/material.dart';
 import '../../../config/constants/app_colors.dart';
 import '../../../config/constants/app_spacing.dart';
+import '../../../domain/models/persona_model.dart';
 
-/// Persona chip widget for displaying user persona trait
+/// Persona pill — gradient background, label, confidence %.
 class PersonaChip extends StatelessWidget {
-  final String label;
-  final VoidCallback? onTap;
+  final PersonaTrait trait;
 
-  const PersonaChip({
-    super.key,
-    required this.label,
-    this.onTap,
-  });
+  const PersonaChip({super.key, required this.trait});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
-    return GestureDetector(
-      onTap: onTap,
+    return Semantics(
+      label:
+          '${trait.label}, confidence ${trait.confidencePercent} percent',
       child: Container(
         padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.sm,
+          horizontal: AppSpacing.sm,
+          vertical: 6,
         ),
         decoration: BoxDecoration(
-          color: AppColors.primary.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(AppSpacing.borderRadius),
+          gradient: const LinearGradient(
+            colors: [AppColors.primary50, AppColors.accent50],
+          ),
+          borderRadius: BorderRadius.circular(999),
           border: Border.all(
-            color: AppColors.primary.withValues(alpha: 0.3),
+            color: AppColors.primary.withValues(alpha: 0.20),
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.local_offer_outlined,
-              color: AppColors.primary,
-              size: 16,
-            ),
-            const SizedBox(width: AppSpacing.xs),
             Text(
-              label,
-              style: theme.textTheme.bodyMedium?.copyWith(
+              trait.label,
+              style: theme.textTheme.labelMedium?.copyWith(
                 color: AppColors.primary,
                 fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              '${trait.confidencePercent}%',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: AppColors.accent,
+                fontWeight: FontWeight.w600,
+                fontSize: 11,
               ),
             ),
           ],

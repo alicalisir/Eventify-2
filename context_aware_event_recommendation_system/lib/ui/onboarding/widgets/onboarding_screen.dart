@@ -6,26 +6,66 @@ import '../../../config/constants/app_colors.dart';
 import '../../../config/constants/app_spacing.dart';
 import '../../../config/constants/app_strings.dart';
 import '../../auth/providers/auth_provider.dart';
-import '../providers/onboarding_provider.dart';
 import '../../core/ui/app_button.dart';
+import '../../core/ui/app_snackbar.dart';
+import '../../core/ui/brand_mark.dart';
+import '../providers/onboarding_provider.dart';
 
-enum PermissionType { location, notifications }
-
-class OnboardingPageData {
+/// Single onboarding slide blueprint.
+class _Slide {
   final IconData icon;
+  final double hue;
   final String title;
   final String description;
-  final PermissionType? permissionType;
 
-  const OnboardingPageData({
+  /// CTA label when permission isn't yet granted.
+  final String ctaLabel;
+
+  /// Permission key — null for the intro slide.
+  final _Permission? permission;
+
+  const _Slide({
     required this.icon,
+    required this.hue,
     required this.title,
     required this.description,
-    this.permissionType,
+    required this.ctaLabel,
+    this.permission,
   });
 }
 
-/// Onboarding Screen
+enum _Permission { location, notifications }
+
+const _slides = <_Slide>[
+  _Slide(
+    icon: Icons.auto_awesome,
+    hue: 270,
+    title: 'AI that understands\nyour context',
+    description:
+        'Our intelligent system learns from your daily patterns to suggest exactly what you need, exactly when you need it.',
+    ctaLabel: AppStrings.next,
+  ),
+  _Slide(
+    icon: Icons.location_on_outlined,
+    hue: 200,
+    title: 'Location-aware\nsuggestions',
+    description:
+        'We use your location to suggest nearby walks, cafés, and places that match your current context.',
+    ctaLabel: 'Allow Location',
+    permission: _Permission.location,
+  ),
+  _Slide(
+    icon: Icons.notifications_outlined,
+    hue: 150,
+    title: 'Timely\ninterventions',
+    description:
+        'Allow notifications so we can proactively suggest activities when the moment is right — never spammy.',
+    ctaLabel: 'Allow Notifications',
+    permission: _Permission.notifications,
+  ),
+];
+
+/// Onboarding screen — three slides + permission dialogs + granted state.
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -35,27 +75,7 @@ class OnboardingScreen extends ConsumerStatefulWidget {
 
 class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final _pageController = PageController();
-
-  final _pages = const [
-    OnboardingPageData(
-      icon: Icons.psychology,
-      title: AppStrings.onboardingTitle1,
-      description: AppStrings.onboardingDesc1,
-      permissionType: null,
-    ),
-    OnboardingPageData(
-      icon: Icons.location_on_outlined,
-      title: AppStrings.onboardingTitle2,
-      description: AppStrings.onboardingDesc2,
-      permissionType: PermissionType.location,
-    ),
-    OnboardingPageData(
-      icon: Icons.notifications_outlined,
-      title: AppStrings.onboardingTitle3,
-      description: AppStrings.onboardingDesc3,
-      permissionType: PermissionType.notifications,
-    ),
-  ];
+  int _page = 0;
 
   @override
   void dispose() {
@@ -63,206 +83,378 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     super.dispose();
   }
 
-  void _nextPage() {
-    if (_pageController.page!.toInt() < _pages.length - 1) {
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    } else {
-      _completeOnboarding();
-    }
+  bool _granted(OnboardingState s, _Permission? p) {
+    if (p == null) return false;
+    return p == _Permission.location ? s.locationGranted : s.notificationsGranted;
   }
 
-  void _completeOnboarding() {
-    ref.read(authProvider.notifier).completeOnboarding();
+  Future<void> _completeAndGo() async {
+    await ref.read(authProvider.notifier).completeOnboarding();
     ref.read(onboardingProvider.notifier).complete();
+    if (!mounted) return;
     context.goNamed('dashboard');
   }
 
-  void _handlePermission(PermissionType type) {
-    // Simulate permission grant
-    if (type == PermissionType.location) {
-      ref.read(onboardingProvider.notifier).grantLocation();
-    } else if (type == PermissionType.notifications) {
-      ref.read(onboardingProvider.notifier).grantNotifications();
+  void _advance() {
+    if (_page < _slides.length - 1) {
+      _pageController.animateToPage(
+        _page + 1,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOut,
+      );
+    } else {
+      _completeAndGo();
+    }
+  }
+
+  Future<void> _handleCta(_Slide slide) async {
+    if (slide.permission == null) {
+      _advance();
+      return;
+    }
+    final granted = await showDialog<bool>(
+      context: context,
+      builder: (_) => _PermissionDialog(kind: slide.permission!),
+    );
+    if (!mounted) return;
+    if (granted == true) {
+      if (slide.permission == _Permission.location) {
+        ref.read(onboardingProvider.notifier).grantLocation();
+      } else {
+        ref.read(onboardingProvider.notifier).grantNotifications();
+      }
+      // Small delay to let user see the granted state.
+      await Future.delayed(const Duration(milliseconds: 350));
+      if (!mounted) return;
+      _advance();
+    } else {
+      AppSnackbar.show(
+        context,
+        message: 'Permission denied — some features will be limited',
+        kind: SnackKind.warning,
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final onboardingState = ref.watch(onboardingProvider);
+    final state = ref.watch(onboardingProvider);
     final theme = Theme.of(context);
+    final secondaryText = theme.colorScheme.onSurfaceVariant;
 
     return Scaffold(
       body: SafeArea(
         child: Column(
           children: [
-            // Skip button
-            Align(
-              alignment: Alignment.centerRight,
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                child: TextButton(
-                  onPressed: _completeOnboarding,
-                  child: const Text(AppStrings.skip),
-                ),
+            // Header: brand + skip
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                vertical: AppSpacing.md,
+                horizontal: AppSpacing.lg,
               ),
-            ),
-            // Page view
-            Expanded(
-              child: PageView.builder(
-                controller: _pageController,
-                onPageChanged: (index) {
-                  ref.read(onboardingProvider.notifier).setPage(index);
-                },
-                itemCount: _pages.length,
-                itemBuilder: (context, index) {
-                  final page = _pages[index];
-                  final isPermissionGranted = page.permissionType == null ||
-                      (page.permissionType == PermissionType.location &&
-                          onboardingState.locationGranted) ||
-                      (page.permissionType == PermissionType.notifications &&
-                          onboardingState.notificationsGranted);
-
-                  return OnboardingPage(
-                    data: page,
-                    isPermissionGranted: isPermissionGranted,
-                    onPermissionRequest: page.permissionType != null
-                        ? () => _handlePermission(page.permissionType!)
-                        : null,
-                  );
-                },
-              ),
-            ),
-            // Bottom controls
-            Container(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              child: Column(
+              child: Row(
                 children: [
-                  // Page indicators
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(
-                      _pages.length,
-                      (index) => AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        margin:
-                            const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
-                        width: onboardingState.currentPage == index ? 24 : 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: onboardingState.currentPage == index
-                              ? AppColors.primary
-                              : theme.colorScheme.onSurfaceVariant
-                                  .withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  // Next/Get Started button
-                  AppButton(
-                    text: onboardingState.currentPage == _pages.length - 1
-                        ? AppStrings.getStarted
-                        : AppStrings.next,
-                    onPressed: _nextPage,
+                  const BrandMark(),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: _completeAndGo,
+                    style: TextButton.styleFrom(foregroundColor: secondaryText),
+                    child: const Text(AppStrings.skip),
                   ),
                 ],
               ),
+            ),
+            Expanded(
+              child: PageView.builder(
+                controller: _pageController,
+                itemCount: _slides.length,
+                onPageChanged: (i) {
+                  setState(() => _page = i);
+                  ref.read(onboardingProvider.notifier).setPage(i);
+                },
+                itemBuilder: (_, i) => _SlideView(slide: _slides[i]),
+              ),
+            ),
+            // Page indicators
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(_slides.length, (i) {
+                  final active = i == _page;
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 220),
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    width: active ? 28 : 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: active ? AppColors.primary : theme.dividerColor,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  );
+                }),
+              ),
+            ),
+            // Bottom CTA
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.md,
+                AppSpacing.lg,
+                AppSpacing.xl,
+              ),
+              child: _buildCta(state),
             ),
           ],
         ),
       ),
     );
   }
+
+  Widget _buildCta(OnboardingState state) {
+    final slide = _slides[_page];
+    final granted = _granted(state, slide.permission);
+    if (granted) {
+      return AppButton(
+        text: 'Permission Granted',
+        leadingIcon: Icons.check,
+        backgroundColor: AppColors.success,
+        onPressed: _advance,
+      );
+    }
+    return Column(
+      children: [
+        AppButton(
+          text: _page == _slides.length - 1
+              ? AppStrings.getStarted
+              : slide.ctaLabel,
+          onPressed: () => _handleCta(slide),
+        ),
+        if (_page > 0)
+          TextButton(
+            onPressed: _advance,
+            style: TextButton.styleFrom(
+              foregroundColor:
+                  Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            child: const Text('Not now'),
+          ),
+      ],
+    );
+  }
 }
 
-class OnboardingPage extends StatelessWidget {
-  final OnboardingPageData data;
-  final bool isPermissionGranted;
-  final VoidCallback? onPermissionRequest;
+class _SlideView extends StatelessWidget {
+  final _Slide slide;
 
-  const OnboardingPage({
-    super.key,
-    required this.data,
-    required this.isPermissionGranted,
-    this.onPermissionRequest,
-  });
+  const _SlideView({required this.slide});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final secondaryText = theme.colorScheme.onSurfaceVariant;
+    final hueColor = HSLColor.fromAHSL(1, slide.hue, 0.6, 0.55).toColor();
 
     return Padding(
-      padding: const EdgeInsets.all(AppSpacing.xl),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.xl,
+      ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            data.icon,
-            size: 120,
-            color: AppColors.primary,
-          ),
+          _IllustrationTile(icon: slide.icon, hue: slide.hue),
           const SizedBox(height: AppSpacing.xl),
           Text(
-            data.title,
-            style: theme.textTheme.headlineMedium,
+            slide.title,
             textAlign: TextAlign.center,
+            style: theme.textTheme.headlineMedium,
           ),
           const SizedBox(height: AppSpacing.md),
-          Text(
-            data.description,
-            style: theme.textTheme.bodyLarge,
-            textAlign: TextAlign.center,
-          ),
-          if (data.permissionType != null) ...[
-            const SizedBox(height: AppSpacing.xl),
-            _PermissionButton(
-              isGranted: isPermissionGranted,
-              onPressed: onPermissionRequest,
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 320),
+            child: Text(
+              slide.description,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyLarge?.copyWith(color: secondaryText),
             ),
-          ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          // Subtle hue accent — dot + label visible in semantic tree only.
+          Semantics(
+            container: true,
+            child: SizedBox(
+              width: 1,
+              height: 1,
+              child: ColoredBox(color: hueColor),
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _PermissionButton extends StatelessWidget {
-  final bool isGranted;
-  final VoidCallback? onPressed;
+class _IllustrationTile extends StatelessWidget {
+  final IconData icon;
+  final double hue;
 
-  const _PermissionButton({
-    required this.isGranted,
-    this.onPressed,
-  });
+  const _IllustrationTile({required this.icon, required this.hue});
 
   @override
   Widget build(BuildContext context) {
-    if (isGranted) {
-      return Semantics(
-        label: 'Permission granted',
-        child: ElevatedButton.icon(
-          onPressed: null,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.success,
-            disabledBackgroundColor: AppColors.success,
-            disabledForegroundColor: Colors.white,
-          ),
-          icon: const Icon(Icons.check),
-          label: const Text('Granted'),
+    final base = HSLColor.fromAHSL(1, hue, 0.55, 0.85).toColor();
+    final accent = HSLColor.fromAHSL(1, hue + 30, 0.55, 0.78).toColor();
+    final iconColor = HSLColor.fromAHSL(1, hue, 0.55, 0.50).toColor();
+
+    return Container(
+      width: 220,
+      height: 220,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [base, accent],
         ),
+        borderRadius: BorderRadius.circular(32),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Striped overlay for the "calm intelligence" texture.
+          Positioned.fill(
+            child: CustomPaint(painter: _StripePainter()),
+          ),
+          // Inner card with the icon.
+          Container(
+            width: 110,
+            height: 110,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.85),
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.18),
+                  blurRadius: 40,
+                  offset: const Offset(0, 12),
+                ),
+              ],
+            ),
+            child: Icon(icon, size: 56, color: iconColor),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StripePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.25)
+      ..strokeWidth = 1;
+    const step = 19.0;
+    final diag = size.width + size.height;
+    for (var x = -size.height; x < diag; x += step) {
+      canvas.drawLine(
+        Offset(x, 0),
+        Offset(x + size.height, size.height),
+        paint,
       );
     }
+  }
 
-    return Semantics(
-      button: true,
-      label: 'Allow access button',
-      child: ElevatedButton(
-        onPressed: onPressed,
-        child: const Text(AppStrings.allowAccess),
+  @override
+  bool shouldRepaint(_StripePainter oldDelegate) => false;
+}
+
+class _PermissionDialog extends StatelessWidget {
+  final _Permission kind;
+
+  const _PermissionDialog({required this.kind});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final secondaryText = theme.colorScheme.onSurfaceVariant;
+    final divider = theme.dividerColor;
+
+    final (title, body) = switch (kind) {
+      _Permission.location => (
+          '${AppStrings.appName} Would Like to Use Your Location',
+          'Used to suggest nearby walks, places to recharge, and route-aware tips. Never sold or shared.',
+        ),
+      _Permission.notifications => (
+          '${AppStrings.appName} Would Like to Send Notifications',
+          'Only proactive, context-rich nudges — typically 2–4 per day. You can mute anytime.',
+        ),
+    };
+
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+      ),
+      backgroundColor: theme.colorScheme.surface,
+      insetPadding: const EdgeInsets.all(AppSpacing.lg),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 320),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Column(
+                children: [
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    body,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(color: secondaryText),
+                  ),
+                ],
+              ),
+            ),
+            Divider(color: divider, height: 1),
+            IntrinsicHeight(
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      style: TextButton.styleFrom(
+                        foregroundColor: secondaryText,
+                        shape: const RoundedRectangleBorder(),
+                        minimumSize: const Size.fromHeight(48),
+                      ),
+                      child: const Text("Don't Allow"),
+                    ),
+                  ),
+                  VerticalDivider(width: 1, color: divider),
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        textStyle:
+                            const TextStyle(fontWeight: FontWeight.w600),
+                        shape: const RoundedRectangleBorder(),
+                        minimumSize: const Size.fromHeight(48),
+                      ),
+                      child: const Text('Allow'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

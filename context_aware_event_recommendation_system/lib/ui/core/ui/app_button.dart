@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:context_aware_event_recommendation_system/config/constants/app_colors.dart';
 import 'package:context_aware_event_recommendation_system/config/constants/app_spacing.dart';
 
-/// Primary app button with loading state
+/// Primary app button — supports filled, outlined, loading, leading icon,
+/// trailing icon, and explicit color override (e.g. success-state buttons).
 class AppButton extends StatelessWidget {
   final String text;
   final VoidCallback? onPressed;
   final bool isLoading;
   final bool isOutlined;
-  final IconData? icon;
+  final IconData? leadingIcon;
+  final IconData? trailingIcon;
   final Color? backgroundColor;
   final Color? foregroundColor;
+  final double height;
+  final bool fullWidth;
 
   const AppButton({
     super.key,
@@ -17,64 +22,113 @@ class AppButton extends StatelessWidget {
     this.onPressed,
     this.isLoading = false,
     this.isOutlined = false,
-    this.icon,
+    this.leadingIcon,
+    this.trailingIcon,
     this.backgroundColor,
     this.foregroundColor,
+    this.height = 52,
+    this.fullWidth = true,
   });
 
   @override
   Widget build(BuildContext context) {
-    final Widget buttonChild = isLoading
-        ? const SizedBox(
-            width: 24,
-            height: 24,
+    final disabled = isLoading || onPressed == null;
+    final effectiveFg =
+        foregroundColor ?? (isOutlined ? AppColors.textPrimaryLight : Colors.white);
+    final effectiveBg = backgroundColor ?? AppColors.primary;
+
+    final child = isLoading
+        ? SizedBox(
+            width: 20,
+            height: 20,
             child: CircularProgressIndicator(
-              strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              strokeWidth: 2.5,
+              valueColor: AlwaysStoppedAnimation<Color>(effectiveFg),
             ),
           )
-        : icon != null
-            ? Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(icon, size: AppSpacing.iconSizeSm),
-                  const SizedBox(width: AppSpacing.xs),
-                  Text(text),
-                ],
-              )
-            : Text(text);
+        : Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (leadingIcon != null) ...[
+                Icon(leadingIcon, size: 20, color: effectiveFg),
+                const SizedBox(width: AppSpacing.xs),
+              ],
+              Flexible(
+                child: Text(
+                  text,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: effectiveFg,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              if (trailingIcon != null) ...[
+                const SizedBox(width: AppSpacing.xs),
+                Icon(trailingIcon, size: 18, color: effectiveFg),
+              ],
+            ],
+          );
 
-    if (isOutlined) {
-      return Semantics(
-        button: true,
-        enabled: !isLoading && onPressed != null,
-        label: text,
-        child: OutlinedButton(
-          onPressed: isLoading ? null : onPressed,
-          style: OutlinedButton.styleFrom(
-            foregroundColor: foregroundColor,
-            side: foregroundColor != null
-                ? BorderSide(color: foregroundColor!)
-                : null,
-          ),
-          child: buttonChild,
-        ),
-      );
-    }
+    final size = Size(fullWidth ? double.infinity : 0, height);
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(AppSpacing.borderRadius),
+    );
 
-    return Semantics(
+    final button = Semantics(
       button: true,
-      enabled: !isLoading && onPressed != null,
+      enabled: !disabled,
       label: text,
-      child: ElevatedButton(
-        onPressed: isLoading ? null : onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: backgroundColor,
-          foregroundColor: foregroundColor,
-        ),
-        child: buttonChild,
+      child: isOutlined
+          ? OutlinedButton(
+              onPressed: disabled ? null : onPressed,
+              style: OutlinedButton.styleFrom(
+                minimumSize: size,
+                foregroundColor: effectiveFg,
+                side: BorderSide(
+                  color: foregroundColor ?? AppColors.dividerLight,
+                  width: 1.5,
+                ),
+                shape: shape,
+              ),
+              child: child,
+            )
+          : ElevatedButton(
+              onPressed: disabled ? null : onPressed,
+              style: ElevatedButton.styleFrom(
+                minimumSize: size,
+                backgroundColor: effectiveBg,
+                foregroundColor: effectiveFg,
+                shape: shape,
+                elevation: 0,
+                shadowColor: Colors.transparent,
+              ),
+              child: child,
+            ),
+    );
+
+    if (isOutlined || backgroundColor != null) return button;
+
+    // Filled primary button gets the brand glow.
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppSpacing.borderRadius),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.30),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.18),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
+      child: button,
     );
   }
 }

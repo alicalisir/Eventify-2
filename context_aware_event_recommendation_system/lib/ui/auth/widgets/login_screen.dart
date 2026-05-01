@@ -7,11 +7,13 @@ import '../../../config/constants/app_spacing.dart';
 import '../../../config/constants/app_strings.dart';
 import '../../../utils/validators.dart';
 import '../../core/ui/app_button.dart';
+import '../../core/ui/app_pressable.dart';
+import '../../core/ui/app_snackbar.dart';
 import '../../core/ui/app_text_field.dart';
-import '../../core/ui/accessible_tap_target.dart';
+import '../../core/ui/brand_mark.dart';
 import '../providers/auth_provider.dart';
 
-/// Login Screen
+/// Login screen — "Calm Intelligence" design.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -35,22 +37,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _handleSignIn() async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() => _isLoading = true);
-
     final success = await ref.read(authProvider.notifier).signIn(
           _emailController.text.trim(),
           _passwordController.text,
         );
-
+    if (!mounted) return;
     setState(() => _isLoading = false);
-
-    if (!success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(AppStrings.invalidCredentials),
-          backgroundColor: AppColors.error,
-        ),
+    if (success) {
+      context.goNamed('dashboard');
+    } else {
+      AppSnackbar.show(
+        context,
+        message: AppStrings.invalidCredentials,
+        kind: SnackKind.error,
       );
     }
   }
@@ -58,108 +58,145 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final secondaryText = theme.colorScheme.onSurfaceVariant;
+    final divider = theme.dividerColor;
 
     return Scaffold(
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: IntrinsicHeight(
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      children: [
-                        const Spacer(),
-                        // Logo area
-                        Semantics(
-                          label: 'ContextAI Logo',
-                          child: Icon(
-                            Icons.psychology,
-                            size: 80,
-                            color: AppColors.primary,
-                          ),
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg,
+                  AppSpacing.xxl,
+                  AppSpacing.lg,
+                  AppSpacing.lg,
+                ),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Align(
+                        alignment: Alignment.centerLeft,
+                        child: BrandMark(),
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
+                      Text(
+                        AppStrings.welcomeBack,
+                        style: theme.textTheme.displayLarge?.copyWith(
+                          fontSize: 30,
                         ),
-                        const SizedBox(height: AppSpacing.lg),
-                        Text(
-                          AppStrings.welcomeBack,
-                          style: theme.textTheme.headlineMedium,
-                        ),
-                        const SizedBox(height: AppSpacing.xxl),
-                        // Form
-                        AppTextField(
-                          controller: _emailController,
-                          label: AppStrings.email,
-                          hint: 'you@example.com',
-                          keyboardType: TextInputType.emailAddress,
-                          textInputAction: TextInputAction.next,
-                          prefixIcon: const Icon(Icons.email_outlined),
-                          validator: Validators.email,
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        AppTextField(
-                          controller: _passwordController,
-                          label: AppStrings.password,
-                          obscureText: _obscurePassword,
-                          textInputAction: TextInputAction.done,
-                          prefixIcon: const Icon(Icons.lock_outlined),
-                          suffixIcon: AccessibleTapTarget(
-                            tooltip: _obscurePassword
-                                ? 'Show password'
-                                : 'Hide password',
-                            onTap: () {
-                              setState(() => _obscurePassword = !_obscurePassword);
-                            },
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        'Your context is ready when you are.',
+                        style: theme.textTheme.bodyLarge
+                            ?.copyWith(color: secondaryText),
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
+                      AppTextField(
+                        controller: _emailController,
+                        label: AppStrings.email,
+                        keyboardType: TextInputType.emailAddress,
+                        textInputAction: TextInputAction.next,
+                        validator: Validators.email,
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      AppTextField(
+                        controller: _passwordController,
+                        label: AppStrings.password,
+                        obscureText: _obscurePassword,
+                        textInputAction: TextInputAction.done,
+                        validator: Validators.password,
+                        onEditingComplete: _handleSignIn,
+                        suffixIcon: AppPressable(
+                          semanticLabel: _obscurePassword
+                              ? 'Show password'
+                              : 'Hide password',
+                          onTap: () {
+                            setState(() => _obscurePassword = !_obscurePassword);
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.all(AppSpacing.sm),
                             child: Icon(
                               _obscurePassword
                                   ? Icons.visibility_outlined
                                   : Icons.visibility_off_outlined,
+                              size: 20,
+                              color: secondaryText,
                             ),
                           ),
-                          validator: Validators.password,
-                          onEditingComplete: _handleSignIn,
                         ),
-                        const SizedBox(height: AppSpacing.xs),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: () {
-                              // TODO: Implement forgot password
-                            },
-                            child: const Text(AppStrings.forgotPassword),
+                      ),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: () => AppSnackbar.show(
+                            context,
+                            message: 'Reset link sent to your email',
+                            kind: SnackKind.info,
                           ),
+                          child: const Text(AppStrings.forgotPassword),
                         ),
-                        const SizedBox(height: AppSpacing.lg),
-                        AppButton(
-                          text: AppStrings.signIn,
-                          isLoading: _isLoading,
-                          onPressed: _handleSignIn,
-                        ),
-                        const Spacer(),
-                        // Footer
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              "Don't have an account?",
-                              style: theme.textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      AppButton(
+                        text: AppStrings.signIn,
+                        onPressed: _handleSignIn,
+                        isLoading: _isLoading,
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      Row(
+                        children: [
+                          Expanded(child: Divider(color: divider)),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.sm),
+                            child: Text(
+                              'OR',
+                              style: theme.textTheme.labelSmall
+                                  ?.copyWith(color: secondaryText),
                             ),
-                            TextButton(
-                              onPressed: () => context.pushNamed('register'),
-                              child: const Text(AppStrings.createAccount),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                      ],
-                    ),
+                          ),
+                          Expanded(child: Divider(color: divider)),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      AppButton(
+                        text: 'Continue with Apple',
+                        leadingIcon: Icons.apple,
+                        isOutlined: true,
+                        foregroundColor: AppColors.textPrimaryLight,
+                        onPressed: () => context.goNamed('dashboard'),
+                      ),
+                    ],
                   ),
                 ),
               ),
-            );
-          },
+            ),
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'New here?',
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(color: secondaryText),
+                  ),
+                  TextButton(
+                    onPressed: () => context.pushNamed('register'),
+                    child: const Text(
+                      AppStrings.createAccount,
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
