@@ -66,6 +66,7 @@ class ContextRepository {
       locationLabel: locationLabel,
       activityLabel: _activityLabel(speed),
     );
+    AppLogger.i('[Context] Context refreshed → ${fresh.greeting}, ${fresh.activityLabel}, location: ${fresh.locationLabel ?? 'unavailable'}');
     _cachedContext = fresh;
     _contextExpiresAt = now.add(_contextTtl);
     return fresh;

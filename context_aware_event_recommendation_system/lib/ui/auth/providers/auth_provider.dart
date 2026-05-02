@@ -31,6 +31,11 @@ class Auth extends _$Auth {
 
   Future<void> restoreSession() async {
     final user = await ref.read(authRepositoryProvider).restoreSession();
+    if (user != null) {
+      AppLogger.i('[Auth] Session restored → ${user.email}');
+    } else {
+      AppLogger.i('[Auth] No persisted session found');
+    }
     state = AuthState(
       status:
           user != null ? AuthStatus.authenticated : AuthStatus.unauthenticated,
@@ -44,9 +49,11 @@ class Auth extends _$Auth {
       final user =
           await ref.read(authRepositoryProvider).signIn(email, password);
       if (user != null) {
+        AppLogger.i('[Auth] signIn success → ${user.email}');
         state = state.copyWith(status: AuthStatus.authenticated, user: user);
         return true;
       }
+      AppLogger.w('[Auth] signIn rejected (invalid credentials)');
       state = state.copyWith(
         status: AuthStatus.unauthenticated,
         error: const AuthError(),
@@ -66,9 +73,11 @@ class Auth extends _$Auth {
       final user =
           await ref.read(authRepositoryProvider).signUp(name, email, password);
       if (user != null) {
+        AppLogger.i('[Auth] signUp success → ${user.email}');
         state = state.copyWith(status: AuthStatus.authenticated, user: user);
         return true;
       }
+      AppLogger.w('[Auth] signUp rejected');
       state = state.copyWith(
         status: AuthStatus.unauthenticated,
         error: const UnknownError(),

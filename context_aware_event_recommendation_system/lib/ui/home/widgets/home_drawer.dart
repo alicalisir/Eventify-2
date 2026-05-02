@@ -161,12 +161,15 @@ class _DrawerItem extends StatelessWidget {
           children: [
             Icon(icon, size: 20, color: fg),
             const SizedBox(width: AppSpacing.md),
-            Text(
-              label,
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: fg,
-                fontWeight: active ? FontWeight.w600 : FontWeight.w500,
-                fontSize: 15,
+            Flexible(
+              child: Text(
+                label,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: fg,
+                  fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+                  fontSize: 15,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],

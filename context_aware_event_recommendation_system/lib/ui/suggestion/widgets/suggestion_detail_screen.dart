@@ -236,11 +236,14 @@ class _SuggestionDetailScreenState
                                   const Icon(Icons.auto_awesome,
                                       size: 18, color: AppColors.accent),
                                   const SizedBox(width: AppSpacing.xs),
-                                  Text(
-                                    AppStrings.whyThisSuggestion,
-                                    style: theme.textTheme.titleMedium?.copyWith(
-                                      color: AppColors.accent,
-                                      fontSize: 15,
+                                  Flexible(
+                                    child: Text(
+                                      AppStrings.whyThisSuggestion,
+                                      style: theme.textTheme.titleMedium?.copyWith(
+                                        color: AppColors.accent,
+                                        fontSize: 15,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                 ],

@@ -160,11 +160,14 @@ class _DismissBackground extends StatelessWidget {
         children: [
           const Icon(Icons.close, color: AppColors.error),
           const SizedBox(width: AppSpacing.xs),
-          Text(
-            'Dismiss',
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: AppColors.error,
-                ),
+          Flexible(
+            child: Text(
+              'Dismiss',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: AppColors.error,
+                  ),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),
@@ -185,10 +188,13 @@ class _SwipeHint extends StatelessWidget {
         children: [
           Icon(Icons.swipe_left, size: 14, color: theme.colorScheme.onSurfaceVariant),
           const SizedBox(width: 6),
-          Text(
-            'Swipe a card to dismiss · Pull down to refresh',
-            style: theme.textTheme.labelSmall
-                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          Flexible(
+            child: Text(
+              'Swipe a card to dismiss · Pull down to refresh',
+              style: theme.textTheme.labelSmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),
