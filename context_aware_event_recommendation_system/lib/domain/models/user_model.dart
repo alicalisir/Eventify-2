@@ -1,37 +1,19 @@
-/// User model for authentication
-class UserModel {
-  final String id;
-  final String email;
-  final String name;
-  final String? avatarUrl;
-  final bool hasCompletedOnboarding;
-  final DateTime createdAt;
+import 'package:freezed_annotation/freezed_annotation.dart';
 
-  const UserModel({
-    required this.id,
-    required this.email,
-    required this.name,
-    this.avatarUrl,
-    this.hasCompletedOnboarding = false,
-    required this.createdAt,
-  });
+part 'user_model.freezed.dart';
+part 'user_model.g.dart';
 
-  UserModel copyWith({
-    String? id,
-    String? email,
-    String? name,
+@freezed
+abstract class UserModel with _$UserModel {
+  const factory UserModel({
+    required String id,
+    required String email,
+    required String name,
     String? avatarUrl,
-    bool? hasCompletedOnboarding,
-    DateTime? createdAt,
-  }) {
-    return UserModel(
-      id: id ?? this.id,
-      email: email ?? this.email,
-      name: name ?? this.name,
-      avatarUrl: avatarUrl ?? this.avatarUrl,
-      hasCompletedOnboarding:
-          hasCompletedOnboarding ?? this.hasCompletedOnboarding,
-      createdAt: createdAt ?? this.createdAt,
-    );
-  }
+    @Default(false) bool hasCompletedOnboarding,
+    required DateTime createdAt,
+  }) = _UserModel;
+
+  factory UserModel.fromJson(Map<String, dynamic> json) =>
+      _$UserModelFromJson(json);
 }

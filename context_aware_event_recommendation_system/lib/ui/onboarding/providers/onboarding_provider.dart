@@ -1,33 +1,17 @@
+import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+part 'onboarding_provider.freezed.dart';
 part 'onboarding_provider.g.dart';
 
-class OnboardingState {
-  final int currentPage;
-  final bool locationGranted;
-  final bool notificationsGranted;
-  final bool isComplete;
-
-  const OnboardingState({
-    this.currentPage = 0,
-    this.locationGranted = false,
-    this.notificationsGranted = false,
-    this.isComplete = false,
-  });
-
-  OnboardingState copyWith({
-    int? currentPage,
-    bool? locationGranted,
-    bool? notificationsGranted,
-    bool? isComplete,
-  }) {
-    return OnboardingState(
-      currentPage: currentPage ?? this.currentPage,
-      locationGranted: locationGranted ?? this.locationGranted,
-      notificationsGranted: notificationsGranted ?? this.notificationsGranted,
-      isComplete: isComplete ?? this.isComplete,
-    );
-  }
+@freezed
+abstract class OnboardingState with _$OnboardingState {
+  const factory OnboardingState({
+    @Default(0) int currentPage,
+    @Default(false) bool locationGranted,
+    @Default(false) bool notificationsGranted,
+    @Default(false) bool isComplete,
+  }) = _OnboardingState;
 }
 
 @riverpod

@@ -17,17 +17,13 @@ class AuthRepository {
 
   Future<UserModel?> signIn(String email, String password) async {
     final user = await _authService.signIn(email, password);
-    if (user != null) {
-      await _persist(user);
-    }
+    if (user != null) await _persist(user);
     return user;
   }
 
   Future<UserModel?> signUp(String name, String email, String password) async {
     final user = await _authService.signUp(name, email, password);
-    if (user != null) {
-      await _persist(user);
-    }
+    if (user != null) await _persist(user);
     return user;
   }
 
@@ -41,7 +37,7 @@ class AuthRepository {
     final raw = _prefs.getString(_userKey);
     if (raw == null) return null;
     try {
-      return _decode(raw);
+      return UserModel.fromJson(jsonDecode(raw) as Map<String, dynamic>);
     } catch (_) {
       await _prefs.remove(_userKey);
       return null;
@@ -55,28 +51,6 @@ class AuthRepository {
   }
 
   Future<void> _persist(UserModel user) async {
-    await _prefs.setString(_userKey, _encode(user));
-  }
-
-  String _encode(UserModel user) => jsonEncode({
-        'id': user.id,
-        'email': user.email,
-        'name': user.name,
-        'avatarUrl': user.avatarUrl,
-        'hasCompletedOnboarding': user.hasCompletedOnboarding,
-        'createdAt': user.createdAt.toIso8601String(),
-      });
-
-  UserModel _decode(String raw) {
-    final json = jsonDecode(raw) as Map<String, dynamic>;
-    return UserModel(
-      id: json['id'] as String,
-      email: json['email'] as String,
-      name: json['name'] as String,
-      avatarUrl: json['avatarUrl'] as String?,
-      hasCompletedOnboarding:
-          json['hasCompletedOnboarding'] as bool? ?? false,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-    );
+    await _prefs.setString(_userKey, jsonEncode(user.toJson()));
   }
 }

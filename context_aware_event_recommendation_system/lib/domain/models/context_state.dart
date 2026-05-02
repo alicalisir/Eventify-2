@@ -1,32 +1,28 @@
+import 'package:freezed_annotation/freezed_annotation.dart';
+
 import '../../config/constants/app_strings.dart';
 
-/// User context state for dashboard
-class ContextState {
-  final String greeting;
-  final String contextDescription;
-  final bool isLocationEnabled;
-  final bool isNotificationsEnabled;
-  final DateTime? lastUpdated;
+part 'context_state.freezed.dart';
 
-  const ContextState({
-    required this.greeting,
-    required this.contextDescription,
-    this.isLocationEnabled = false,
-    this.isNotificationsEnabled = false,
-    this.lastUpdated,
-  });
+@freezed
+abstract class ContextState with _$ContextState {
+  const ContextState._();
+
+  const factory ContextState({
+    required String greeting,
+    required String contextDescription,
+    @Default(false) bool isLocationEnabled,
+    @Default(false) bool isNotificationsEnabled,
+    DateTime? lastUpdated,
+  }) = _ContextState;
 
   static ContextState initial() {
     final hour = DateTime.now().hour;
-    String greeting;
-    if (hour < 12) {
-      greeting = AppStrings.goodMorning;
-    } else if (hour < 17) {
-      greeting = AppStrings.goodAfternoon;
-    } else {
-      greeting = AppStrings.goodEvening;
-    }
-
+    final greeting = hour < 12
+        ? AppStrings.goodMorning
+        : hour < 17
+            ? AppStrings.goodAfternoon
+            : AppStrings.goodEvening;
     return ContextState(
       greeting: greeting,
       contextDescription: 'Analyzing your current context...',

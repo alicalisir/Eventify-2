@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/repositories/auth_repository.dart';
@@ -8,39 +7,31 @@ import '../data/repositories/suggestion_repository.dart';
 import '../data/services/auth_service.dart';
 import '../data/services/context_service.dart';
 
-part 'providers.g.dart';
-
 /// Bootstrapped in main.dart via ProviderScope.overrides before runApp.
-@Riverpod(keepAlive: true)
-SharedPreferences sharedPreferences(Ref ref) {
+final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
   throw UnimplementedError(
     'sharedPreferencesProvider must be overridden in ProviderScope',
   );
-}
+});
 
-@Riverpod(keepAlive: true)
-AuthService authService(Ref ref) => AuthService();
+final authServiceProvider = Provider<AuthService>((ref) => AuthService());
 
-@Riverpod(keepAlive: true)
-AuthRepository authRepository(Ref ref) {
+final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepository(
     ref.watch(authServiceProvider),
     ref.watch(sharedPreferencesProvider),
   );
-}
+});
 
-@Riverpod(keepAlive: true)
-ContextService contextService(Ref ref) => ContextService();
+final contextServiceProvider = Provider<ContextService>((ref) => ContextService());
 
-@Riverpod(keepAlive: true)
-ContextRepository contextRepository(Ref ref) {
+final contextRepositoryProvider = Provider<ContextRepository>((ref) {
   return ContextRepository(ref.watch(contextServiceProvider));
-}
+});
 
-@Riverpod(keepAlive: true)
-SuggestionRepository suggestionRepository(Ref ref) {
+final suggestionRepositoryProvider = Provider<SuggestionRepository>((ref) {
   return SuggestionRepository(
     ref.watch(contextServiceProvider),
     ref.watch(sharedPreferencesProvider),
   );
-}
+});

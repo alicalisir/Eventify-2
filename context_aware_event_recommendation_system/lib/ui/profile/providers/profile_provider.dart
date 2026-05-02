@@ -1,59 +1,26 @@
+import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+part 'profile_provider.freezed.dart';
 part 'profile_provider.g.dart';
 
-class ProfileSettings {
-  final bool locationTrackingEnabled;
-  final bool activityRecognitionEnabled;
-  final bool notificationsEnabled;
-  final bool trackingPaused;
-
-  const ProfileSettings({
-    this.locationTrackingEnabled = true,
-    this.activityRecognitionEnabled = true,
-    this.notificationsEnabled = true,
-    this.trackingPaused = false,
-  });
-
-  ProfileSettings copyWith({
-    bool? locationTrackingEnabled,
-    bool? activityRecognitionEnabled,
-    bool? notificationsEnabled,
-    bool? trackingPaused,
-  }) {
-    return ProfileSettings(
-      locationTrackingEnabled:
-          locationTrackingEnabled ?? this.locationTrackingEnabled,
-      activityRecognitionEnabled:
-          activityRecognitionEnabled ?? this.activityRecognitionEnabled,
-      notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
-      trackingPaused: trackingPaused ?? this.trackingPaused,
-    );
-  }
+@freezed
+abstract class ProfileSettings with _$ProfileSettings {
+  const factory ProfileSettings({
+    @Default(true) bool locationTrackingEnabled,
+    @Default(true) bool activityRecognitionEnabled,
+    @Default(true) bool notificationsEnabled,
+    @Default(false) bool trackingPaused,
+  }) = _ProfileSettings;
 }
 
-class ProfileState {
-  final ProfileSettings settings;
-  final bool isLoading;
-  final String? error;
-
-  const ProfileState({
-    this.settings = const ProfileSettings(),
-    this.isLoading = false,
-    this.error,
-  });
-
-  ProfileState copyWith({
-    ProfileSettings? settings,
-    bool? isLoading,
+@freezed
+abstract class ProfileState with _$ProfileState {
+  const factory ProfileState({
+    @Default(ProfileSettings()) ProfileSettings settings,
+    @Default(false) bool isLoading,
     String? error,
-  }) {
-    return ProfileState(
-      settings: settings ?? this.settings,
-      isLoading: isLoading ?? this.isLoading,
-      error: error,
-    );
-  }
+  }) = _ProfileState;
 }
 
 @Riverpod(keepAlive: true)

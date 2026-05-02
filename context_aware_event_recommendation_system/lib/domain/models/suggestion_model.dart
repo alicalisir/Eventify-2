@@ -1,52 +1,37 @@
 import 'package:flutter/material.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 
-/// Suggestion model — a single AI-generated context recommendation.
-class SuggestionModel {
-  final String id;
-  final String title;
-  final String description;
+part 'suggestion_model.freezed.dart';
 
-  /// Why the AI surfaced this — visible inside cards and detail view.
-  final String rationale;
-  final String category;
+@freezed
+abstract class SuggestionModel with _$SuggestionModel {
+  const factory SuggestionModel({
+    required String id,
+    required String title,
+    required String description,
 
-  /// Distance in km, null if not location-bound.
-  final double? distance;
+    /// Why the AI surfaced this — visible inside cards and detail view.
+    required String rationale,
+    required String category,
 
-  /// Estimated minutes for the activity.
-  final int? estimatedMinutes;
-  final String? address;
-  final double? latitude;
-  final double? longitude;
-  final List<String> tags;
+    /// Distance in km, null if not location-bound.
+    double? distance,
 
-  /// Optional context-weather summary (e.g. "21° • Clear").
-  final String? weather;
+    /// Estimated minutes for the activity.
+    int? estimatedMinutes,
+    String? address,
+    double? latitude,
+    double? longitude,
+    @Default(<String>[]) List<String> tags,
 
-  /// Material icon used in the card hero + detail meta.
-  final IconData icon;
+    /// Optional context-weather summary (e.g. "21° • Clear").
+    String? weather,
 
-  /// Hue (0–360) used to colour the card hero gradient. Lets each suggestion
-  /// feel like its own little world without bespoke imagery.
-  final double hue;
+    /// Material icon used in the card hero + detail meta.
+    @Default(Icons.auto_awesome) IconData icon,
 
-  final DateTime createdAt;
-
-  const SuggestionModel({
-    required this.id,
-    required this.title,
-    required this.description,
-    required this.rationale,
-    required this.category,
-    this.distance,
-    this.estimatedMinutes,
-    this.address,
-    this.latitude,
-    this.longitude,
-    this.tags = const [],
-    this.weather,
-    this.icon = Icons.auto_awesome,
-    this.hue = 250,
-    required this.createdAt,
-  });
+    /// Hue (0–360) used to colour the card hero gradient.
+    @Default(250.0) double hue,
+    required DateTime createdAt,
+  }) = _SuggestionModel;
 }

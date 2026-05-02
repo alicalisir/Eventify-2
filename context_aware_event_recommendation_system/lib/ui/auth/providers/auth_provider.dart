@@ -1,3 +1,4 @@
+import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:context_aware_event_recommendation_system/di/providers.dart';
 import 'package:context_aware_event_recommendation_system/domain/models/user_model.dart';
@@ -5,32 +6,18 @@ import 'package:context_aware_event_recommendation_system/domain/models/user_mod
 export 'package:context_aware_event_recommendation_system/di/providers.dart'
     show sharedPreferencesProvider;
 
+part 'auth_provider.freezed.dart';
 part 'auth_provider.g.dart';
 
 enum AuthStatus { initial, authenticated, unauthenticated, loading }
 
-class AuthState {
-  final AuthStatus status;
-  final UserModel? user;
-  final String? error;
-
-  const AuthState({
-    this.status = AuthStatus.initial,
-    this.user,
-    this.error,
-  });
-
-  AuthState copyWith({
-    AuthStatus? status,
+@freezed
+abstract class AuthState with _$AuthState {
+  const factory AuthState({
+    @Default(AuthStatus.initial) AuthStatus status,
     UserModel? user,
     String? error,
-  }) {
-    return AuthState(
-      status: status ?? this.status,
-      user: user ?? this.user,
-      error: error,
-    );
-  }
+  }) = _AuthState;
 }
 
 @Riverpod(keepAlive: true)
@@ -41,9 +28,8 @@ class Auth extends _$Auth {
   Future<void> restoreSession() async {
     final user = await ref.read(authRepositoryProvider).restoreSession();
     state = AuthState(
-      status: user != null
-          ? AuthStatus.authenticated
-          : AuthStatus.unauthenticated,
+      status:
+          user != null ? AuthStatus.authenticated : AuthStatus.unauthenticated,
       user: user,
     );
   }
@@ -75,9 +61,8 @@ class Auth extends _$Auth {
   Future<bool> signUp(String name, String email, String password) async {
     state = state.copyWith(status: AuthStatus.loading, error: null);
     try {
-      final user = await ref
-          .read(authRepositoryProvider)
-          .signUp(name, email, password);
+      final user =
+          await ref.read(authRepositoryProvider).signUp(name, email, password);
       if (user != null) {
         state = state.copyWith(status: AuthStatus.authenticated, user: user);
         return true;
