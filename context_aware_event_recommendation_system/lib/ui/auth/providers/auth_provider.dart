@@ -1,10 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:context_aware_event_recommendation_system/data/repositories/auth_repository.dart';
-import 'package:context_aware_event_recommendation_system/data/services/auth_service.dart';
+import 'package:context_aware_event_recommendation_system/di/providers.dart';
 import 'package:context_aware_event_recommendation_system/domain/models/user_model.dart';
 
-/// Auth state
+export 'package:context_aware_event_recommendation_system/di/providers.dart'
+    show sharedPreferencesProvider;
+
 enum AuthStatus { initial, authenticated, unauthenticated, loading }
 
 class AuthState {
@@ -36,7 +37,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   AuthNotifier(this._repository) : super(const AuthState());
 
-  /// Hydrate persisted session on app start.
   Future<void> restoreSession() async {
     final user = await _repository.restoreSession();
     state = AuthState(
@@ -100,24 +100,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
 }
-
-/// Providers
-
-/// Bootstrapped in `main.dart` via `ProviderScope.overrides`.
-final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
-  throw UnimplementedError(
-    'sharedPreferencesProvider must be overridden in ProviderScope',
-  );
-});
-
-final authServiceProvider = Provider((ref) => AuthService());
-
-final authRepositoryProvider = Provider<AuthRepository>((ref) {
-  return AuthRepository(
-    ref.watch(authServiceProvider),
-    ref.watch(sharedPreferencesProvider),
-  );
-});
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   return AuthNotifier(ref.watch(authRepositoryProvider));

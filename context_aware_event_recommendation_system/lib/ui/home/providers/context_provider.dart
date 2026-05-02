@@ -1,24 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:context_aware_event_recommendation_system/data/repositories/context_repository.dart';
 import 'package:context_aware_event_recommendation_system/data/repositories/suggestion_repository.dart';
-import 'package:context_aware_event_recommendation_system/data/services/context_service.dart';
+import 'package:context_aware_event_recommendation_system/di/providers.dart';
 import 'package:context_aware_event_recommendation_system/domain/models/suggestion_model.dart';
 import 'package:context_aware_event_recommendation_system/domain/models/persona_model.dart';
 import 'package:context_aware_event_recommendation_system/domain/models/context_state.dart';
-import 'package:context_aware_event_recommendation_system/ui/auth/providers/auth_provider.dart';
 
-final contextServiceProvider = Provider((ref) => ContextService());
-
-final contextRepositoryProvider = Provider<ContextRepository>((ref) {
-  return ContextRepository(ref.watch(contextServiceProvider));
-});
-
-final suggestionRepositoryProvider = Provider<SuggestionRepository>((ref) {
-  return SuggestionRepository(
-    ref.watch(contextServiceProvider),
-    ref.watch(sharedPreferencesProvider),
-  );
-});
+export 'package:context_aware_event_recommendation_system/di/providers.dart'
+    show contextRepositoryProvider, suggestionRepositoryProvider;
 
 /// Raw suggestions from the repository (TTL-cached, backed by ContextService).
 final suggestionProvider = FutureProvider<List<SuggestionModel>>((ref) async {
@@ -44,7 +32,6 @@ class DismissedSuggestionsNotifier extends AsyncNotifier<Set<String>> {
   Future<Set<String>> build() => _repo.getDismissedIds();
 
   Future<void> dismiss(String id) async {
-    // Optimistic update so the card disappears immediately.
     state = AsyncData({...state.valueOrNull ?? {}, id});
     await _repo.dismiss(id);
   }
