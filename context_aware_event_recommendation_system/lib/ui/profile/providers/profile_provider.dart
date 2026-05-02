@@ -1,6 +1,7 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-/// User-controlled tracking + privacy switches.
+part 'profile_provider.g.dart';
+
 class ProfileSettings {
   final bool locationTrackingEnabled;
   final bool activityRecognitionEnabled;
@@ -55,8 +56,10 @@ class ProfileState {
   }
 }
 
-class ProfileNotifier extends StateNotifier<ProfileState> {
-  ProfileNotifier() : super(const ProfileState());
+@Riverpod(keepAlive: true)
+class Profile extends _$Profile {
+  @override
+  ProfileState build() => const ProfileState();
 
   void toggleLocationTracking() {
     state = state.copyWith(
@@ -94,8 +97,3 @@ class ProfileNotifier extends StateNotifier<ProfileState> {
     state = state.copyWith(settings: settings);
   }
 }
-
-final profileProvider =
-    StateNotifierProvider<ProfileNotifier, ProfileState>((ref) {
-  return ProfileNotifier();
-});

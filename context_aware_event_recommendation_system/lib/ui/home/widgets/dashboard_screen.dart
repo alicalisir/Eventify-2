@@ -25,14 +25,14 @@ class DashboardScreen extends ConsumerWidget {
     ref.read(contextRepositoryProvider).invalidateContext();
     await ref.read(dismissedSuggestionsProvider.notifier).clear();
     ref.invalidate(suggestionProvider);
-    ref.invalidate(contextProvider);
+    ref.invalidate(ambientContextProvider);
     await ref.read(suggestionProvider.future);
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final visibleAsync = ref.watch(visibleSuggestionsProvider);
-    final contextAsync = ref.watch(contextProvider);
+    final contextAsync = ref.watch(ambientContextProvider);
     final user = ref.watch(authProvider).user;
 
     return Scaffold(

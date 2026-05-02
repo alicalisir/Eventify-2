@@ -1,10 +1,11 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:context_aware_event_recommendation_system/data/repositories/auth_repository.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:context_aware_event_recommendation_system/di/providers.dart';
 import 'package:context_aware_event_recommendation_system/domain/models/user_model.dart';
 
 export 'package:context_aware_event_recommendation_system/di/providers.dart'
     show sharedPreferencesProvider;
+
+part 'auth_provider.g.dart';
 
 enum AuthStatus { initial, authenticated, unauthenticated, loading }
 
@@ -32,13 +33,13 @@ class AuthState {
   }
 }
 
-class AuthNotifier extends StateNotifier<AuthState> {
-  final AuthRepository _repository;
-
-  AuthNotifier(this._repository) : super(const AuthState());
+@Riverpod(keepAlive: true)
+class Auth extends _$Auth {
+  @override
+  AuthState build() => const AuthState();
 
   Future<void> restoreSession() async {
-    final user = await _repository.restoreSession();
+    final user = await ref.read(authRepositoryProvider).restoreSession();
     state = AuthState(
       status: user != null
           ? AuthStatus.authenticated
@@ -50,7 +51,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<bool> signIn(String email, String password) async {
     state = state.copyWith(status: AuthStatus.loading, error: null);
     try {
-      final user = await _repository.signIn(email, password);
+      final user =
+          await ref.read(authRepositoryProvider).signIn(email, password);
       if (user != null) {
         state = state.copyWith(status: AuthStatus.authenticated, user: user);
         return true;
@@ -73,7 +75,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<bool> signUp(String name, String email, String password) async {
     state = state.copyWith(status: AuthStatus.loading, error: null);
     try {
-      final user = await _repository.signUp(name, email, password);
+      final user = await ref
+          .read(authRepositoryProvider)
+          .signUp(name, email, password);
       if (user != null) {
         state = state.copyWith(status: AuthStatus.authenticated, user: user);
         return true;
@@ -91,16 +95,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> completeOnboarding() async {
     final user = state.user;
     if (user == null) return;
-    final updated = await _repository.markOnboardingCompleted(user);
+    final updated =
+        await ref.read(authRepositoryProvider).markOnboardingCompleted(user);
     state = state.copyWith(user: updated);
   }
 
   Future<void> signOut() async {
-    await _repository.signOut();
+    await ref.read(authRepositoryProvider).signOut();
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
 }
-
-final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  return AuthNotifier(ref.watch(authRepositoryProvider));
-});

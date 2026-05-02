@@ -1,6 +1,7 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-/// Onboarding state
+part 'onboarding_provider.g.dart';
+
 class OnboardingState {
   final int currentPage;
   final bool locationGranted;
@@ -29,8 +30,10 @@ class OnboardingState {
   }
 }
 
-class OnboardingNotifier extends StateNotifier<OnboardingState> {
-  OnboardingNotifier() : super(const OnboardingState());
+@riverpod
+class Onboarding extends _$Onboarding {
+  @override
+  OnboardingState build() => const OnboardingState();
 
   void setPage(int page) {
     state = state.copyWith(currentPage: page);
@@ -48,8 +51,3 @@ class OnboardingNotifier extends StateNotifier<OnboardingState> {
     state = state.copyWith(isComplete: true);
   }
 }
-
-final onboardingProvider =
-    StateNotifierProvider<OnboardingNotifier, OnboardingState>((ref) {
-  return OnboardingNotifier();
-});

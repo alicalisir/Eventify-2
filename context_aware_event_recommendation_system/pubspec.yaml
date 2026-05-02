@@ -37,6 +37,7 @@ dependencies:
   
   # State management
   flutter_riverpod: ^2.6.1
+  riverpod_annotation: ^2.3.5
   
   # Routing
   go_router: ^15.1.2
@@ -61,6 +62,10 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  riverpod_generator: ^2.4.3
+  build_runner: ^2.4.13
+  custom_lint: ^0.7.5
+  riverpod_lint: ^2.3.13
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
