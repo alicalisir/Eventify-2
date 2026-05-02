@@ -119,9 +119,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     if (!mounted) return;
     if (granted == true) {
       if (slide.permission == _Permission.location) {
-        ref.read(onboardingProvider.notifier).grantLocation();
+        await ref.read(onboardingProvider.notifier).grantLocation();
       } else {
-        ref.read(onboardingProvider.notifier).grantNotifications();
+        await ref.read(onboardingProvider.notifier).grantNotifications();
       }
       // Small delay to let user see the granted state.
       await Future.delayed(const Duration(milliseconds: 350));

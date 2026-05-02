@@ -74,18 +74,31 @@ class ContextHeaderCard extends StatelessWidget {
                 spacing: AppSpacing.xs,
                 runSpacing: AppSpacing.xs,
                 children: [
-                  const _ContextChip(icon: Icons.place, label: 'Soho, NYC'),
-                  const _ContextChip(icon: Icons.wb_sunny, label: '21° Clear'),
+                  if (contextState.locationLabel != null)
+                    _ContextChip(
+                      icon: Icons.place,
+                      label: contextState.locationLabel!,
+                    )
+                  else if (contextState.isLocationEnabled)
+                    const _ContextChip(
+                      icon: Icons.place,
+                      label: 'Location active',
+                    ),
+                  if (contextState.weather != null)
+                    _ContextChip(
+                      icon: Icons.wb_sunny,
+                      label: contextState.weather!,
+                    ),
                   _ContextChip(
                     icon: Icons.sensors,
-                    label: 'Stationary',
+                    label: contextState.activityLabel,
                     pulse: isRefreshing,
                   ),
                 ],
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
-                'Updated just now • Synced from 4 signals',
+                _updatedLabel(contextState.lastUpdated),
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: Colors.white.withValues(alpha: 0.7),
                 ),
@@ -95,6 +108,16 @@ class ContextHeaderCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  static String _updatedLabel(DateTime? lastUpdated) {
+    if (lastUpdated == null) return 'Not yet updated';
+    final diff = DateTime.now().difference(lastUpdated);
+    if (diff.inSeconds < 60) return 'Updated just now';
+    if (diff.inMinutes < 60) return 'Updated ${diff.inMinutes}m ago';
+    final h = lastUpdated.hour.toString().padLeft(2, '0');
+    final m = lastUpdated.minute.toString().padLeft(2, '0');
+    return 'Updated at $h:$m';
   }
 }
 

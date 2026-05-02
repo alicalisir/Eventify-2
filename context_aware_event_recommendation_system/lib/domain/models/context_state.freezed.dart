@@ -14,7 +14,10 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$ContextState {
 
- String get greeting; String get contextDescription; bool get isLocationEnabled; bool get isNotificationsEnabled; DateTime? get lastUpdated;
+ String get greeting; String get contextDescription; bool get isLocationEnabled; bool get isNotificationsEnabled; DateTime? get lastUpdated;/// Human-readable address from reverse geocoding (e.g. "Soho, New York").
+ String? get locationLabel;/// Motion state derived from GPS speed (e.g. "Stationary", "Walking").
+ String get activityLabel;/// Optional weather summary from a future weather service (e.g. "21° Clear").
+ String? get weather;
 /// Create a copy of ContextState
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -25,16 +28,16 @@ $ContextStateCopyWith<ContextState> get copyWith => _$ContextStateCopyWithImpl<C
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is ContextState&&(identical(other.greeting, greeting) || other.greeting == greeting)&&(identical(other.contextDescription, contextDescription) || other.contextDescription == contextDescription)&&(identical(other.isLocationEnabled, isLocationEnabled) || other.isLocationEnabled == isLocationEnabled)&&(identical(other.isNotificationsEnabled, isNotificationsEnabled) || other.isNotificationsEnabled == isNotificationsEnabled)&&(identical(other.lastUpdated, lastUpdated) || other.lastUpdated == lastUpdated));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ContextState&&(identical(other.greeting, greeting) || other.greeting == greeting)&&(identical(other.contextDescription, contextDescription) || other.contextDescription == contextDescription)&&(identical(other.isLocationEnabled, isLocationEnabled) || other.isLocationEnabled == isLocationEnabled)&&(identical(other.isNotificationsEnabled, isNotificationsEnabled) || other.isNotificationsEnabled == isNotificationsEnabled)&&(identical(other.lastUpdated, lastUpdated) || other.lastUpdated == lastUpdated)&&(identical(other.locationLabel, locationLabel) || other.locationLabel == locationLabel)&&(identical(other.activityLabel, activityLabel) || other.activityLabel == activityLabel)&&(identical(other.weather, weather) || other.weather == weather));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,greeting,contextDescription,isLocationEnabled,isNotificationsEnabled,lastUpdated);
+int get hashCode => Object.hash(runtimeType,greeting,contextDescription,isLocationEnabled,isNotificationsEnabled,lastUpdated,locationLabel,activityLabel,weather);
 
 @override
 String toString() {
-  return 'ContextState(greeting: $greeting, contextDescription: $contextDescription, isLocationEnabled: $isLocationEnabled, isNotificationsEnabled: $isNotificationsEnabled, lastUpdated: $lastUpdated)';
+  return 'ContextState(greeting: $greeting, contextDescription: $contextDescription, isLocationEnabled: $isLocationEnabled, isNotificationsEnabled: $isNotificationsEnabled, lastUpdated: $lastUpdated, locationLabel: $locationLabel, activityLabel: $activityLabel, weather: $weather)';
 }
 
 
@@ -45,7 +48,7 @@ abstract mixin class $ContextStateCopyWith<$Res>  {
   factory $ContextStateCopyWith(ContextState value, $Res Function(ContextState) _then) = _$ContextStateCopyWithImpl;
 @useResult
 $Res call({
- String greeting, String contextDescription, bool isLocationEnabled, bool isNotificationsEnabled, DateTime? lastUpdated
+ String greeting, String contextDescription, bool isLocationEnabled, bool isNotificationsEnabled, DateTime? lastUpdated, String? locationLabel, String activityLabel, String? weather
 });
 
 
@@ -62,14 +65,17 @@ class _$ContextStateCopyWithImpl<$Res>
 
 /// Create a copy of ContextState
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? greeting = null,Object? contextDescription = null,Object? isLocationEnabled = null,Object? isNotificationsEnabled = null,Object? lastUpdated = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? greeting = null,Object? contextDescription = null,Object? isLocationEnabled = null,Object? isNotificationsEnabled = null,Object? lastUpdated = freezed,Object? locationLabel = freezed,Object? activityLabel = null,Object? weather = freezed,}) {
   return _then(_self.copyWith(
 greeting: null == greeting ? _self.greeting : greeting // ignore: cast_nullable_to_non_nullable
 as String,contextDescription: null == contextDescription ? _self.contextDescription : contextDescription // ignore: cast_nullable_to_non_nullable
 as String,isLocationEnabled: null == isLocationEnabled ? _self.isLocationEnabled : isLocationEnabled // ignore: cast_nullable_to_non_nullable
 as bool,isNotificationsEnabled: null == isNotificationsEnabled ? _self.isNotificationsEnabled : isNotificationsEnabled // ignore: cast_nullable_to_non_nullable
 as bool,lastUpdated: freezed == lastUpdated ? _self.lastUpdated : lastUpdated // ignore: cast_nullable_to_non_nullable
-as DateTime?,
+as DateTime?,locationLabel: freezed == locationLabel ? _self.locationLabel : locationLabel // ignore: cast_nullable_to_non_nullable
+as String?,activityLabel: null == activityLabel ? _self.activityLabel : activityLabel // ignore: cast_nullable_to_non_nullable
+as String,weather: freezed == weather ? _self.weather : weather // ignore: cast_nullable_to_non_nullable
+as String?,
   ));
 }
 
@@ -154,10 +160,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String greeting,  String contextDescription,  bool isLocationEnabled,  bool isNotificationsEnabled,  DateTime? lastUpdated)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String greeting,  String contextDescription,  bool isLocationEnabled,  bool isNotificationsEnabled,  DateTime? lastUpdated,  String? locationLabel,  String activityLabel,  String? weather)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _ContextState() when $default != null:
-return $default(_that.greeting,_that.contextDescription,_that.isLocationEnabled,_that.isNotificationsEnabled,_that.lastUpdated);case _:
+return $default(_that.greeting,_that.contextDescription,_that.isLocationEnabled,_that.isNotificationsEnabled,_that.lastUpdated,_that.locationLabel,_that.activityLabel,_that.weather);case _:
   return orElse();
 
 }
@@ -175,10 +181,10 @@ return $default(_that.greeting,_that.contextDescription,_that.isLocationEnabled,
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String greeting,  String contextDescription,  bool isLocationEnabled,  bool isNotificationsEnabled,  DateTime? lastUpdated)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String greeting,  String contextDescription,  bool isLocationEnabled,  bool isNotificationsEnabled,  DateTime? lastUpdated,  String? locationLabel,  String activityLabel,  String? weather)  $default,) {final _that = this;
 switch (_that) {
 case _ContextState():
-return $default(_that.greeting,_that.contextDescription,_that.isLocationEnabled,_that.isNotificationsEnabled,_that.lastUpdated);case _:
+return $default(_that.greeting,_that.contextDescription,_that.isLocationEnabled,_that.isNotificationsEnabled,_that.lastUpdated,_that.locationLabel,_that.activityLabel,_that.weather);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -195,10 +201,10 @@ return $default(_that.greeting,_that.contextDescription,_that.isLocationEnabled,
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String greeting,  String contextDescription,  bool isLocationEnabled,  bool isNotificationsEnabled,  DateTime? lastUpdated)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String greeting,  String contextDescription,  bool isLocationEnabled,  bool isNotificationsEnabled,  DateTime? lastUpdated,  String? locationLabel,  String activityLabel,  String? weather)?  $default,) {final _that = this;
 switch (_that) {
 case _ContextState() when $default != null:
-return $default(_that.greeting,_that.contextDescription,_that.isLocationEnabled,_that.isNotificationsEnabled,_that.lastUpdated);case _:
+return $default(_that.greeting,_that.contextDescription,_that.isLocationEnabled,_that.isNotificationsEnabled,_that.lastUpdated,_that.locationLabel,_that.activityLabel,_that.weather);case _:
   return null;
 
 }
@@ -210,7 +216,7 @@ return $default(_that.greeting,_that.contextDescription,_that.isLocationEnabled,
 
 
 class _ContextState extends ContextState {
-  const _ContextState({required this.greeting, required this.contextDescription, this.isLocationEnabled = false, this.isNotificationsEnabled = false, this.lastUpdated}): super._();
+  const _ContextState({required this.greeting, required this.contextDescription, this.isLocationEnabled = false, this.isNotificationsEnabled = false, this.lastUpdated, this.locationLabel, this.activityLabel = 'Stationary', this.weather}): super._();
   
 
 @override final  String greeting;
@@ -218,6 +224,12 @@ class _ContextState extends ContextState {
 @override@JsonKey() final  bool isLocationEnabled;
 @override@JsonKey() final  bool isNotificationsEnabled;
 @override final  DateTime? lastUpdated;
+/// Human-readable address from reverse geocoding (e.g. "Soho, New York").
+@override final  String? locationLabel;
+/// Motion state derived from GPS speed (e.g. "Stationary", "Walking").
+@override@JsonKey() final  String activityLabel;
+/// Optional weather summary from a future weather service (e.g. "21° Clear").
+@override final  String? weather;
 
 /// Create a copy of ContextState
 /// with the given fields replaced by the non-null parameter values.
@@ -229,16 +241,16 @@ _$ContextStateCopyWith<_ContextState> get copyWith => __$ContextStateCopyWithImp
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ContextState&&(identical(other.greeting, greeting) || other.greeting == greeting)&&(identical(other.contextDescription, contextDescription) || other.contextDescription == contextDescription)&&(identical(other.isLocationEnabled, isLocationEnabled) || other.isLocationEnabled == isLocationEnabled)&&(identical(other.isNotificationsEnabled, isNotificationsEnabled) || other.isNotificationsEnabled == isNotificationsEnabled)&&(identical(other.lastUpdated, lastUpdated) || other.lastUpdated == lastUpdated));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ContextState&&(identical(other.greeting, greeting) || other.greeting == greeting)&&(identical(other.contextDescription, contextDescription) || other.contextDescription == contextDescription)&&(identical(other.isLocationEnabled, isLocationEnabled) || other.isLocationEnabled == isLocationEnabled)&&(identical(other.isNotificationsEnabled, isNotificationsEnabled) || other.isNotificationsEnabled == isNotificationsEnabled)&&(identical(other.lastUpdated, lastUpdated) || other.lastUpdated == lastUpdated)&&(identical(other.locationLabel, locationLabel) || other.locationLabel == locationLabel)&&(identical(other.activityLabel, activityLabel) || other.activityLabel == activityLabel)&&(identical(other.weather, weather) || other.weather == weather));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,greeting,contextDescription,isLocationEnabled,isNotificationsEnabled,lastUpdated);
+int get hashCode => Object.hash(runtimeType,greeting,contextDescription,isLocationEnabled,isNotificationsEnabled,lastUpdated,locationLabel,activityLabel,weather);
 
 @override
 String toString() {
-  return 'ContextState(greeting: $greeting, contextDescription: $contextDescription, isLocationEnabled: $isLocationEnabled, isNotificationsEnabled: $isNotificationsEnabled, lastUpdated: $lastUpdated)';
+  return 'ContextState(greeting: $greeting, contextDescription: $contextDescription, isLocationEnabled: $isLocationEnabled, isNotificationsEnabled: $isNotificationsEnabled, lastUpdated: $lastUpdated, locationLabel: $locationLabel, activityLabel: $activityLabel, weather: $weather)';
 }
 
 
@@ -249,7 +261,7 @@ abstract mixin class _$ContextStateCopyWith<$Res> implements $ContextStateCopyWi
   factory _$ContextStateCopyWith(_ContextState value, $Res Function(_ContextState) _then) = __$ContextStateCopyWithImpl;
 @override @useResult
 $Res call({
- String greeting, String contextDescription, bool isLocationEnabled, bool isNotificationsEnabled, DateTime? lastUpdated
+ String greeting, String contextDescription, bool isLocationEnabled, bool isNotificationsEnabled, DateTime? lastUpdated, String? locationLabel, String activityLabel, String? weather
 });
 
 
@@ -266,14 +278,17 @@ class __$ContextStateCopyWithImpl<$Res>
 
 /// Create a copy of ContextState
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? greeting = null,Object? contextDescription = null,Object? isLocationEnabled = null,Object? isNotificationsEnabled = null,Object? lastUpdated = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? greeting = null,Object? contextDescription = null,Object? isLocationEnabled = null,Object? isNotificationsEnabled = null,Object? lastUpdated = freezed,Object? locationLabel = freezed,Object? activityLabel = null,Object? weather = freezed,}) {
   return _then(_ContextState(
 greeting: null == greeting ? _self.greeting : greeting // ignore: cast_nullable_to_non_nullable
 as String,contextDescription: null == contextDescription ? _self.contextDescription : contextDescription // ignore: cast_nullable_to_non_nullable
 as String,isLocationEnabled: null == isLocationEnabled ? _self.isLocationEnabled : isLocationEnabled // ignore: cast_nullable_to_non_nullable
 as bool,isNotificationsEnabled: null == isNotificationsEnabled ? _self.isNotificationsEnabled : isNotificationsEnabled // ignore: cast_nullable_to_non_nullable
 as bool,lastUpdated: freezed == lastUpdated ? _self.lastUpdated : lastUpdated // ignore: cast_nullable_to_non_nullable
-as DateTime?,
+as DateTime?,locationLabel: freezed == locationLabel ? _self.locationLabel : locationLabel // ignore: cast_nullable_to_non_nullable
+as String?,activityLabel: null == activityLabel ? _self.activityLabel : activityLabel // ignore: cast_nullable_to_non_nullable
+as String,weather: freezed == weather ? _self.weather : weather // ignore: cast_nullable_to_non_nullable
+as String?,
   ));
 }
 

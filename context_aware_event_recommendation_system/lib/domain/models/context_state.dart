@@ -14,6 +14,12 @@ abstract class ContextState with _$ContextState {
     @Default(false) bool isLocationEnabled,
     @Default(false) bool isNotificationsEnabled,
     DateTime? lastUpdated,
+    /// Human-readable address from reverse geocoding (e.g. "Soho, New York").
+    String? locationLabel,
+    /// Motion state derived from GPS speed (e.g. "Stationary", "Walking").
+    @Default('Stationary') String activityLabel,
+    /// Optional weather summary from a future weather service (e.g. "21° Clear").
+    String? weather,
   }) = _ContextState;
 
   static ContextState initial() {

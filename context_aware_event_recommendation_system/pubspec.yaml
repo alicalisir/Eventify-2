@@ -52,9 +52,14 @@ dependencies:
   # Local storage
   shared_preferences: ^2.3.5
 
+  # Location & permissions
+  geolocator: ^13.0.1
+  permission_handler: ^11.3.1
+
   # Immutable models
   freezed_annotation: ^3.0.0
   json_annotation: ^4.9.0
+  http: ^1.6.0
 
 dev_dependencies:
   flutter_test:
