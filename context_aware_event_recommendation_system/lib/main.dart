@@ -1,12 +1,28 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'config/app.dart';
 import 'ui/auth/providers/auth_provider.dart';
+import 'utils/app_logger.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  FlutterError.onError = (details) {
+    AppLogger.e(
+      '[Flutter] ${details.exceptionAsString()}',
+      details.exception,
+      details.stack,
+    );
+  };
+
+  PlatformDispatcher.instance.onError = (error, stack) {
+    AppLogger.e('[Dart] Uncaught error', error, stack);
+    return true;
+  };
 
   // Preload Google Fonts to avoid blocking the main thread
   try {

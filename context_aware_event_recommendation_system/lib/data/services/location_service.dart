@@ -1,8 +1,9 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
+
+import '../../utils/app_logger.dart';
 
 class LocationService {
   Future<bool> isLocationServiceEnabled() =>
@@ -59,8 +60,9 @@ class LocationService {
       if (city != null) return city;
       if (neighbourhood != null) return neighbourhood;
       return _coordLabel(lat, lon);
-    } catch (e) {
-      debugPrint('[LocationService] Geocoding error: $e');
+    } catch (e, s) {
+      AppLogger.w('[LocationService] Geocoding error', e);
+      AppLogger.d('[LocationService] Geocoding stack', s);
       return _coordLabel(lat, lon);
     }
   }

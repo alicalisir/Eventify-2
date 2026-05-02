@@ -47,9 +47,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (success) {
       context.goNamed('dashboard');
     } else {
+      final error = ref.read(authProvider).error;
       AppSnackbar.show(
         context,
-        message: AppStrings.invalidCredentials,
+        message: error?.userMessage ?? AppStrings.invalidCredentials,
         kind: SnackKind.error,
       );
     }

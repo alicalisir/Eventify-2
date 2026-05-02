@@ -14,7 +14,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$AuthState {
 
- AuthStatus get status; UserModel? get user; String? get error;
+ AuthStatus get status; UserModel? get user; AppError? get error;
 /// Create a copy of AuthState
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -45,7 +45,7 @@ abstract mixin class $AuthStateCopyWith<$Res>  {
   factory $AuthStateCopyWith(AuthState value, $Res Function(AuthState) _then) = _$AuthStateCopyWithImpl;
 @useResult
 $Res call({
- AuthStatus status, UserModel? user, String? error
+ AuthStatus status, UserModel? user, AppError? error
 });
 
 
@@ -67,7 +67,7 @@ class _$AuthStateCopyWithImpl<$Res>
 status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
 as AuthStatus,user: freezed == user ? _self.user : user // ignore: cast_nullable_to_non_nullable
 as UserModel?,error: freezed == error ? _self.error : error // ignore: cast_nullable_to_non_nullable
-as String?,
+as AppError?,
   ));
 }
 /// Create a copy of AuthState
@@ -164,7 +164,7 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( AuthStatus status,  UserModel? user,  String? error)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( AuthStatus status,  UserModel? user,  AppError? error)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _AuthState() when $default != null:
 return $default(_that.status,_that.user,_that.error);case _:
@@ -185,7 +185,7 @@ return $default(_that.status,_that.user,_that.error);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( AuthStatus status,  UserModel? user,  String? error)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( AuthStatus status,  UserModel? user,  AppError? error)  $default,) {final _that = this;
 switch (_that) {
 case _AuthState():
 return $default(_that.status,_that.user,_that.error);case _:
@@ -205,7 +205,7 @@ return $default(_that.status,_that.user,_that.error);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( AuthStatus status,  UserModel? user,  String? error)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( AuthStatus status,  UserModel? user,  AppError? error)?  $default,) {final _that = this;
 switch (_that) {
 case _AuthState() when $default != null:
 return $default(_that.status,_that.user,_that.error);case _:
@@ -225,7 +225,7 @@ class _AuthState implements AuthState {
 
 @override@JsonKey() final  AuthStatus status;
 @override final  UserModel? user;
-@override final  String? error;
+@override final  AppError? error;
 
 /// Create a copy of AuthState
 /// with the given fields replaced by the non-null parameter values.
@@ -257,7 +257,7 @@ abstract mixin class _$AuthStateCopyWith<$Res> implements $AuthStateCopyWith<$Re
   factory _$AuthStateCopyWith(_AuthState value, $Res Function(_AuthState) _then) = __$AuthStateCopyWithImpl;
 @override @useResult
 $Res call({
- AuthStatus status, UserModel? user, String? error
+ AuthStatus status, UserModel? user, AppError? error
 });
 
 
@@ -279,7 +279,7 @@ class __$AuthStateCopyWithImpl<$Res>
 status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
 as AuthStatus,user: freezed == user ? _self.user : user // ignore: cast_nullable_to_non_nullable
 as UserModel?,error: freezed == error ? _self.error : error // ignore: cast_nullable_to_non_nullable
-as String?,
+as AppError?,
   ));
 }
 

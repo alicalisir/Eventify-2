@@ -1,8 +1,8 @@
-import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../domain/models/context_state.dart';
 import '../../domain/models/persona_model.dart';
+import '../../utils/app_logger.dart';
 import '../services/context_service.dart';
 import 'location_repository.dart';
 
@@ -39,7 +39,7 @@ class ContextRepository {
 
     assert(() {
       if (position != null) {
-        debugPrint(
+        AppLogger.d(
           '[ContextRepository] GPS: ${position.latitude.toStringAsFixed(5)}, '
           '${position.longitude.toStringAsFixed(5)} | '
           'speed: ${position.speed.toStringAsFixed(1)} m/s | '
@@ -47,7 +47,7 @@ class ContextRepository {
           'address: $locationLabel',
         );
       } else {
-        debugPrint(
+        AppLogger.d(
           '[ContextRepository] GPS: no position '
           '(permission denied or service off)',
         );

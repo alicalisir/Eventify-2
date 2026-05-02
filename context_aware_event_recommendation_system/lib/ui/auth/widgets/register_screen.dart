@@ -97,9 +97,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     if (success) {
       context.goNamed('onboarding');
     } else {
+      final error = ref.read(authProvider).error;
       AppSnackbar.show(
         context,
-        message: 'Could not create account. Try again.',
+        message: error?.userMessage ?? AppStrings.somethingWentWrong,
         kind: SnackKind.error,
       );
     }

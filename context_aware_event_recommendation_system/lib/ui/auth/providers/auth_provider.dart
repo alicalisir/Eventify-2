@@ -1,7 +1,11 @@
+import 'dart:io';
+
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:context_aware_event_recommendation_system/di/providers.dart';
 import 'package:context_aware_event_recommendation_system/domain/models/user_model.dart';
+import 'package:context_aware_event_recommendation_system/domain/models/app_error.dart';
+import 'package:context_aware_event_recommendation_system/utils/app_logger.dart';
 
 export 'package:context_aware_event_recommendation_system/di/providers.dart'
     show sharedPreferencesProvider;
@@ -16,7 +20,7 @@ abstract class AuthState with _$AuthState {
   const factory AuthState({
     @Default(AuthStatus.initial) AuthStatus status,
     UserModel? user,
-    String? error,
+    AppError? error,
   }) = _AuthState;
 }
 
@@ -42,18 +46,16 @@ class Auth extends _$Auth {
       if (user != null) {
         state = state.copyWith(status: AuthStatus.authenticated, user: user);
         return true;
-      } else {
-        state = state.copyWith(
-          status: AuthStatus.unauthenticated,
-          error: 'Invalid credentials. Please try again.',
-        );
-        return false;
       }
-    } catch (e) {
       state = state.copyWith(
         status: AuthStatus.unauthenticated,
-        error: e.toString(),
+        error: const AuthError(),
       );
+      return false;
+    } catch (e, s) {
+      final err = _classify(e);
+      AppLogger.e('[Auth] signIn failed', e, s);
+      state = state.copyWith(status: AuthStatus.unauthenticated, error: err);
       return false;
     }
   }
@@ -67,12 +69,15 @@ class Auth extends _$Auth {
         state = state.copyWith(status: AuthStatus.authenticated, user: user);
         return true;
       }
-      return false;
-    } catch (e) {
       state = state.copyWith(
         status: AuthStatus.unauthenticated,
-        error: e.toString(),
+        error: const UnknownError(),
       );
+      return false;
+    } catch (e, s) {
+      final err = _classify(e);
+      AppLogger.e('[Auth] signUp failed', e, s);
+      state = state.copyWith(status: AuthStatus.unauthenticated, error: err);
       return false;
     }
   }
@@ -88,5 +93,17 @@ class Auth extends _$Auth {
   Future<void> signOut() async {
     await ref.read(authRepositoryProvider).signOut();
     state = const AuthState(status: AuthStatus.unauthenticated);
+  }
+
+  static AppError _classify(Object e) {
+    if (e is SocketException || e is HttpException) return const NetworkError();
+    final msg = e.toString().toLowerCase();
+    if (msg.contains('socket') ||
+        msg.contains('network') ||
+        msg.contains('timeout') ||
+        msg.contains('connection')) {
+      return const NetworkError();
+    }
+    return const UnknownError();
   }
 }
