@@ -25,9 +25,7 @@ class PersonaChip extends StatelessWidget {
             colors: [AppColors.primary50, AppColors.accent50],
           ),
           borderRadius: BorderRadius.circular(AppSpacing.pill),
-          border: Border.all(
-            color: AppColors.primary.withValues(alpha: 0.20),
-          ),
+          border: Border.all(color: AppColors.selectedChipBorder),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,

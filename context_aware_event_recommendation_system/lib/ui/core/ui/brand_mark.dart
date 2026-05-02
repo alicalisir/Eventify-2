@@ -38,7 +38,7 @@ class BrandMark extends StatelessWidget {
               borderRadius: BorderRadius.circular(tileSize * 0.32),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.35),
+                  color: AppColors.brandLogoHalo,
                   blurRadius: 20,
                   offset: const Offset(0, 6),
                 ),

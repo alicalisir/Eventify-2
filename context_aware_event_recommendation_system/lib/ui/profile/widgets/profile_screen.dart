@@ -68,7 +68,7 @@ class ProfileScreen extends ConsumerWidget {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.30),
+                        color: AppColors.brandCardShadow,
                         blurRadius: 20,
                         offset: const Offset(0, 6),
                       ),
@@ -106,7 +106,7 @@ class ProfileScreen extends ConsumerWidget {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.success50,
+                          color: AppColors.permissionGrantedBackground,
                           borderRadius: BorderRadius.circular(AppSpacing.pill),
                         ),
                         child: Row(
@@ -398,7 +398,7 @@ class _SwitchRow extends StatelessWidget {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: value ? AppColors.primary50 : theme.scaffoldBackgroundColor,
+                color: value ? AppColors.activeItemBackground : theme.scaffoldBackgroundColor,
                 borderRadius: BorderRadius.circular(AppSpacing.borderRadius),
               ),
               child: Icon(

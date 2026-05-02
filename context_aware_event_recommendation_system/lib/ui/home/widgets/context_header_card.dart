@@ -30,7 +30,7 @@ class ContextHeaderCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppSpacing.borderRadiusLg),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.25),
+            color: AppColors.brandCardShadow,
             blurRadius: 30,
             offset: const Offset(0, 12),
           ),

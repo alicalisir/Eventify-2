@@ -49,6 +49,38 @@ abstract final class AppColors {
   /// Brand gradient stops (used by ContextHeader, BrandMark, etc.)
   static const List<Color> brandGradient = [primary, accent];
 
+  // ─── Semantic Tokens ────────────────────────────────────────────────────────
+  // Named aliases that describe *intent*. Widgets reference these; primitives
+  // stay in the brand layer above.
+
+  // Active / Selected States
+  /// Background for an active navigation row or an enabled toggle icon.
+  static const Color activeItemBackground = primary50;
+  /// Border ring on a selected persona chip.
+  static final Color selectedChipBorder = primary.withValues(alpha: 0.20);
+
+  // Brand Shadows & Glows
+  /// Drop shadow beneath gradient hero surfaces (header card, avatar).
+  static final Color brandCardShadow = primary.withValues(alpha: 0.25);
+  /// Close shadow under a primary filled button (brand glow, near layer).
+  static final Color buttonGlowNear = primary.withValues(alpha: 0.30);
+  /// Diffuse ambient shadow under a primary filled button (far layer).
+  static final Color buttonGlowFar = primary.withValues(alpha: 0.18);
+  /// Ambient halo beneath the brand logo tile.
+  static final Color brandLogoHalo = primary.withValues(alpha: 0.35);
+
+  // Intelligence Surface (AI rationale)
+  /// Background for the AI rationale band inside recommendation cards.
+  static const Color intelligenceBand = accent50;
+  /// Border for priority (featured) recommendation cards.
+  static final Color featuredCardBorder = accent.withValues(alpha: 0.25);
+  /// Drop shadow for priority (featured) recommendation cards.
+  static final Color featuredCardShadow = accent.withValues(alpha: 0.12);
+
+  // Permission & Status Badges
+  /// Background for inline "active" or "permission granted" status badges.
+  static const Color permissionGrantedBackground = success50;
+
   static ColorScheme get lightColorScheme => const ColorScheme(
         brightness: Brightness.light,
         primary: primary,

@@ -156,7 +156,7 @@ class _DrawerItem extends StatelessWidget {
       child: Container(
         height: AppSpacing.minTouchTarget,
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-        color: active ? AppColors.primary50 : Colors.transparent,
+        color: active ? AppColors.activeItemBackground : Colors.transparent,
         child: Row(
           children: [
             Icon(icon, size: 20, color: fg),

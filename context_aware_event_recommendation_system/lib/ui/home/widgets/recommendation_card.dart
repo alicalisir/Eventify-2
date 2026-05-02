@@ -38,14 +38,12 @@ class RecommendationCard extends StatelessWidget {
           color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(AppSpacing.borderRadiusLg),
           border: Border.all(
-            color: priority
-                ? AppColors.accent.withValues(alpha: 0.25)
-                : divider,
+            color: priority ? AppColors.featuredCardBorder : divider,
           ),
           boxShadow: priority
               ? [
                   BoxShadow(
-                    color: AppColors.accent.withValues(alpha: 0.12),
+                    color: AppColors.featuredCardShadow,
                     blurRadius: 28,
                     offset: const Offset(0, 12),
                   ),
@@ -138,7 +136,7 @@ class RecommendationCard extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(AppSpacing.sm),
                       decoration: BoxDecoration(
-                        color: AppColors.accent50,
+                        color: AppColors.intelligenceBand,
                         borderRadius: BorderRadius.circular(
                             AppSpacing.borderRadiusSm),
                         border: Border(
