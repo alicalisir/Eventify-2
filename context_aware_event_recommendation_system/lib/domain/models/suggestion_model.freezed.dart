@@ -15,12 +15,12 @@ T _$identity<T>(T value) => value;
 mixin _$SuggestionModel {
 
  String get id; String get title; String get description;/// Why the AI surfaced this — visible inside cards and detail view.
- String get rationale; String get category;/// Distance in km, null if not location-bound.
+ String get rationale;/// Category string is the single source of truth for icon and hue.
+/// Use [SuggestionCategoryX] extension to derive display values.
+ String get category;/// Distance in km, null if not location-bound.
  double? get distance;/// Estimated minutes for the activity.
  int? get estimatedMinutes; String? get address; double? get latitude; double? get longitude; List<String> get tags;/// Optional context-weather summary (e.g. "21° • Clear").
- String? get weather;/// Material icon used in the card hero + detail meta.
- IconData get icon;/// Hue (0–360) used to colour the card hero gradient.
- double get hue; DateTime get createdAt;
+ String? get weather; DateTime get createdAt;
 /// Create a copy of SuggestionModel
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -31,16 +31,16 @@ $SuggestionModelCopyWith<SuggestionModel> get copyWith => _$SuggestionModelCopyW
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is SuggestionModel&&(identical(other.id, id) || other.id == id)&&(identical(other.title, title) || other.title == title)&&(identical(other.description, description) || other.description == description)&&(identical(other.rationale, rationale) || other.rationale == rationale)&&(identical(other.category, category) || other.category == category)&&(identical(other.distance, distance) || other.distance == distance)&&(identical(other.estimatedMinutes, estimatedMinutes) || other.estimatedMinutes == estimatedMinutes)&&(identical(other.address, address) || other.address == address)&&(identical(other.latitude, latitude) || other.latitude == latitude)&&(identical(other.longitude, longitude) || other.longitude == longitude)&&const DeepCollectionEquality().equals(other.tags, tags)&&(identical(other.weather, weather) || other.weather == weather)&&(identical(other.icon, icon) || other.icon == icon)&&(identical(other.hue, hue) || other.hue == hue)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is SuggestionModel&&(identical(other.id, id) || other.id == id)&&(identical(other.title, title) || other.title == title)&&(identical(other.description, description) || other.description == description)&&(identical(other.rationale, rationale) || other.rationale == rationale)&&(identical(other.category, category) || other.category == category)&&(identical(other.distance, distance) || other.distance == distance)&&(identical(other.estimatedMinutes, estimatedMinutes) || other.estimatedMinutes == estimatedMinutes)&&(identical(other.address, address) || other.address == address)&&(identical(other.latitude, latitude) || other.latitude == latitude)&&(identical(other.longitude, longitude) || other.longitude == longitude)&&const DeepCollectionEquality().equals(other.tags, tags)&&(identical(other.weather, weather) || other.weather == weather)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,id,title,description,rationale,category,distance,estimatedMinutes,address,latitude,longitude,const DeepCollectionEquality().hash(tags),weather,icon,hue,createdAt);
+int get hashCode => Object.hash(runtimeType,id,title,description,rationale,category,distance,estimatedMinutes,address,latitude,longitude,const DeepCollectionEquality().hash(tags),weather,createdAt);
 
 @override
 String toString() {
-  return 'SuggestionModel(id: $id, title: $title, description: $description, rationale: $rationale, category: $category, distance: $distance, estimatedMinutes: $estimatedMinutes, address: $address, latitude: $latitude, longitude: $longitude, tags: $tags, weather: $weather, icon: $icon, hue: $hue, createdAt: $createdAt)';
+  return 'SuggestionModel(id: $id, title: $title, description: $description, rationale: $rationale, category: $category, distance: $distance, estimatedMinutes: $estimatedMinutes, address: $address, latitude: $latitude, longitude: $longitude, tags: $tags, weather: $weather, createdAt: $createdAt)';
 }
 
 
@@ -51,7 +51,7 @@ abstract mixin class $SuggestionModelCopyWith<$Res>  {
   factory $SuggestionModelCopyWith(SuggestionModel value, $Res Function(SuggestionModel) _then) = _$SuggestionModelCopyWithImpl;
 @useResult
 $Res call({
- String id, String title, String description, String rationale, String category, double? distance, int? estimatedMinutes, String? address, double? latitude, double? longitude, List<String> tags, String? weather, IconData icon, double hue, DateTime createdAt
+ String id, String title, String description, String rationale, String category, double? distance, int? estimatedMinutes, String? address, double? latitude, double? longitude, List<String> tags, String? weather, DateTime createdAt
 });
 
 
@@ -68,7 +68,7 @@ class _$SuggestionModelCopyWithImpl<$Res>
 
 /// Create a copy of SuggestionModel
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? title = null,Object? description = null,Object? rationale = null,Object? category = null,Object? distance = freezed,Object? estimatedMinutes = freezed,Object? address = freezed,Object? latitude = freezed,Object? longitude = freezed,Object? tags = null,Object? weather = freezed,Object? icon = null,Object? hue = null,Object? createdAt = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? title = null,Object? description = null,Object? rationale = null,Object? category = null,Object? distance = freezed,Object? estimatedMinutes = freezed,Object? address = freezed,Object? latitude = freezed,Object? longitude = freezed,Object? tags = null,Object? weather = freezed,Object? createdAt = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
@@ -82,9 +82,7 @@ as String?,latitude: freezed == latitude ? _self.latitude : latitude // ignore: 
 as double?,longitude: freezed == longitude ? _self.longitude : longitude // ignore: cast_nullable_to_non_nullable
 as double?,tags: null == tags ? _self.tags : tags // ignore: cast_nullable_to_non_nullable
 as List<String>,weather: freezed == weather ? _self.weather : weather // ignore: cast_nullable_to_non_nullable
-as String?,icon: null == icon ? _self.icon : icon // ignore: cast_nullable_to_non_nullable
-as IconData,hue: null == hue ? _self.hue : hue // ignore: cast_nullable_to_non_nullable
-as double,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
+as String?,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
 as DateTime,
   ));
 }
@@ -170,10 +168,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String title,  String description,  String rationale,  String category,  double? distance,  int? estimatedMinutes,  String? address,  double? latitude,  double? longitude,  List<String> tags,  String? weather,  IconData icon,  double hue,  DateTime createdAt)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String title,  String description,  String rationale,  String category,  double? distance,  int? estimatedMinutes,  String? address,  double? latitude,  double? longitude,  List<String> tags,  String? weather,  DateTime createdAt)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _SuggestionModel() when $default != null:
-return $default(_that.id,_that.title,_that.description,_that.rationale,_that.category,_that.distance,_that.estimatedMinutes,_that.address,_that.latitude,_that.longitude,_that.tags,_that.weather,_that.icon,_that.hue,_that.createdAt);case _:
+return $default(_that.id,_that.title,_that.description,_that.rationale,_that.category,_that.distance,_that.estimatedMinutes,_that.address,_that.latitude,_that.longitude,_that.tags,_that.weather,_that.createdAt);case _:
   return orElse();
 
 }
@@ -191,10 +189,10 @@ return $default(_that.id,_that.title,_that.description,_that.rationale,_that.cat
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String title,  String description,  String rationale,  String category,  double? distance,  int? estimatedMinutes,  String? address,  double? latitude,  double? longitude,  List<String> tags,  String? weather,  IconData icon,  double hue,  DateTime createdAt)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String title,  String description,  String rationale,  String category,  double? distance,  int? estimatedMinutes,  String? address,  double? latitude,  double? longitude,  List<String> tags,  String? weather,  DateTime createdAt)  $default,) {final _that = this;
 switch (_that) {
 case _SuggestionModel():
-return $default(_that.id,_that.title,_that.description,_that.rationale,_that.category,_that.distance,_that.estimatedMinutes,_that.address,_that.latitude,_that.longitude,_that.tags,_that.weather,_that.icon,_that.hue,_that.createdAt);case _:
+return $default(_that.id,_that.title,_that.description,_that.rationale,_that.category,_that.distance,_that.estimatedMinutes,_that.address,_that.latitude,_that.longitude,_that.tags,_that.weather,_that.createdAt);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -211,10 +209,10 @@ return $default(_that.id,_that.title,_that.description,_that.rationale,_that.cat
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String title,  String description,  String rationale,  String category,  double? distance,  int? estimatedMinutes,  String? address,  double? latitude,  double? longitude,  List<String> tags,  String? weather,  IconData icon,  double hue,  DateTime createdAt)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String title,  String description,  String rationale,  String category,  double? distance,  int? estimatedMinutes,  String? address,  double? latitude,  double? longitude,  List<String> tags,  String? weather,  DateTime createdAt)?  $default,) {final _that = this;
 switch (_that) {
 case _SuggestionModel() when $default != null:
-return $default(_that.id,_that.title,_that.description,_that.rationale,_that.category,_that.distance,_that.estimatedMinutes,_that.address,_that.latitude,_that.longitude,_that.tags,_that.weather,_that.icon,_that.hue,_that.createdAt);case _:
+return $default(_that.id,_that.title,_that.description,_that.rationale,_that.category,_that.distance,_that.estimatedMinutes,_that.address,_that.latitude,_that.longitude,_that.tags,_that.weather,_that.createdAt);case _:
   return null;
 
 }
@@ -226,7 +224,7 @@ return $default(_that.id,_that.title,_that.description,_that.rationale,_that.cat
 
 
 class _SuggestionModel implements SuggestionModel {
-  const _SuggestionModel({required this.id, required this.title, required this.description, required this.rationale, required this.category, this.distance, this.estimatedMinutes, this.address, this.latitude, this.longitude, final  List<String> tags = const <String>[], this.weather, this.icon = Icons.auto_awesome, this.hue = 250.0, required this.createdAt}): _tags = tags;
+  const _SuggestionModel({required this.id, required this.title, required this.description, required this.rationale, required this.category, this.distance, this.estimatedMinutes, this.address, this.latitude, this.longitude, final  List<String> tags = const <String>[], this.weather, required this.createdAt}): _tags = tags;
   
 
 @override final  String id;
@@ -234,6 +232,8 @@ class _SuggestionModel implements SuggestionModel {
 @override final  String description;
 /// Why the AI surfaced this — visible inside cards and detail view.
 @override final  String rationale;
+/// Category string is the single source of truth for icon and hue.
+/// Use [SuggestionCategoryX] extension to derive display values.
 @override final  String category;
 /// Distance in km, null if not location-bound.
 @override final  double? distance;
@@ -251,10 +251,6 @@ class _SuggestionModel implements SuggestionModel {
 
 /// Optional context-weather summary (e.g. "21° • Clear").
 @override final  String? weather;
-/// Material icon used in the card hero + detail meta.
-@override@JsonKey() final  IconData icon;
-/// Hue (0–360) used to colour the card hero gradient.
-@override@JsonKey() final  double hue;
 @override final  DateTime createdAt;
 
 /// Create a copy of SuggestionModel
@@ -267,16 +263,16 @@ _$SuggestionModelCopyWith<_SuggestionModel> get copyWith => __$SuggestionModelCo
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _SuggestionModel&&(identical(other.id, id) || other.id == id)&&(identical(other.title, title) || other.title == title)&&(identical(other.description, description) || other.description == description)&&(identical(other.rationale, rationale) || other.rationale == rationale)&&(identical(other.category, category) || other.category == category)&&(identical(other.distance, distance) || other.distance == distance)&&(identical(other.estimatedMinutes, estimatedMinutes) || other.estimatedMinutes == estimatedMinutes)&&(identical(other.address, address) || other.address == address)&&(identical(other.latitude, latitude) || other.latitude == latitude)&&(identical(other.longitude, longitude) || other.longitude == longitude)&&const DeepCollectionEquality().equals(other._tags, _tags)&&(identical(other.weather, weather) || other.weather == weather)&&(identical(other.icon, icon) || other.icon == icon)&&(identical(other.hue, hue) || other.hue == hue)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _SuggestionModel&&(identical(other.id, id) || other.id == id)&&(identical(other.title, title) || other.title == title)&&(identical(other.description, description) || other.description == description)&&(identical(other.rationale, rationale) || other.rationale == rationale)&&(identical(other.category, category) || other.category == category)&&(identical(other.distance, distance) || other.distance == distance)&&(identical(other.estimatedMinutes, estimatedMinutes) || other.estimatedMinutes == estimatedMinutes)&&(identical(other.address, address) || other.address == address)&&(identical(other.latitude, latitude) || other.latitude == latitude)&&(identical(other.longitude, longitude) || other.longitude == longitude)&&const DeepCollectionEquality().equals(other._tags, _tags)&&(identical(other.weather, weather) || other.weather == weather)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,id,title,description,rationale,category,distance,estimatedMinutes,address,latitude,longitude,const DeepCollectionEquality().hash(_tags),weather,icon,hue,createdAt);
+int get hashCode => Object.hash(runtimeType,id,title,description,rationale,category,distance,estimatedMinutes,address,latitude,longitude,const DeepCollectionEquality().hash(_tags),weather,createdAt);
 
 @override
 String toString() {
-  return 'SuggestionModel(id: $id, title: $title, description: $description, rationale: $rationale, category: $category, distance: $distance, estimatedMinutes: $estimatedMinutes, address: $address, latitude: $latitude, longitude: $longitude, tags: $tags, weather: $weather, icon: $icon, hue: $hue, createdAt: $createdAt)';
+  return 'SuggestionModel(id: $id, title: $title, description: $description, rationale: $rationale, category: $category, distance: $distance, estimatedMinutes: $estimatedMinutes, address: $address, latitude: $latitude, longitude: $longitude, tags: $tags, weather: $weather, createdAt: $createdAt)';
 }
 
 
@@ -287,7 +283,7 @@ abstract mixin class _$SuggestionModelCopyWith<$Res> implements $SuggestionModel
   factory _$SuggestionModelCopyWith(_SuggestionModel value, $Res Function(_SuggestionModel) _then) = __$SuggestionModelCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String title, String description, String rationale, String category, double? distance, int? estimatedMinutes, String? address, double? latitude, double? longitude, List<String> tags, String? weather, IconData icon, double hue, DateTime createdAt
+ String id, String title, String description, String rationale, String category, double? distance, int? estimatedMinutes, String? address, double? latitude, double? longitude, List<String> tags, String? weather, DateTime createdAt
 });
 
 
@@ -304,7 +300,7 @@ class __$SuggestionModelCopyWithImpl<$Res>
 
 /// Create a copy of SuggestionModel
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? title = null,Object? description = null,Object? rationale = null,Object? category = null,Object? distance = freezed,Object? estimatedMinutes = freezed,Object? address = freezed,Object? latitude = freezed,Object? longitude = freezed,Object? tags = null,Object? weather = freezed,Object? icon = null,Object? hue = null,Object? createdAt = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? title = null,Object? description = null,Object? rationale = null,Object? category = null,Object? distance = freezed,Object? estimatedMinutes = freezed,Object? address = freezed,Object? latitude = freezed,Object? longitude = freezed,Object? tags = null,Object? weather = freezed,Object? createdAt = null,}) {
   return _then(_SuggestionModel(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
@@ -318,9 +314,7 @@ as String?,latitude: freezed == latitude ? _self.latitude : latitude // ignore: 
 as double?,longitude: freezed == longitude ? _self.longitude : longitude // ignore: cast_nullable_to_non_nullable
 as double?,tags: null == tags ? _self._tags : tags // ignore: cast_nullable_to_non_nullable
 as List<String>,weather: freezed == weather ? _self.weather : weather // ignore: cast_nullable_to_non_nullable
-as String?,icon: null == icon ? _self.icon : icon // ignore: cast_nullable_to_non_nullable
-as IconData,hue: null == hue ? _self.hue : hue // ignore: cast_nullable_to_non_nullable
-as double,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
+as String?,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
 as DateTime,
   ));
 }

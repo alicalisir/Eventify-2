@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../config/constants/app_colors.dart';
 import '../../../config/constants/app_spacing.dart';
+import '../../../domain/models/suggestion_category.dart';
 import '../../../domain/models/suggestion_model.dart';
 import '../../core/ui/app_pressable.dart';
 import '../../core/ui/tag.dart';
@@ -23,14 +24,11 @@ class RecommendationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final divider = theme.dividerColor;
-    final base =
-        HSLColor.fromAHSL(1, suggestion.hue, 0.55, 0.85).toColor();
-    final accent =
-        HSLColor.fromAHSL(1, suggestion.hue + 25, 0.55, 0.78).toColor();
-    final iconTint =
-        HSLColor.fromAHSL(1, suggestion.hue, 0.55, 0.50).toColor();
-    final categoryTint =
-        HSLColor.fromAHSL(1, suggestion.hue, 0.65, 0.45).toColor();
+    final hue = suggestion.category.categoryHue;
+    final base = HSLColor.fromAHSL(1, hue, 0.55, 0.85).toColor();
+    final accent = HSLColor.fromAHSL(1, hue + 25, 0.55, 0.78).toColor();
+    final iconTint = HSLColor.fromAHSL(1, hue, 0.55, 0.50).toColor();
+    final categoryTint = HSLColor.fromAHSL(1, hue, 0.65, 0.45).toColor();
 
     return AppPressable(
       semanticLabel: 'Open suggestion: ${suggestion.title}',
@@ -113,7 +111,7 @@ class RecommendationCard extends StatelessWidget {
                           ),
                         ],
                       ),
-                      child: Icon(suggestion.icon, size: 28, color: iconTint),
+                      child: Icon(suggestion.category.categoryIcon, size: 28, color: iconTint),
                     ),
                   ],
                 ),

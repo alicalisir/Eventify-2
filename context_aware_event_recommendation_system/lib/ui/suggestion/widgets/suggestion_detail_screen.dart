@@ -9,6 +9,7 @@ import '../../core/ui/app_button.dart';
 import '../../core/ui/app_pressable.dart';
 import '../../core/ui/app_snackbar.dart';
 import '../../core/ui/error_state_widget.dart';
+import '../../../domain/models/suggestion_category.dart';
 import '../../home/providers/context_provider.dart';
 import 'map_hero.dart';
 import 'meta_tile.dart';
@@ -154,7 +155,7 @@ class _SuggestionDetailScreenState
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(suggestion.icon,
+                              Icon(suggestion.category.categoryIcon,
                                   size: 14, color: AppColors.primary),
                               const SizedBox(width: 6),
                               Text(

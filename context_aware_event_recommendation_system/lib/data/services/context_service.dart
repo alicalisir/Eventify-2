@@ -28,8 +28,6 @@ class ContextService {
         longitude: -73.9654,
         tags: const ['Outdoors', 'Low effort', '7,500 steps today'],
         weather: '21° • Clear',
-        icon: Icons.directions_walk_outlined,
-        hue: 150,
         createdAt: now,
       ),
       SuggestionModel(
@@ -47,8 +45,6 @@ class ContextService {
         longitude: -74.0021,
         tags: const ['Quiet', '\$', 'Solo time'],
         weather: '21° • Clear',
-        icon: Icons.local_cafe_outlined,
-        hue: 30,
         createdAt: now,
       ),
       SuggestionModel(
@@ -62,8 +58,6 @@ class ContextService {
         estimatedMinutes: 22,
         address: 'Audiobook • Resume from 00:12:34',
         tags: const ['Audio', 'Resume', 'Commute-friendly'],
-        icon: Icons.menu_book_outlined,
-        hue: 270,
         createdAt: now,
       ),
     ];

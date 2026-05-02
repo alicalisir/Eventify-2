@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../config/constants/app_colors.dart';
 import '../../../config/constants/app_spacing.dart';
+import '../../../domain/models/suggestion_category.dart';
 import '../../../domain/models/suggestion_model.dart';
 
 /// Faux map hero — gradient backdrop, grid lines, dashed route, two pins,
@@ -39,8 +40,9 @@ class _MapHeroState extends State<MapHero>
   Widget build(BuildContext context) {
     final s = widget.suggestion;
     final theme = Theme.of(context);
-    final base = HSLColor.fromAHSL(1, s.hue, 0.50, 0.85).toColor();
-    final deep = HSLColor.fromAHSL(1, s.hue + 20, 0.60, 0.72).toColor();
+    final hue = s.category.categoryHue;
+    final base = HSLColor.fromAHSL(1, hue, 0.50, 0.85).toColor();
+    final deep = HSLColor.fromAHSL(1, hue + 20, 0.60, 0.72).toColor();
 
     return SizedBox(
       height: widget.height,
@@ -78,7 +80,7 @@ class _MapHeroState extends State<MapHero>
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(s.icon, size: 14, color: theme.colorScheme.onSurface),
+                  Icon(s.category.categoryIcon, size: 14, color: theme.colorScheme.onSurface),
                   const SizedBox(width: 6),
                   Text(
                     s.distance != null
