@@ -271,7 +271,7 @@ class _StrengthMeter extends StatelessWidget {
               );
             }),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: AppSpacing.xxs),
           Text(
             label,
             style: Theme.of(context)
@@ -314,7 +314,7 @@ class _TermsCheckbox extends StatelessWidget {
                   color: value ? AppColors.primary : theme.dividerColor,
                   width: 1.5,
                 ),
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(AppSpacing.borderRadiusSm),
               ),
               child: value
                   ? const Icon(Icons.check, size: 14, color: Colors.white)

@@ -143,7 +143,7 @@ abstract final class AppTheme {
         ),
         side: BorderSide(color: divider),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: BorderRadius.circular(AppSpacing.pill),
         ),
       ),
       dividerTheme: DividerThemeData(

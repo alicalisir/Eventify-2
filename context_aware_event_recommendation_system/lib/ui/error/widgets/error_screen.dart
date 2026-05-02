@@ -145,7 +145,7 @@ class _IllustrationTile extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: [base, accent],
         ),
-        borderRadius: BorderRadius.circular(40),
+        borderRadius: BorderRadius.circular(AppSpacing.xl),
       ),
       alignment: Alignment.center,
       child: Container(
@@ -153,7 +153,7 @@ class _IllustrationTile extends StatelessWidget {
         height: 80,
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.85),
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(AppSpacing.lg),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.15),

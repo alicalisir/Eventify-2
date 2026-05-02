@@ -5,11 +5,11 @@ import 'package:go_router/go_router.dart';
 import '../../../config/constants/app_colors.dart';
 import '../../../config/constants/app_spacing.dart';
 import '../../../config/constants/app_strings.dart';
+import '../../../domain/models/suggestion_category.dart';
 import '../../core/ui/app_button.dart';
 import '../../core/ui/app_pressable.dart';
 import '../../core/ui/app_snackbar.dart';
 import '../../core/ui/error_state_widget.dart';
-import '../../../domain/models/suggestion_category.dart';
 import '../../home/providers/context_provider.dart';
 import 'map_hero.dart';
 import 'meta_tile.dart';
@@ -30,6 +30,8 @@ class SuggestionDetailScreen extends ConsumerStatefulWidget {
 class _SuggestionDetailScreenState
     extends ConsumerState<SuggestionDetailScreen> {
   static const _heroHeight = 240.0;
+  // Bottom padding to clear the fixed action bar (button + padding + safe area).
+  static const _actionBarClearance = 120.0;
   final _scrollController = ScrollController();
   bool _accepted = false;
 
@@ -119,14 +121,14 @@ class _SuggestionDetailScreenState
                     decoration: BoxDecoration(
                       color: theme.colorScheme.surface,
                       borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(24),
+                        top: Radius.circular(AppSpacing.lg),
                       ),
                     ),
                     padding: const EdgeInsets.fromLTRB(
                       AppSpacing.lg,
                       AppSpacing.lg,
                       AppSpacing.lg,
-                      120,
+                      _actionBarClearance,
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -137,7 +139,7 @@ class _SuggestionDetailScreenState
                             height: 4,
                             decoration: BoxDecoration(
                               color: theme.dividerColor,
-                              borderRadius: BorderRadius.circular(2),
+                              borderRadius: BorderRadius.circular(2), // ignore: no_raw_spacing_literals — drag handle indicator, half its 4 px height
                             ),
                           ),
                         ),
@@ -146,18 +148,18 @@ class _SuggestionDetailScreenState
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: AppSpacing.sm,
-                            vertical: 4,
+                            vertical: AppSpacing.xxs,
                           ),
                           decoration: BoxDecoration(
                             color: AppColors.primary50,
-                            borderRadius: BorderRadius.circular(999),
+                            borderRadius: BorderRadius.circular(AppSpacing.pill),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(suggestion.category.categoryIcon,
                                   size: 14, color: AppColors.primary),
-                              const SizedBox(width: 6),
+                              const SizedBox(width: AppSpacing.xxs),
                               Text(
                                 suggestion.category.toUpperCase(),
                                 style: theme.textTheme.labelSmall?.copyWith(
@@ -298,7 +300,7 @@ class _SuggestionDetailScreenState
                                     decoration: BoxDecoration(
                                       color: AppColors.primary50,
                                       borderRadius:
-                                          BorderRadius.circular(12),
+                                          BorderRadius.circular(AppSpacing.borderRadius),
                                     ),
                                     child: const Icon(Icons.place,
                                         size: 18, color: AppColors.primary),
@@ -420,11 +422,11 @@ class _SignalPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.sm,
-        vertical: 4,
+        vertical: AppSpacing.xxs,
       ),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(AppSpacing.pill),
         border: Border.all(color: AppColors.accent.withValues(alpha: 0.30)),
       ),
       child: Text(

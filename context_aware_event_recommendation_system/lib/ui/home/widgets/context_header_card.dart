@@ -61,7 +61,7 @@ class ContextHeaderCard extends StatelessWidget {
                   color: Colors.white.withValues(alpha: 0.85),
                 ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 2), // ignore: no_raw_spacing_literals — deliberate 2 px hairline gap between greeting and activity text
               Text(
                 contextState.contextDescription,
                 style: theme.textTheme.headlineMedium?.copyWith(
@@ -138,11 +138,11 @@ class _ContextChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.sm,
-        vertical: 6,
+        vertical: AppSpacing.xxs,
       ),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.20),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(AppSpacing.pill),
         border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
       ),
       child: Row(
@@ -152,7 +152,7 @@ class _ContextChip extends StatelessWidget {
             const _PulseDot()
           else
             Icon(icon, size: 14, color: Colors.white),
-          const SizedBox(width: 6),
+          const SizedBox(width: AppSpacing.xxs),
           Flexible(
             child: Text(
               label,
@@ -198,8 +198,8 @@ class _PulseDotState extends State<_PulseDot>
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 14,
-      height: 14,
+      width: AppSpacing.iconSizeXs,
+      height: AppSpacing.iconSizeXs,
       child: AnimatedBuilder(
         animation: _controller,
         builder: (_, _) {

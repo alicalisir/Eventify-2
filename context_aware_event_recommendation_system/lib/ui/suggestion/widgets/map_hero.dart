@@ -71,17 +71,17 @@ class _MapHeroState extends State<MapHero>
             child: Container(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.sm,
-                vertical: 6,
+                vertical: AppSpacing.xxs,
               ),
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.92),
-                borderRadius: BorderRadius.circular(999),
+                borderRadius: BorderRadius.circular(AppSpacing.pill),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(s.category.categoryIcon, size: 14, color: theme.colorScheme.onSurface),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: AppSpacing.xxs),
                   Text(
                     s.distance != null
                         ? '${s.estimatedMinutes} min · ${s.distance} km'

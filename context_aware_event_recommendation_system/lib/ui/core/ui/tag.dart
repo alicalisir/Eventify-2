@@ -37,7 +37,7 @@ class Tag extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(AppSpacing.pill),
         border: Border.all(color: border),
       ),
       child: Row(
@@ -45,7 +45,7 @@ class Tag extends StatelessWidget {
         children: [
           if (icon != null) ...[
             Icon(icon, size: 12, color: fg),
-            const SizedBox(width: 4),
+            const SizedBox(width: AppSpacing.xxs),
           ],
           Text(
             label,

@@ -187,7 +187,7 @@ class _SwipeHint extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.swipe_left, size: 14, color: theme.colorScheme.onSurfaceVariant),
-          const SizedBox(width: 6),
+          const SizedBox(width: AppSpacing.xxs),
           Flexible(
             child: Text(
               'Swipe a card to dismiss · Pull down to refresh',

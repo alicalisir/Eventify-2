@@ -30,7 +30,7 @@ class MetaTile extends StatelessWidget {
           Row(
             children: [
               Icon(icon, size: 12, color: secondaryText),
-              const SizedBox(width: 4),
+              const SizedBox(width: AppSpacing.xxs),
               Flexible(
                 child: Text(
                   label,
@@ -45,7 +45,9 @@ class MetaTile extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             value,
-            style: theme.textTheme.titleMedium?.copyWith(fontSize: 14),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
             overflow: TextOverflow.ellipsis,
           ),
         ],

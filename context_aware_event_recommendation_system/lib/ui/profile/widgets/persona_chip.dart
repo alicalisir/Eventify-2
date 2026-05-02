@@ -18,13 +18,13 @@ class PersonaChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.sm,
-          vertical: 6,
+          vertical: AppSpacing.xxs,
         ),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [AppColors.primary50, AppColors.accent50],
           ),
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: BorderRadius.circular(AppSpacing.pill),
           border: Border.all(
             color: AppColors.primary.withValues(alpha: 0.20),
           ),
@@ -39,7 +39,7 @@ class PersonaChip extends StatelessWidget {
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: AppSpacing.xxs),
             Text(
               '${trait.confidencePercent}%',
               style: theme.textTheme.labelSmall?.copyWith(

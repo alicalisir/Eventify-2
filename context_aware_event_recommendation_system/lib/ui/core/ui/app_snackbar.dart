@@ -43,7 +43,7 @@ abstract final class AppSnackbar {
               Expanded(
                 child: Text(
                   message,
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white),
                 ),
               ),
             ],

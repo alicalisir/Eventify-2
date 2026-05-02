@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../config/constants/app_spacing.dart';
 
 /// Loading overlay widget for showing loading state
 class LoadingOverlay extends StatelessWidget {
@@ -27,12 +28,11 @@ class LoadingOverlay extends StatelessWidget {
                 children: [
                   const CircularProgressIndicator(),
                   if (message != null) ...[
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.md),
                     Text(
                       message!,
-                      style: const TextStyle(
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Colors.white,
-                        fontSize: 16,
                       ),
                     ),
                   ],

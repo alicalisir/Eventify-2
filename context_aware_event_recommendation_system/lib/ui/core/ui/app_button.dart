@@ -39,8 +39,8 @@ class AppButton extends StatelessWidget {
 
     final child = isLoading
         ? SizedBox(
-            width: 20,
-            height: 20,
+            width: AppSpacing.iconSizeSm,
+            height: AppSpacing.iconSizeSm,
             child: CircularProgressIndicator(
               strokeWidth: 2.5,
               valueColor: AlwaysStoppedAnimation<Color>(effectiveFg),
@@ -51,16 +51,15 @@ class AppButton extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (leadingIcon != null) ...[
-                Icon(leadingIcon, size: 20, color: effectiveFg),
+                Icon(leadingIcon, size: AppSpacing.iconSizeSm, color: effectiveFg),
                 const SizedBox(width: AppSpacing.xs),
               ],
               Flexible(
                 child: Text(
                   text,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: effectiveFg,
-                    fontSize: 15,
                     fontWeight: FontWeight.w600,
                   ),
                 ),

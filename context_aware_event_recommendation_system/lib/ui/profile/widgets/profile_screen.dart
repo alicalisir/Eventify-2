@@ -99,7 +99,7 @@ class ProfileScreen extends ConsumerWidget {
                         style: theme.textTheme.labelSmall
                             ?.copyWith(color: secondaryText),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: AppSpacing.xxs),
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: AppSpacing.xs,
@@ -107,7 +107,7 @@ class ProfileScreen extends ConsumerWidget {
                         ),
                         decoration: BoxDecoration(
                           color: AppColors.success50,
-                          borderRadius: BorderRadius.circular(999),
+                          borderRadius: BorderRadius.circular(AppSpacing.pill),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -120,7 +120,7 @@ class ProfileScreen extends ConsumerWidget {
                                 color: AppColors.success,
                               ),
                             ),
-                            const SizedBox(width: 6),
+                            const SizedBox(width: AppSpacing.xxs),
                             Text(
                               'Persona active',
                               style: theme.textTheme.labelSmall?.copyWith(
@@ -180,7 +180,7 @@ class ProfileScreen extends ConsumerWidget {
                 );
               },
               loading: () => const SizedBox(
-                height: 48,
+                height: AppSpacing.minTouchTarget,
                 child: Center(child: CircularProgressIndicator()),
               ),
               error: (_, _) => Text(
@@ -362,7 +362,7 @@ class _RowDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(left: 64),
+      padding: const EdgeInsets.only(left: AppSpacing.xxl),
       child: Divider(color: divider, height: 1),
     );
   }
@@ -399,7 +399,7 @@ class _SwitchRow extends StatelessWidget {
               height: 36,
               decoration: BoxDecoration(
                 color: value ? AppColors.primary50 : theme.scaffoldBackgroundColor,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(AppSpacing.borderRadius),
               ),
               child: Icon(
                 icon,
@@ -473,7 +473,7 @@ class _NavRow extends StatelessWidget {
               height: 36,
               decoration: BoxDecoration(
                 color: theme.scaffoldBackgroundColor,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(AppSpacing.borderRadius),
               ),
               child: Icon(icon, size: 18, color: color ?? secondaryText),
             ),

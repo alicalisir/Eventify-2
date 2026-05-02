@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../config/constants/app_colors.dart';
+import '../../../config/constants/app_spacing.dart';
 
 /// Password strength indicator widget
 class PasswordStrengthIndicator extends StatelessWidget {
@@ -33,7 +34,7 @@ class PasswordStrengthIndicator extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         ClipRRect(
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(AppSpacing.xxs),
           child: LinearProgressIndicator(
             value: strength.value,
             minHeight: 4,
@@ -41,12 +42,11 @@ class PasswordStrengthIndicator extends StatelessWidget {
             backgroundColor: Colors.grey[300],
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.xs),
         Text(
           strength.label,
-          style: TextStyle(
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
             color: strength.color,
-            fontSize: 12,
             fontWeight: FontWeight.w500,
           ),
         ),

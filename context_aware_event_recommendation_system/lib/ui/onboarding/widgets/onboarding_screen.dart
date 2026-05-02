@@ -184,12 +184,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   final active = i == _page;
                   return AnimatedContainer(
                     duration: const Duration(milliseconds: 220),
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
                     width: active ? 28 : 8,
                     height: 8,
                     decoration: BoxDecoration(
                       color: active ? AppColors.primary : theme.dividerColor,
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(AppSpacing.xxs),
                     ),
                   );
                 }),
@@ -316,7 +316,7 @@ class _IllustrationTile extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: [base, accent],
         ),
-        borderRadius: BorderRadius.circular(32),
+        borderRadius: BorderRadius.circular(AppSpacing.xl),
       ),
       child: Stack(
         alignment: Alignment.center,
@@ -331,7 +331,7 @@ class _IllustrationTile extends StatelessWidget {
             height: 110,
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.85),
-              borderRadius: BorderRadius.circular(28),
+              borderRadius: BorderRadius.circular(AppSpacing.xl),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.18),
@@ -393,7 +393,7 @@ class _PermissionDialog extends StatelessWidget {
 
     return Dialog(
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(AppSpacing.borderRadiusXl),
       ),
       backgroundColor: theme.colorScheme.surface,
       insetPadding: const EdgeInsets.all(AppSpacing.lg),
