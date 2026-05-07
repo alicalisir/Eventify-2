@@ -21,7 +21,8 @@ class NoRawSpacingLiterals extends DartLintRule {
 
   static const _code = LintCode(
     name: 'no_raw_spacing_literals',
-    problemMessage: 'Raw number in layout constructor — use an AppSpacing constant.',
+    problemMessage:
+        'Raw number in layout constructor — use an AppSpacing constant.',
     correctionMessage:
         'Replace with AppSpacing.xxs(4), xs(8), sm(12), md(16), lg(24), '
         'xl(32), xxl(48), borderRadius(12), borderRadiusLg(16). '

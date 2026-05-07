@@ -14,11 +14,7 @@ class ErrorScreen extends StatelessWidget {
   final ErrorKind kind;
   final VoidCallback? onRetry;
 
-  const ErrorScreen({
-    super.key,
-    this.kind = ErrorKind.offline,
-    this.onRetry,
-  });
+  const ErrorScreen({super.key, this.kind = ErrorKind.offline, this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +26,8 @@ class ErrorScreen extends StatelessWidget {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.canPop() ? context.pop() : context.goNamed('dashboard'),
+          onPressed: () =>
+              context.canPop() ? context.pop() : context.goNamed('dashboard'),
         ),
         title: const Text(''),
       ),
@@ -41,7 +38,9 @@ class ErrorScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Center(child: _IllustrationTile(icon: copy.icon, hue: copy.hue)),
+              Center(
+                child: _IllustrationTile(icon: copy.icon, hue: copy.hue),
+              ),
               const SizedBox(height: AppSpacing.lg),
               Text(
                 copy.title,
@@ -55,8 +54,9 @@ class ErrorScreen extends StatelessWidget {
                   child: Text(
                     copy.description,
                     textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyLarge
-                        ?.copyWith(color: secondaryText),
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: secondaryText,
+                    ),
                   ),
                 ),
               ),

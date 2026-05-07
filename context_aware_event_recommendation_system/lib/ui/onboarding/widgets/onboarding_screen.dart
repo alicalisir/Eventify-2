@@ -87,7 +87,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   bool _granted(OnboardingState s, _Permission? p) {
     if (p == null) return false;
-    return p == _Permission.location ? s.locationGranted : s.notificationsGranted;
+    return p == _Permission.location
+        ? s.locationGranted
+        : s.notificationsGranted;
   }
 
   Future<void> _completeAndGo() async {
@@ -193,7 +195,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         ? Duration.zero
                         : AppDurations.quick,
                     curve: AppCurves.standard,
-                    margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xxs,
+                    ),
                     width: active ? 28 : 8,
                     height: 8,
                     decoration: BoxDecoration(
@@ -243,8 +247,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           TextButton(
             onPressed: _advance,
             style: TextButton.styleFrom(
-              foregroundColor:
-                  Theme.of(context).colorScheme.onSurfaceVariant,
+              foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
             child: const Text('Not now'),
           ),
@@ -331,9 +334,7 @@ class _IllustrationTile extends StatelessWidget {
         alignment: Alignment.center,
         children: [
           // Striped overlay for the "calm intelligence" texture.
-          Positioned.fill(
-            child: CustomPaint(painter: _StripePainter()),
-          ),
+          Positioned.fill(child: CustomPaint(painter: _StripePainter())),
           // Inner card with the icon.
           Container(
             width: 110,
@@ -391,13 +392,13 @@ class _PermissionDialog extends StatelessWidget {
 
     final (title, body) = switch (kind) {
       _Permission.location => (
-          '${AppStrings.appName} Would Like to Use Your Location',
-          'Used to suggest nearby walks, places to recharge, and route-aware tips. Never sold or shared.',
-        ),
+        '${AppStrings.appName} Would Like to Use Your Location',
+        'Used to suggest nearby walks, places to recharge, and route-aware tips. Never sold or shared.',
+      ),
       _Permission.notifications => (
-          '${AppStrings.appName} Would Like to Send Notifications',
-          'Only proactive, context-rich nudges — typically 2–4 per day. You can mute anytime.',
-        ),
+        '${AppStrings.appName} Would Like to Send Notifications',
+        'Only proactive, context-rich nudges — typically 2–4 per day. You can mute anytime.',
+      ),
     };
 
     return Dialog(
@@ -424,8 +425,9 @@ class _PermissionDialog extends StatelessWidget {
                   Text(
                     body,
                     textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium
-                        ?.copyWith(color: secondaryText),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: secondaryText,
+                    ),
                   ),
                 ],
               ),
@@ -451,8 +453,7 @@ class _PermissionDialog extends StatelessWidget {
                       onPressed: () => Navigator.of(context).pop(true),
                       style: TextButton.styleFrom(
                         foregroundColor: AppColors.primary,
-                        textStyle:
-                            const TextStyle(fontWeight: FontWeight.w600),
+                        textStyle: const TextStyle(fontWeight: FontWeight.w600),
                         shape: const RoundedRectangleBorder(),
                         minimumSize: const Size.fromHeight(48),
                       ),

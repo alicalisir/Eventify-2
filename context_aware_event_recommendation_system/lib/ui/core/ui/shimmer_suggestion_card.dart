@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:context_aware_event_recommendation_system/config/constants/app_colors.dart';
 import 'package:context_aware_event_recommendation_system/config/constants/app_spacing.dart';
+import 'package:flutter/material.dart';
 
 /// Shimmer loading effect widget
 class ShimmerSuggestionCard extends StatefulWidget {
@@ -45,10 +45,12 @@ class _ShimmerSuggestionCardState extends State<ShimmerSuggestionCard>
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final baseColor =
-        isDark ? AppColors.shimmerBaseDark : AppColors.shimmerBaseLight;
-    final highlightColor =
-        isDark ? AppColors.shimmerHighlightDark : AppColors.shimmerHighlightLight;
+    final baseColor = isDark
+        ? AppColors.shimmerBaseDark
+        : AppColors.shimmerBaseLight;
+    final highlightColor = isDark
+        ? AppColors.shimmerHighlightDark
+        : AppColors.shimmerHighlightLight;
 
     return AnimatedBuilder(
       animation: _animation,

@@ -12,17 +12,21 @@ abstract final class AppTheme {
 
   static ThemeData _build(Brightness brightness) {
     final isLight = brightness == Brightness.light;
-    final scheme =
-        isLight ? AppColors.lightColorScheme : AppColors.darkColorScheme;
+    final scheme = isLight
+        ? AppColors.lightColorScheme
+        : AppColors.darkColorScheme;
     final bg = isLight ? AppColors.backgroundLight : AppColors.backgroundDark;
     final surface = isLight ? AppColors.surfaceLight : AppColors.surfaceDark;
     final divider = isLight ? AppColors.dividerLight : AppColors.dividerDark;
-    final textPrimary =
-        isLight ? AppColors.textPrimaryLight : AppColors.textPrimaryDark;
-    final textSecondary =
-        isLight ? AppColors.textSecondaryLight : AppColors.textSecondaryDark;
-    final textDisabled =
-        isLight ? AppColors.textDisabledLight : AppColors.textDisabledDark;
+    final textPrimary = isLight
+        ? AppColors.textPrimaryLight
+        : AppColors.textPrimaryDark;
+    final textSecondary = isLight
+        ? AppColors.textSecondaryLight
+        : AppColors.textSecondaryDark;
+    final textDisabled = isLight
+        ? AppColors.textDisabledLight
+        : AppColors.textDisabledDark;
 
     return ThemeData(
       useMaterial3: true,
@@ -84,8 +88,10 @@ abstract final class AppTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: AppColors.primary,
-          minimumSize:
-              const Size(AppSpacing.minTouchTarget, AppSpacing.minTouchTarget),
+          minimumSize: const Size(
+            AppSpacing.minTouchTarget,
+            AppSpacing.minTouchTarget,
+          ),
           textStyle: GoogleFonts.inter(
             fontSize: 14,
             fontWeight: FontWeight.w500,
@@ -130,10 +136,7 @@ abstract final class AppTheme {
           color: AppColors.primary,
           fontWeight: FontWeight.w500,
         ),
-        hintStyle: GoogleFonts.inter(
-          fontSize: 15,
-          color: textDisabled,
-        ),
+        hintStyle: GoogleFonts.inter(fontSize: 15, color: textDisabled),
       ),
       chipTheme: ChipThemeData(
         backgroundColor: bg,
@@ -146,11 +149,7 @@ abstract final class AppTheme {
           borderRadius: BorderRadius.circular(AppSpacing.pill),
         ),
       ),
-      dividerTheme: DividerThemeData(
-        color: divider,
-        thickness: 1,
-        space: 1,
-      ),
+      dividerTheme: DividerThemeData(color: divider, thickness: 1, space: 1),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(

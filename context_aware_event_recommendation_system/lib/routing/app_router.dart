@@ -129,9 +129,6 @@ final routerProvider = Provider<GoRouter>((ref) {
 /// re-evaluate redirects on sign-in / sign-out.
 class _AuthRouterListenable extends ChangeNotifier {
   _AuthRouterListenable(Ref ref) {
-    ref.listen<AuthState>(
-      authProvider,
-      (_, _) => notifyListeners(),
-    );
+    ref.listen<AuthState>(authProvider, (_, _) => notifyListeners());
   }
 }

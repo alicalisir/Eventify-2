@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 import '../../domain/models/context_state.dart';
 import '../../domain/models/persona_model.dart';
 import '../../domain/models/suggestion_model.dart';

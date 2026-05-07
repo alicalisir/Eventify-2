@@ -27,8 +27,8 @@ abstract class PersonaModel with _$PersonaModel {
   }) = _PersonaModel;
 
   static PersonaModel get empty => PersonaModel(
-        traits: const [],
-        preferences: const {},
-        lastUpdated: DateTime.now(),
-      );
+    traits: const [],
+    preferences: const {},
+    lastUpdated: DateTime.now(),
+  );
 }

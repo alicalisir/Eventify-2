@@ -45,11 +45,7 @@ class ErrorStateWidget extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              size: 64,
-              color: AppColors.textSecondaryLight,
-            ),
+            Icon(icon, size: 64, color: AppColors.textSecondaryLight),
             const SizedBox(height: AppSpacing.md),
             Text(
               title,
@@ -66,10 +62,7 @@ class ErrorStateWidget extends StatelessWidget {
             ),
             if (onRetry != null) ...[
               const SizedBox(height: AppSpacing.md),
-              AppButton(
-                text: 'Try Again',
-                onPressed: onRetry!,
-              ),
+              AppButton(text: 'Try Again', onPressed: onRetry!),
             ],
           ],
         ),

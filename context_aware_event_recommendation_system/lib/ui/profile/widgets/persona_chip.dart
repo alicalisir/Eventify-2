@@ -13,8 +13,7 @@ class PersonaChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Semantics(
-      label:
-          '${trait.label}, confidence ${trait.confidencePercent} percent',
+      label: '${trait.label}, confidence ${trait.confidencePercent} percent',
       child: Container(
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.sm,

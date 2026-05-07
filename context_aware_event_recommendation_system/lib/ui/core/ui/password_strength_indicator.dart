@@ -6,10 +6,7 @@ import '../../../config/constants/app_spacing.dart';
 class PasswordStrengthIndicator extends StatelessWidget {
   final String password;
 
-  const PasswordStrengthIndicator({
-    super.key,
-    required this.password,
-  });
+  const PasswordStrengthIndicator({super.key, required this.password});
 
   PasswordStrength _calculateStrength(String password) {
     if (password.isEmpty) return PasswordStrength.none;

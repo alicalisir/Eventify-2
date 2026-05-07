@@ -28,9 +28,12 @@ class Onboarding extends _$Onboarding {
   }
 
   Future<void> grantLocation() async {
-    final granted =
-        await ref.read(locationRepositoryProvider).requestPermission();
-    AppLogger.i('[Onboarding] Location permission → ${granted ? 'granted' : 'denied'}');
+    final granted = await ref
+        .read(locationRepositoryProvider)
+        .requestPermission();
+    AppLogger.i(
+      '[Onboarding] Location permission → ${granted ? 'granted' : 'denied'}',
+    );
     state = state.copyWith(locationGranted: granted);
     if (granted) ref.read(contextRepositoryProvider).invalidateContext();
   }
@@ -39,7 +42,9 @@ class Onboarding extends _$Onboarding {
     final status = await Permission.notification.request();
     AppLogger.i('[Onboarding] Notification permission → ${status.name}');
     state = state.copyWith(notificationsGranted: status.isGranted);
-    if (status.isGranted) ref.read(contextRepositoryProvider).invalidateContext();
+    if (status.isGranted) {
+      ref.read(contextRepositoryProvider).invalidateContext();
+    }
   }
 
   void complete() {

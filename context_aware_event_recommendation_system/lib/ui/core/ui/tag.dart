@@ -24,11 +24,14 @@ class Tag extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final fg = foreground ??
+    final fg =
+        foreground ??
         (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight);
-    final bg = background ??
+    final bg =
+        background ??
         (isDark ? AppColors.backgroundDark : AppColors.backgroundLight);
-    final border = borderColor ??
+    final border =
+        borderColor ??
         (isDark ? AppColors.dividerDark : AppColors.dividerLight);
     return Container(
       padding: const EdgeInsets.symmetric(

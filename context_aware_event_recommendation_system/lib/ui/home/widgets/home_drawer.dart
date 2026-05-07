@@ -67,8 +67,9 @@ class HomeDrawer extends ConsumerWidget {
                   const SizedBox(height: AppSpacing.sm),
                   Text(
                     user?.name ?? 'Guest',
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(color: Colors.white),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: Colors.white,
+                    ),
                   ),
                   Text(
                     user?.email ?? '',
@@ -148,8 +149,8 @@ class _DrawerItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final fg = color ??
-        (active ? AppColors.primary : theme.colorScheme.onSurface);
+    final fg =
+        color ?? (active ? AppColors.primary : theme.colorScheme.onSurface);
     return AppPressable(
       semanticLabel: label,
       onTap: onTap,

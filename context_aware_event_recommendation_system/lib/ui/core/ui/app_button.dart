@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:context_aware_event_recommendation_system/config/constants/app_colors.dart';
 import 'package:context_aware_event_recommendation_system/config/constants/app_spacing.dart';
+import 'package:flutter/material.dart';
 
 /// Primary app button — supports filled, outlined, loading, leading icon,
 /// trailing icon, and explicit color override (e.g. success-state buttons).
@@ -34,7 +34,8 @@ class AppButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final disabled = isLoading || onPressed == null;
     final effectiveFg =
-        foregroundColor ?? (isOutlined ? AppColors.textPrimaryLight : Colors.white);
+        foregroundColor ??
+        (isOutlined ? AppColors.textPrimaryLight : Colors.white);
     final effectiveBg = backgroundColor ?? AppColors.primary;
 
     final child = isLoading
@@ -51,7 +52,11 @@ class AppButton extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (leadingIcon != null) ...[
-                Icon(leadingIcon, size: AppSpacing.iconSizeSm, color: effectiveFg),
+                Icon(
+                  leadingIcon,
+                  size: AppSpacing.iconSizeSm,
+                  color: effectiveFg,
+                ),
                 const SizedBox(width: AppSpacing.xs),
               ],
               Flexible(

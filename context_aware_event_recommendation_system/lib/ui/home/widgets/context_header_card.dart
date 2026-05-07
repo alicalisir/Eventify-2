@@ -61,7 +61,9 @@ class ContextHeaderCard extends StatelessWidget {
                   color: Colors.white.withValues(alpha: 0.85),
                 ),
               ),
-              const SizedBox(height: 2), // ignore: no_raw_spacing_literals — deliberate 2 px hairline gap between greeting and activity text
+              const SizedBox(
+                height: 2,
+              ), // ignore: no_raw_spacing_literals — deliberate 2 px hairline gap between greeting and activity text
               Text(
                 contextState.contextDescription,
                 style: theme.textTheme.headlineMedium?.copyWith(

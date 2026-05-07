@@ -5,11 +5,6 @@ analyzer:
   plugins:
     - custom_lint
 
-  errors:
-    # Treat these as warnings instead of hints so they appear in the Problems panel
-    no_raw_spacing_literals: warning
-    no_raw_text_style_font_size: warning
-
   exclude:
     # Generated files — never lint these
     - "**/*.g.dart"

@@ -33,8 +33,9 @@ class SectionLabel extends StatelessWidget {
             const SizedBox(width: AppSpacing.xs),
             Text(
               '· $count',
-              style: theme.textTheme.labelSmall
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ],

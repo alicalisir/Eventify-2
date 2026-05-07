@@ -12,7 +12,6 @@ import 'package:context_aware_event_recommendation_system/ui/auth/widgets/login_
 import 'package:context_aware_event_recommendation_system/ui/auth/widgets/register_screen.dart';
 import 'package:context_aware_event_recommendation_system/ui/onboarding/widgets/onboarding_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -21,11 +20,8 @@ import 'package:flutter_test/flutter_test.dart';
 // ---------------------------------------------------------------------------
 
 Widget _wrap(Widget child, {ThemeData? theme}) => ProviderScope(
-      child: MaterialApp(
-        theme: theme ?? ThemeData.light(),
-        home: child,
-      ),
-    );
+  child: MaterialApp(theme: theme ?? ThemeData.light(), home: child),
+);
 
 // ---------------------------------------------------------------------------
 // LoginScreen
@@ -61,7 +57,9 @@ void main() {
   group('Accessibility – LoginScreen (dark)', () {
     testWidgets('text contrast ≥ 4.5:1', (tester) async {
       final handle = tester.ensureSemantics();
-      await tester.pumpWidget(_wrap(const LoginScreen(), theme: ThemeData.dark()));
+      await tester.pumpWidget(
+        _wrap(const LoginScreen(), theme: ThemeData.dark()),
+      );
       await tester.pumpAndSettle();
       await expectLater(tester, meetsGuideline(textContrastGuideline));
       handle.dispose();
@@ -97,8 +95,9 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('terms checkbox exposes checked state to screen reader',
-        (tester) async {
+    testWidgets('terms checkbox exposes checked state to screen reader', (
+      tester,
+    ) async {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(_wrap(const RegisterScreen()));
       await tester.pumpAndSettle();
@@ -111,8 +110,8 @@ void main() {
       await tester.pumpAndSettle();
 
       final uncheckedNode = tester.getSemantics(checkboxFinder);
-      expect(uncheckedNode.hasFlag(SemanticsFlag.isChecked), isFalse);
-      expect(uncheckedNode.hasFlag(SemanticsFlag.isButton), isTrue);
+      expect(uncheckedNode.flagsCollection.isChecked, isFalse);
+      expect(uncheckedNode.flagsCollection.isButton, isTrue);
 
       await tester.tap(checkboxFinder);
       await tester.pumpAndSettle();
@@ -120,7 +119,7 @@ void main() {
       final checkedNode = tester.getSemantics(
         find.bySemanticsLabel('Terms of Service and Privacy Policy, agreed'),
       );
-      expect(checkedNode.hasFlag(SemanticsFlag.isChecked), isTrue);
+      expect(checkedNode.flagsCollection.isChecked, isTrue);
 
       handle.dispose();
     });

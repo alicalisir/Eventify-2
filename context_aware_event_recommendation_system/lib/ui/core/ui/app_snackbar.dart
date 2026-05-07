@@ -43,7 +43,9 @@ abstract final class AppSnackbar {
               Expanded(
                 child: Text(
                   message,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: Colors.white),
                 ),
               ),
             ],

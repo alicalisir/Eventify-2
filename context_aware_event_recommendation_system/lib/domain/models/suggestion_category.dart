@@ -19,7 +19,9 @@ extension SuggestionCategoryX on String {
       case 'health':
         return Icons.favorite_outline;
       default:
-        AppLogger.w('SuggestionCategoryX: unknown category "$this", using fallback icon');
+        AppLogger.w(
+          'SuggestionCategoryX: unknown category "$this", using fallback icon',
+        );
         return Icons.auto_awesome;
     }
   }

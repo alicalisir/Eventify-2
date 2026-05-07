@@ -25,15 +25,17 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
   );
 });
 
-final locationServiceProvider =
-    Provider<LocationService>((ref) => LocationService());
+final locationServiceProvider = Provider<LocationService>(
+  (ref) => LocationService(),
+);
 
 final locationRepositoryProvider = Provider<LocationRepository>((ref) {
   return LocationRepository(ref.watch(locationServiceProvider));
 });
 
-final contextServiceProvider =
-    Provider<ContextService>((ref) => ContextService());
+final contextServiceProvider = Provider<ContextService>(
+  (ref) => ContextService(),
+);
 
 final contextRepositoryProvider = Provider<ContextRepository>((ref) {
   return ContextRepository(

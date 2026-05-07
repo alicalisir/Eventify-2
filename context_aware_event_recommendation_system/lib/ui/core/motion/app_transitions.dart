@@ -18,26 +18,24 @@ abstract final class AppTransitions {
   static CustomTransitionPage<T> fadeThroughPage<T>({
     required LocalKey pageKey,
     required Widget child,
-  }) =>
-      CustomTransitionPage<T>(
-        key: pageKey,
-        child: child,
-        transitionDuration: AppDurations.standard,
-        reverseTransitionDuration: AppDurations.quick,
-        transitionsBuilder: _fadeThrough,
-      );
+  }) => CustomTransitionPage<T>(
+    key: pageKey,
+    child: child,
+    transitionDuration: AppDurations.standard,
+    reverseTransitionDuration: AppDurations.quick,
+    transitionsBuilder: _fadeThrough,
+  );
 
   static CustomTransitionPage<T> sharedAxisXPage<T>({
     required LocalKey pageKey,
     required Widget child,
-  }) =>
-      CustomTransitionPage<T>(
-        key: pageKey,
-        child: child,
-        transitionDuration: AppDurations.standard,
-        reverseTransitionDuration: AppDurations.quick,
-        transitionsBuilder: _sharedAxisX,
-      );
+  }) => CustomTransitionPage<T>(
+    key: pageKey,
+    child: child,
+    transitionDuration: AppDurations.standard,
+    reverseTransitionDuration: AppDurations.quick,
+    transitionsBuilder: _sharedAxisX,
+  );
 
   // ── builders ────────────────────────────────────────────────────────────────
 
@@ -85,8 +83,14 @@ class _FadeThroughTransition extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final enter = CurvedAnimation(parent: animation, curve: AppCurves.decelerate);
-    final exit = CurvedAnimation(parent: secondaryAnimation, curve: AppCurves.accelerate);
+    final enter = CurvedAnimation(
+      parent: animation,
+      curve: AppCurves.decelerate,
+    );
+    final exit = CurvedAnimation(
+      parent: secondaryAnimation,
+      curve: AppCurves.accelerate,
+    );
 
     return FadeTransition(
       opacity: enter,
@@ -116,8 +120,14 @@ class _SharedAxisXTransition extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final enter = CurvedAnimation(parent: animation, curve: AppCurves.decelerate);
-    final exit = CurvedAnimation(parent: secondaryAnimation, curve: AppCurves.accelerate);
+    final enter = CurvedAnimation(
+      parent: animation,
+      curve: AppCurves.decelerate,
+    );
+    final exit = CurvedAnimation(
+      parent: secondaryAnimation,
+      curve: AppCurves.accelerate,
+    );
 
     // Incoming: slide from +8 % right → 0, fade in.
     // Outgoing: slide to -8 % left, fade out.

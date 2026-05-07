@@ -9,8 +9,7 @@ class LocationService {
   Future<bool> isLocationServiceEnabled() =>
       Geolocator.isLocationServiceEnabled();
 
-  Future<LocationPermission> checkPermission() =>
-      Geolocator.checkPermission();
+  Future<LocationPermission> checkPermission() => Geolocator.checkPermission();
 
   Future<LocationPermission> requestPermission() =>
       Geolocator.requestPermission();
@@ -37,22 +36,26 @@ class LocationService {
         'https://nominatim.openstreetmap.org/reverse'
         '?format=json&lat=$lat&lon=$lon&zoom=14&addressdetails=1',
       );
-      final response = await http.get(
-        uri,
-        headers: {
-          'User-Agent': 'context_aware_event_recommendation_system/1.0',
-        },
-      ).timeout(const Duration(seconds: 6));
+      final response = await http
+          .get(
+            uri,
+            headers: {
+              'User-Agent': 'context_aware_event_recommendation_system/1.0',
+            },
+          )
+          .timeout(const Duration(seconds: 6));
 
       if (response.statusCode != 200) return _coordLabel(lat, lon);
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       final address = json['address'] as Map<String, dynamic>?;
       if (address == null) return _coordLabel(lat, lon);
 
-      final neighbourhood = address['quarter'] as String? ??
+      final neighbourhood =
+          address['quarter'] as String? ??
           address['suburb'] as String? ??
           address['neighbourhood'] as String?;
-      final city = address['city'] as String? ??
+      final city =
+          address['city'] as String? ??
           address['town'] as String? ??
           address['village'] as String?;
 

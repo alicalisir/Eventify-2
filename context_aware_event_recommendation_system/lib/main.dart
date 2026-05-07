@@ -27,10 +27,7 @@ Future<void> main() async {
   // Preload Google Fonts to avoid blocking the main thread
   try {
     await Future.wait([
-      GoogleFonts.pendingFonts([
-        GoogleFonts.poppins(),
-        GoogleFonts.inter(),
-      ]),
+      GoogleFonts.pendingFonts([GoogleFonts.poppins(), GoogleFonts.inter()]),
     ]);
   } catch (e) {
     // Fonts will be loaded on demand if preloading fails
@@ -40,9 +37,7 @@ Future<void> main() async {
   final prefs = await SharedPreferences.getInstance();
 
   final container = ProviderContainer(
-    overrides: [
-      sharedPreferencesProvider.overrideWithValue(prefs),
-    ],
+    overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
   );
 
   // Hydrate persisted session before the router runs its first redirect.

@@ -15,7 +15,9 @@ class LocationRepository {
   Future<bool> requestPermission() async {
     final permission = await _service.requestPermission();
     final granted = _service.isGranted(permission);
-    AppLogger.i('[Location] Permission request → ${granted ? 'granted' : 'denied'} ($permission)');
+    AppLogger.i(
+      '[Location] Permission request → ${granted ? 'granted' : 'denied'} ($permission)',
+    );
     return granted;
   }
 
@@ -38,7 +40,9 @@ class LocationRepository {
       _positionExpiresAt = now.add(_ttl);
       AppLogger.i('[Location] Fresh position acquired');
     } else {
-      AppLogger.w('[Location] Could not acquire position (permission denied or service off)');
+      AppLogger.w(
+        '[Location] Could not acquire position (permission denied or service off)',
+      );
     }
     return position;
   }

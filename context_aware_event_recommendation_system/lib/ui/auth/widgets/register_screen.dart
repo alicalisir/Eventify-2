@@ -87,7 +87,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       return;
     }
     setState(() => _isLoading = true);
-    final success = await ref.read(authProvider.notifier).signUp(
+    final success = await ref
+        .read(authProvider.notifier)
+        .signUp(
           _nameController.text.trim(),
           _emailController.text.trim(),
           _passwordController.text,
@@ -145,8 +147,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       const SizedBox(height: AppSpacing.xs),
                       Text(
                         'A few details to set up your computational persona.',
-                        style: theme.textTheme.bodyMedium
-                            ?.copyWith(color: secondaryText),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: secondaryText,
+                        ),
                       ),
                       const SizedBox(height: AppSpacing.lg),
                       AppTextField(
@@ -175,7 +178,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         suffixIcon: AppPressable(
                           semanticLabel: 'Toggle password visibility',
                           onTap: () => setState(
-                              () => _obscurePassword = !_obscurePassword),
+                            () => _obscurePassword = !_obscurePassword,
+                          ),
                           child: Padding(
                             padding: const EdgeInsets.all(AppSpacing.sm),
                             child: Icon(
@@ -204,7 +208,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         obscureText: _obscurePassword,
                         textInputAction: TextInputAction.done,
                         validator: (v) => Validators.confirmPassword(
-                            v, _passwordController.text),
+                          v,
+                          _passwordController.text,
+                        ),
                       ),
                       const SizedBox(height: AppSpacing.lg),
                       _TermsCheckbox(
@@ -275,10 +281,10 @@ class _StrengthMeter extends StatelessWidget {
           const SizedBox(height: AppSpacing.xxs),
           Text(
             label,
-            style: Theme.of(context)
-                .textTheme
-                .labelSmall
-                ?.copyWith(color: color, fontWeight: FontWeight.w500),
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),
@@ -308,59 +314,62 @@ class _TermsCheckbox extends StatelessWidget {
       onTap: () => onChanged(!value),
       excludeSemantics: true,
       child: AppPressable(
-      onTap: () => onChanged(!value),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xs),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              width: 22,
-              height: 22,
-              margin: const EdgeInsets.only(top: 2),
-              decoration: BoxDecoration(
-                color: value ? AppColors.primary : Colors.transparent,
-                border: Border.all(
-                  color: value ? AppColors.primary : theme.dividerColor,
-                  width: 1.5,
+        onTap: () => onChanged(!value),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.xs),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                width: 22,
+                height: 22,
+                margin: const EdgeInsets.only(top: 2),
+                decoration: BoxDecoration(
+                  color: value ? AppColors.primary : Colors.transparent,
+                  border: Border.all(
+                    color: value ? AppColors.primary : theme.dividerColor,
+                    width: 1.5,
+                  ),
+                  borderRadius: BorderRadius.circular(
+                    AppSpacing.borderRadiusSm,
+                  ),
                 ),
-                borderRadius: BorderRadius.circular(AppSpacing.borderRadiusSm),
+                child: value
+                    ? const Icon(Icons.check, size: 14, color: Colors.white)
+                    : null,
               ),
-              child: value
-                  ? const Icon(Icons.check, size: 14, color: Colors.white)
-                  : null,
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: RichText(
-                text: TextSpan(
-                  style: theme.textTheme.bodyMedium
-                      ?.copyWith(color: secondaryText),
-                  children: const [
-                    TextSpan(text: 'I agree to the '),
-                    TextSpan(
-                      text: 'Terms of Service',
-                      style: TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w500,
-                      ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: RichText(
+                  text: TextSpan(
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: secondaryText,
                     ),
-                    TextSpan(text: ' and '),
-                    TextSpan(
-                      text: 'Privacy Policy',
-                      style: TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w500,
+                    children: const [
+                      TextSpan(text: 'I agree to the '),
+                      TextSpan(
+                        text: 'Terms of Service',
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                    ),
-                  ],
+                      TextSpan(text: ' and '),
+                      TextSpan(
+                        text: 'Privacy Policy',
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
       ),
     );
   }

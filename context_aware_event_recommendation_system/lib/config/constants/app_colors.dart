@@ -56,24 +56,30 @@ abstract final class AppColors {
   // Active / Selected States
   /// Background for an active navigation row or an enabled toggle icon.
   static const Color activeItemBackground = primary50;
+
   /// Border ring on a selected persona chip.
   static final Color selectedChipBorder = primary.withValues(alpha: 0.20);
 
   // Brand Shadows & Glows
   /// Drop shadow beneath gradient hero surfaces (header card, avatar).
   static final Color brandCardShadow = primary.withValues(alpha: 0.25);
+
   /// Close shadow under a primary filled button (brand glow, near layer).
   static final Color buttonGlowNear = primary.withValues(alpha: 0.30);
+
   /// Diffuse ambient shadow under a primary filled button (far layer).
   static final Color buttonGlowFar = primary.withValues(alpha: 0.18);
+
   /// Ambient halo beneath the brand logo tile.
   static final Color brandLogoHalo = primary.withValues(alpha: 0.35);
 
   // Intelligence Surface (AI rationale)
   /// Background for the AI rationale band inside recommendation cards.
   static const Color intelligenceBand = accent50;
+
   /// Border for priority (featured) recommendation cards.
   static final Color featuredCardBorder = accent.withValues(alpha: 0.25);
+
   /// Drop shadow for priority (featured) recommendation cards.
   static final Color featuredCardShadow = accent.withValues(alpha: 0.12);
 
@@ -82,34 +88,34 @@ abstract final class AppColors {
   static const Color permissionGrantedBackground = success50;
 
   static ColorScheme get lightColorScheme => const ColorScheme(
-        brightness: Brightness.light,
-        primary: primary,
-        onPrimary: Colors.white,
-        secondary: secondary,
-        onSecondary: Colors.white,
-        tertiary: accent,
-        onTertiary: Colors.white,
-        error: error,
-        onError: Colors.white,
-        surface: surfaceLight,
-        onSurface: textPrimaryLight,
-        surfaceContainerHighest: backgroundLight,
-        onSurfaceVariant: textSecondaryLight,
-      );
+    brightness: Brightness.light,
+    primary: primary,
+    onPrimary: Colors.white,
+    secondary: secondary,
+    onSecondary: Colors.white,
+    tertiary: accent,
+    onTertiary: Colors.white,
+    error: error,
+    onError: Colors.white,
+    surface: surfaceLight,
+    onSurface: textPrimaryLight,
+    surfaceContainerHighest: backgroundLight,
+    onSurfaceVariant: textSecondaryLight,
+  );
 
   static ColorScheme get darkColorScheme => const ColorScheme(
-        brightness: Brightness.dark,
-        primary: primary,
-        onPrimary: Colors.white,
-        secondary: secondary,
-        onSecondary: Colors.white,
-        tertiary: accent,
-        onTertiary: Colors.white,
-        error: error,
-        onError: Colors.white,
-        surface: surfaceDark,
-        onSurface: textPrimaryDark,
-        surfaceContainerHighest: backgroundDark,
-        onSurfaceVariant: textSecondaryDark,
-      );
+    brightness: Brightness.dark,
+    primary: primary,
+    onPrimary: Colors.white,
+    secondary: secondary,
+    onSecondary: Colors.white,
+    tertiary: accent,
+    onTertiary: Colors.white,
+    error: error,
+    onError: Colors.white,
+    surface: surfaceDark,
+    onSurface: textPrimaryDark,
+    surfaceContainerHighest: backgroundDark,
+    onSurfaceVariant: textSecondaryDark,
+  );
 }

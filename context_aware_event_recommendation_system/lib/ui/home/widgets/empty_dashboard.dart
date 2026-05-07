@@ -34,8 +34,11 @@ class EmptyDashboard extends StatelessWidget {
                 ],
               ),
             ),
-            child: const Icon(Icons.spa_outlined,
-                size: 64, color: AppColors.secondary),
+            child: const Icon(
+              Icons.spa_outlined,
+              size: 64,
+              color: AppColors.secondary,
+            ),
           ),
           const SizedBox(height: AppSpacing.lg),
           Text(

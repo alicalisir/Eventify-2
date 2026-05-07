@@ -113,28 +113,27 @@ class DashboardScreen extends ConsumerWidget {
                           },
                         },
                         child: Dismissible(
-                        key: ValueKey(suggestions[i].id),
-                        direction: DismissDirection.endToStart,
-                        background: const _DismissBackground(),
-                        onDismissed: (_) {
-                          ref
-                              .read(dismissedSuggestionsProvider.notifier)
-                              .dismiss(suggestions[i].id);
-                          AppSnackbar.show(
-                            context,
-                            message:
-                                "Got it — we'll suggest fewer like that",
-                            kind: SnackKind.info,
-                          );
-                        },
-                        child: RecommendationCard(
-                          suggestion: suggestions[i],
-                          priority: i == 0,
-                          onTap: () => context.pushNamed(
-                            'suggestion',
-                            pathParameters: {'id': suggestions[i].id},
+                          key: ValueKey(suggestions[i].id),
+                          direction: DismissDirection.endToStart,
+                          background: const _DismissBackground(),
+                          onDismissed: (_) {
+                            ref
+                                .read(dismissedSuggestionsProvider.notifier)
+                                .dismiss(suggestions[i].id);
+                            AppSnackbar.show(
+                              context,
+                              message: "Got it — we'll suggest fewer like that",
+                              kind: SnackKind.info,
+                            );
+                          },
+                          child: RecommendationCard(
+                            suggestion: suggestions[i],
+                            priority: i == 0,
+                            onTap: () => context.pushNamed(
+                              'suggestion',
+                              pathParameters: {'id': suggestions[i].id},
+                            ),
                           ),
-                        ),
                         ),
                       ),
                       const SizedBox(height: AppSpacing.md),
@@ -178,9 +177,9 @@ class _DismissBackground extends StatelessWidget {
           Flexible(
             child: Text(
               'Dismiss',
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: AppColors.error,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.labelLarge?.copyWith(color: AppColors.error),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -202,14 +201,19 @@ class _SwipeHint extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           ExcludeSemantics(
-            child: Icon(Icons.swipe_left, size: 14, color: theme.colorScheme.onSurfaceVariant),
+            child: Icon(
+              Icons.swipe_left,
+              size: 14,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(width: AppSpacing.xxs),
           Flexible(
             child: Text(
               'Swipe a card to dismiss · Pull down to refresh',
-              style: theme.textTheme.labelSmall
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -224,7 +228,7 @@ class _HeroShimmer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ShimmerLoading(
+    return const ShimmerLoading(
       width: double.infinity,
       height: 156,
       borderRadius: AppSpacing.borderRadiusLg,
@@ -243,7 +247,7 @@ class _SuggestionListShimmer extends StatelessWidget {
           padding: const EdgeInsets.only(bottom: AppSpacing.md),
           child: Opacity(
             opacity: 1 - i * 0.2,
-            child: ShimmerLoading(
+            child: const ShimmerLoading(
               width: double.infinity,
               height: 240,
               borderRadius: AppSpacing.borderRadiusLg,

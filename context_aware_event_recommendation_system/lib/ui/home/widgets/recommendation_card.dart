@@ -100,7 +100,9 @@ class RecommendationCard extends StatelessWidget {
                       height: 56,
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.9),
-                        borderRadius: BorderRadius.circular(AppSpacing.borderRadiusXl),
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.borderRadiusXl,
+                        ),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withValues(alpha: 0.10),
@@ -109,7 +111,11 @@ class RecommendationCard extends StatelessWidget {
                           ),
                         ],
                       ),
-                      child: Icon(suggestion.category.categoryIcon, size: 28, color: iconTint),
+                      child: Icon(
+                        suggestion.category.categoryIcon,
+                        size: 28,
+                        color: iconTint,
+                      ),
                     ),
                   ],
                 ),
@@ -120,10 +126,7 @@ class RecommendationCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      suggestion.title,
-                      style: theme.textTheme.titleMedium,
-                    ),
+                    Text(suggestion.title, style: theme.textTheme.titleMedium),
                     const SizedBox(height: AppSpacing.xs),
                     Text(
                       suggestion.description,
@@ -138,19 +141,20 @@ class RecommendationCard extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: AppColors.intelligenceBand,
                         borderRadius: BorderRadius.circular(
-                            AppSpacing.borderRadiusSm),
-                        border: Border(
-                          left: BorderSide(
-                            color: AppColors.accent,
-                            width: 3,
-                          ),
+                          AppSpacing.borderRadiusSm,
+                        ),
+                        border: const Border(
+                          left: BorderSide(color: AppColors.accent, width: 3),
                         ),
                       ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.auto_awesome,
-                              size: 14, color: AppColors.accent),
+                          const Icon(
+                            Icons.auto_awesome,
+                            size: 14,
+                            color: AppColors.accent,
+                          ),
                           const SizedBox(width: AppSpacing.xs),
                           Expanded(
                             child: Text(

@@ -1,10 +1,10 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:context_aware_event_recommendation_system/data/repositories/suggestion_repository.dart';
 import 'package:context_aware_event_recommendation_system/di/providers.dart';
-import 'package:context_aware_event_recommendation_system/domain/models/suggestion_model.dart';
-import 'package:context_aware_event_recommendation_system/domain/models/persona_model.dart';
 import 'package:context_aware_event_recommendation_system/domain/models/context_state.dart';
+import 'package:context_aware_event_recommendation_system/domain/models/persona_model.dart';
+import 'package:context_aware_event_recommendation_system/domain/models/suggestion_model.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 export 'package:context_aware_event_recommendation_system/di/providers.dart'
     show contextRepositoryProvider, suggestionRepositoryProvider;

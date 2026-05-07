@@ -91,13 +91,15 @@ class ProfileScreen extends ConsumerWidget {
                     children: [
                       Text(
                         user?.name ?? 'Guest',
-                        style:
-                            theme.textTheme.titleMedium?.copyWith(fontSize: 17),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontSize: 17,
+                        ),
                       ),
                       Text(
                         user?.email ?? '',
-                        style: theme.textTheme.labelSmall
-                            ?.copyWith(color: secondaryText),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: secondaryText,
+                        ),
                       ),
                       const SizedBox(height: AppSpacing.xxs),
                       Container(
@@ -139,7 +141,7 @@ class ProfileScreen extends ConsumerWidget {
           ),
 
           // Persona section
-          _SectionTitle(
+          const _SectionTitle(
             label: AppStrings.myPersona,
             hint: 'Inferred from your activity',
           ),
@@ -164,14 +166,18 @@ class ProfileScreen extends ConsumerWidget {
                     const SizedBox(height: AppSpacing.md),
                     Row(
                       children: [
-                        const Icon(Icons.auto_awesome,
-                            size: 14, color: AppColors.accent),
+                        const Icon(
+                          Icons.auto_awesome,
+                          size: 14,
+                          color: AppColors.accent,
+                        ),
                         const SizedBox(width: AppSpacing.xs),
                         Expanded(
                           child: Text(
                             'Updated $lastUpdated · ${persona.signalsProcessedToday} signals processed today',
-                            style: theme.textTheme.labelSmall
-                                ?.copyWith(color: secondaryText),
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: secondaryText,
+                            ),
                           ),
                         ),
                       ],
@@ -185,14 +191,15 @@ class ProfileScreen extends ConsumerWidget {
               ),
               error: (_, _) => Text(
                 'Unable to load persona',
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: secondaryText),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: secondaryText,
+                ),
               ),
             ),
           ),
 
           // Data controls
-          _SectionTitle(label: AppStrings.dataControls),
+          const _SectionTitle(label: AppStrings.dataControls),
           Container(
             decoration: _sectionCardDecoration(theme),
             clipBehavior: Clip.antiAlias,
@@ -236,7 +243,7 @@ class ProfileScreen extends ConsumerWidget {
           ),
 
           // Privacy
-          _SectionTitle(label: 'Privacy'),
+          const _SectionTitle(label: 'Privacy'),
           Container(
             decoration: _sectionCardDecoration(theme),
             clipBehavior: Clip.antiAlias,
@@ -398,7 +405,9 @@ class _SwitchRow extends StatelessWidget {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: value ? AppColors.activeItemBackground : theme.scaffoldBackgroundColor,
+                color: value
+                    ? AppColors.activeItemBackground
+                    : theme.scaffoldBackgroundColor,
                 borderRadius: BorderRadius.circular(AppSpacing.borderRadius),
               ),
               child: Icon(
@@ -422,8 +431,9 @@ class _SwitchRow extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: theme.textTheme.labelSmall
-                        ?.copyWith(color: secondaryText),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: secondaryText,
+                    ),
                   ),
                 ],
               ),

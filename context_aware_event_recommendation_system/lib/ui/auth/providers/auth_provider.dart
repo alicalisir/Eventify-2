@@ -1,11 +1,11 @@
 import 'dart:io';
 
+import 'package:context_aware_event_recommendation_system/di/providers.dart';
+import 'package:context_aware_event_recommendation_system/domain/models/app_error.dart';
+import 'package:context_aware_event_recommendation_system/domain/models/user_model.dart';
+import 'package:context_aware_event_recommendation_system/utils/app_logger.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:context_aware_event_recommendation_system/di/providers.dart';
-import 'package:context_aware_event_recommendation_system/domain/models/user_model.dart';
-import 'package:context_aware_event_recommendation_system/domain/models/app_error.dart';
-import 'package:context_aware_event_recommendation_system/utils/app_logger.dart';
 
 export 'package:context_aware_event_recommendation_system/di/providers.dart'
     show sharedPreferencesProvider;
@@ -37,8 +37,9 @@ class Auth extends _$Auth {
       AppLogger.i('[Auth] No persisted session found');
     }
     state = AuthState(
-      status:
-          user != null ? AuthStatus.authenticated : AuthStatus.unauthenticated,
+      status: user != null
+          ? AuthStatus.authenticated
+          : AuthStatus.unauthenticated,
       user: user,
     );
   }
@@ -46,8 +47,9 @@ class Auth extends _$Auth {
   Future<bool> signIn(String email, String password) async {
     state = state.copyWith(status: AuthStatus.loading, error: null);
     try {
-      final user =
-          await ref.read(authRepositoryProvider).signIn(email, password);
+      final user = await ref
+          .read(authRepositoryProvider)
+          .signIn(email, password);
       if (user != null) {
         AppLogger.i('[Auth] signIn success → ${user.email}');
         state = state.copyWith(status: AuthStatus.authenticated, user: user);
@@ -70,8 +72,9 @@ class Auth extends _$Auth {
   Future<bool> signUp(String name, String email, String password) async {
     state = state.copyWith(status: AuthStatus.loading, error: null);
     try {
-      final user =
-          await ref.read(authRepositoryProvider).signUp(name, email, password);
+      final user = await ref
+          .read(authRepositoryProvider)
+          .signUp(name, email, password);
       if (user != null) {
         AppLogger.i('[Auth] signUp success → ${user.email}');
         state = state.copyWith(status: AuthStatus.authenticated, user: user);
@@ -94,8 +97,9 @@ class Auth extends _$Auth {
   Future<void> completeOnboarding() async {
     final user = state.user;
     if (user == null) return;
-    final updated =
-        await ref.read(authRepositoryProvider).markOnboardingCompleted(user);
+    final updated = await ref
+        .read(authRepositoryProvider)
+        .markOnboardingCompleted(user);
     state = state.copyWith(user: updated);
   }
 

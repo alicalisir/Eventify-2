@@ -17,8 +17,7 @@ class MapHero extends StatefulWidget {
   State<MapHero> createState() => _MapHeroState();
 }
 
-class _MapHeroState extends State<MapHero>
-    with SingleTickerProviderStateMixin {
+class _MapHeroState extends State<MapHero> with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
 
   @override
@@ -80,7 +79,11 @@ class _MapHeroState extends State<MapHero>
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(s.category.categoryIcon, size: 14, color: theme.colorScheme.onSurface),
+                  Icon(
+                    s.category.categoryIcon,
+                    size: 14,
+                    color: theme.colorScheme.onSurface,
+                  ),
                   const SizedBox(width: AppSpacing.xxs),
                   Text(
                     s.distance != null
@@ -174,7 +177,10 @@ class _MapPainter extends CustomPainter {
       while (distance < metric.length) {
         final next = distance + on;
         canvas.drawPath(
-          metric.extractPath(distance.clamp(0, metric.length), next.clamp(0, metric.length)),
+          metric.extractPath(
+            distance.clamp(0, metric.length),
+            next.clamp(0, metric.length),
+          ),
           paint,
         );
         distance = next + off;

@@ -31,10 +31,7 @@ class ContextRepository {
 
     final position = await _location.getCurrentPosition();
     final locationLabel = position != null
-        ? await _location.getAddressLabel(
-            position.latitude,
-            position.longitude,
-          )
+        ? await _location.getAddressLabel(position.latitude, position.longitude)
         : null;
 
     assert(() {
@@ -66,7 +63,9 @@ class ContextRepository {
       locationLabel: locationLabel,
       activityLabel: _activityLabel(speed),
     );
-    AppLogger.i('[Context] Context refreshed → ${fresh.greeting}, ${fresh.activityLabel}, location: ${fresh.locationLabel ?? 'unavailable'}');
+    AppLogger.i(
+      '[Context] Context refreshed → ${fresh.greeting}, ${fresh.activityLabel}, location: ${fresh.locationLabel ?? 'unavailable'}',
+    );
     _cachedContext = fresh;
     _contextExpiresAt = now.add(_contextTtl);
     return fresh;

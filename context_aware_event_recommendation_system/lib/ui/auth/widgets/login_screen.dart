@@ -38,10 +38,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _handleSignIn() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
-    final success = await ref.read(authProvider.notifier).signIn(
-          _emailController.text.trim(),
-          _passwordController.text,
-        );
+    final success = await ref
+        .read(authProvider.notifier)
+        .signIn(_emailController.text.trim(), _passwordController.text);
     if (!mounted) return;
     setState(() => _isLoading = false);
     if (success) {
@@ -93,8 +92,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       const SizedBox(height: AppSpacing.xs),
                       Text(
                         'Your context is ready when you are.',
-                        style: theme.textTheme.bodyLarge
-                            ?.copyWith(color: secondaryText),
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: secondaryText,
+                        ),
                       ),
                       const SizedBox(height: AppSpacing.xl),
                       AppTextField(
@@ -118,7 +118,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               ? 'Show password'
                               : 'Hide password',
                           onTap: () {
-                            setState(() => _obscurePassword = !_obscurePassword);
+                            setState(
+                              () => _obscurePassword = !_obscurePassword,
+                            );
                           },
                           child: Padding(
                             padding: const EdgeInsets.all(AppSpacing.sm),
@@ -155,11 +157,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           Expanded(child: Divider(color: divider)),
                           Padding(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.sm),
+                              horizontal: AppSpacing.sm,
+                            ),
                             child: Text(
                               'OR',
-                              style: theme.textTheme.labelSmall
-                                  ?.copyWith(color: secondaryText),
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: secondaryText,
+                              ),
                             ),
                           ),
                           Expanded(child: Divider(color: divider)),
@@ -185,8 +189,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 children: [
                   Text(
                     'New here?',
-                    style: theme.textTheme.bodyMedium
-                        ?.copyWith(color: secondaryText),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: secondaryText,
+                    ),
                   ),
                   TextButton(
                     onPressed: () => context.pushNamed('register'),

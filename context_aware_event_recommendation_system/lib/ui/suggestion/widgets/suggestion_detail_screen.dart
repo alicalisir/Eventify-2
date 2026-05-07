@@ -139,7 +139,9 @@ class _SuggestionDetailScreenState
                             height: 4,
                             decoration: BoxDecoration(
                               color: theme.dividerColor,
-                              borderRadius: BorderRadius.circular(2), // ignore: no_raw_spacing_literals — drag handle indicator, half its 4 px height
+                              borderRadius: BorderRadius.circular(
+                                2,
+                              ), // ignore: no_raw_spacing_literals — drag handle indicator, half its 4 px height
                             ),
                           ),
                         ),
@@ -152,13 +154,18 @@ class _SuggestionDetailScreenState
                           ),
                           decoration: BoxDecoration(
                             color: AppColors.primary50,
-                            borderRadius: BorderRadius.circular(AppSpacing.pill),
+                            borderRadius: BorderRadius.circular(
+                              AppSpacing.pill,
+                            ),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(suggestion.category.categoryIcon,
-                                  size: 14, color: AppColors.primary),
+                              Icon(
+                                suggestion.category.categoryIcon,
+                                size: 14,
+                                color: AppColors.primary,
+                              ),
                               const SizedBox(width: AppSpacing.xxs),
                               Text(
                                 suggestion.category.toUpperCase(),
@@ -180,8 +187,9 @@ class _SuggestionDetailScreenState
                         const SizedBox(height: AppSpacing.xs),
                         Text(
                           suggestion.description,
-                          style: theme.textTheme.bodyLarge
-                              ?.copyWith(color: secondaryText),
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: secondaryText,
+                          ),
                         ),
                         const SizedBox(height: AppSpacing.lg),
                         // Metadata row
@@ -192,8 +200,7 @@ class _SuggestionDetailScreenState
                                 child: MetaTile(
                                   icon: Icons.schedule,
                                   label: AppStrings.estimatedTime,
-                                  value:
-                                      '${suggestion.estimatedMinutes} min',
+                                  value: '${suggestion.estimatedMinutes} min',
                                 ),
                               ),
                             if (suggestion.distance != null) ...[
@@ -202,8 +209,7 @@ class _SuggestionDetailScreenState
                                 child: MetaTile(
                                   icon: Icons.place,
                                   label: AppStrings.distance,
-                                  value:
-                                      '${suggestion.distance} km',
+                                  value: '${suggestion.distance} km',
                                 ),
                               ),
                             ],
@@ -226,7 +232,8 @@ class _SuggestionDetailScreenState
                           decoration: BoxDecoration(
                             color: AppColors.accent50,
                             borderRadius: BorderRadius.circular(
-                                AppSpacing.borderRadiusLg),
+                              AppSpacing.borderRadiusLg,
+                            ),
                             border: Border.all(
                               color: AppColors.accent.withValues(alpha: 0.15),
                             ),
@@ -236,16 +243,20 @@ class _SuggestionDetailScreenState
                             children: [
                               Row(
                                 children: [
-                                  const Icon(Icons.auto_awesome,
-                                      size: 18, color: AppColors.accent),
+                                  const Icon(
+                                    Icons.auto_awesome,
+                                    size: 18,
+                                    color: AppColors.accent,
+                                  ),
                                   const SizedBox(width: AppSpacing.xs),
                                   Flexible(
                                     child: Text(
                                       AppStrings.whyThisSuggestion,
-                                      style: theme.textTheme.titleMedium?.copyWith(
-                                        color: AppColors.accent,
-                                        fontSize: 15,
-                                      ),
+                                      style: theme.textTheme.titleMedium
+                                          ?.copyWith(
+                                            color: AppColors.accent,
+                                            fontSize: 15,
+                                          ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
@@ -260,10 +271,10 @@ class _SuggestionDetailScreenState
                                 ),
                               ),
                               const SizedBox(height: AppSpacing.sm),
-                              Wrap(
+                              const Wrap(
                                 spacing: 6,
                                 runSpacing: 6,
-                                children: const [
+                                children: [
                                   _SignalPill(label: 'Time of day'),
                                   _SignalPill(label: 'Activity'),
                                   _SignalPill(label: 'Location'),
@@ -277,20 +288,22 @@ class _SuggestionDetailScreenState
                           const SizedBox(height: AppSpacing.lg),
                           Text(
                             'Location',
-                            style: theme.textTheme.titleMedium
-                                ?.copyWith(fontSize: 15),
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontSize: 15,
+                            ),
                           ),
                           const SizedBox(height: AppSpacing.xs),
                           AppPressable(
-                            semanticLabel: 'Get directions to ${suggestion.address}',
+                            semanticLabel:
+                                'Get directions to ${suggestion.address}',
                             onTap: () {},
                             child: Container(
-                              padding:
-                                  const EdgeInsets.all(AppSpacing.md),
+                              padding: const EdgeInsets.all(AppSpacing.md),
                               decoration: BoxDecoration(
                                 color: theme.scaffoldBackgroundColor,
                                 borderRadius: BorderRadius.circular(
-                                    AppSpacing.borderRadius),
+                                  AppSpacing.borderRadius,
+                                ),
                               ),
                               child: Row(
                                 children: [
@@ -299,11 +312,15 @@ class _SuggestionDetailScreenState
                                     height: 40,
                                     decoration: BoxDecoration(
                                       color: AppColors.primary50,
-                                      borderRadius:
-                                          BorderRadius.circular(AppSpacing.borderRadius),
+                                      borderRadius: BorderRadius.circular(
+                                        AppSpacing.borderRadius,
+                                      ),
                                     ),
-                                    child: const Icon(Icons.place,
-                                        size: 18, color: AppColors.primary),
+                                    child: const Icon(
+                                      Icons.place,
+                                      size: 18,
+                                      color: AppColors.primary,
+                                    ),
                                   ),
                                   const SizedBox(width: AppSpacing.sm),
                                   Expanded(
@@ -315,9 +332,10 @@ class _SuggestionDetailScreenState
                                           suggestion.address!,
                                           style: theme.textTheme.bodyMedium
                                               ?.copyWith(
-                                            color: theme.colorScheme.onSurface,
-                                            fontWeight: FontWeight.w500,
-                                          ),
+                                                color:
+                                                    theme.colorScheme.onSurface,
+                                                fontWeight: FontWeight.w500,
+                                              ),
                                         ),
                                         Text(
                                           'Tap for directions',
@@ -327,8 +345,11 @@ class _SuggestionDetailScreenState
                                       ],
                                     ),
                                   ),
-                                  Icon(Icons.chevron_right,
-                                      size: 18, color: secondaryText),
+                                  Icon(
+                                    Icons.chevron_right,
+                                    size: 18,
+                                    color: secondaryText,
+                                  ),
                                 ],
                               ),
                             ),
@@ -338,8 +359,9 @@ class _SuggestionDetailScreenState
                           const SizedBox(height: AppSpacing.lg),
                           Text(
                             'Tags',
-                            style: theme.textTheme.titleMedium
-                                ?.copyWith(fontSize: 15),
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontSize: 15,
+                            ),
                           ),
                           const SizedBox(height: AppSpacing.xs),
                           Wrap(
@@ -381,10 +403,13 @@ class _SuggestionDetailScreenState
                       width: 52,
                       height: 52,
                       decoration: BoxDecoration(
-                        border:
-                            Border.all(color: theme.dividerColor, width: 1.5),
+                        border: Border.all(
+                          color: theme.dividerColor,
+                          width: 1.5,
+                        ),
                         borderRadius: BorderRadius.circular(
-                            AppSpacing.borderRadius),
+                          AppSpacing.borderRadius,
+                        ),
                       ),
                       child: Icon(Icons.close, color: secondaryText),
                     ),
@@ -396,8 +421,9 @@ class _SuggestionDetailScreenState
                       leadingIcon: _accepted
                           ? Icons.check
                           : Icons.calendar_today_outlined,
-                      backgroundColor:
-                          _accepted ? AppColors.success : AppColors.primary,
+                      backgroundColor: _accepted
+                          ? AppColors.success
+                          : AppColors.primary,
                       onPressed: _accepted ? null : _accept,
                     ),
                   ),
