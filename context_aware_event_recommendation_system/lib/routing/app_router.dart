@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../ui/auth/providers/auth_provider.dart';
 import '../ui/auth/widgets/login_screen.dart';
 import '../ui/auth/widgets/register_screen.dart';
+import '../ui/core/motion/app_transitions.dart';
 import '../ui/error/widgets/error_screen.dart';
 import '../ui/home/widgets/dashboard_screen.dart';
 import '../ui/onboarding/widgets/onboarding_screen.dart';
@@ -54,48 +55,69 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/login',
         name: 'login',
-        builder: (context, state) => const LoginScreen(),
+        pageBuilder: (context, state) => AppTransitions.fadeThroughPage(
+          pageKey: state.pageKey,
+          child: const LoginScreen(),
+        ),
       ),
       GoRoute(
         path: '/register',
         name: 'register',
-        builder: (context, state) => const RegisterScreen(),
+        pageBuilder: (context, state) => AppTransitions.fadeThroughPage(
+          pageKey: state.pageKey,
+          child: const RegisterScreen(),
+        ),
       ),
       GoRoute(
         path: '/onboarding',
         name: 'onboarding',
-        builder: (context, state) => const OnboardingScreen(),
+        pageBuilder: (context, state) => AppTransitions.fadeThroughPage(
+          pageKey: state.pageKey,
+          child: const OnboardingScreen(),
+        ),
       ),
       GoRoute(
         path: '/dashboard',
         name: 'dashboard',
-        builder: (context, state) => const DashboardScreen(),
+        pageBuilder: (context, state) => AppTransitions.fadeThroughPage(
+          pageKey: state.pageKey,
+          child: const DashboardScreen(),
+        ),
       ),
       GoRoute(
         path: '/suggestion/:id',
         name: 'suggestion',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final id = state.pathParameters['id']!;
-          return SuggestionDetailScreen(suggestionId: id);
+          return AppTransitions.sharedAxisXPage(
+            pageKey: state.pageKey,
+            child: SuggestionDetailScreen(suggestionId: id),
+          );
         },
       ),
       GoRoute(
         path: '/profile',
         name: 'profile',
-        builder: (context, state) => const ProfileScreen(),
+        pageBuilder: (context, state) => AppTransitions.sharedAxisXPage(
+          pageKey: state.pageKey,
+          child: const ProfileScreen(),
+        ),
       ),
       GoRoute(
         path: '/error',
         name: 'error',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final raw = state.uri.queryParameters['kind'];
           final kind = ErrorKind.values.firstWhere(
             (k) => k.name == raw,
             orElse: () => ErrorKind.offline,
           );
-          return ErrorScreen(
-            kind: kind,
-            onRetry: () => context.goNamed('dashboard'),
+          return AppTransitions.fadeThroughPage(
+            pageKey: state.pageKey,
+            child: ErrorScreen(
+              kind: kind,
+              onRetry: () => context.goNamed('dashboard'),
+            ),
           );
         },
       ),

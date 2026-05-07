@@ -282,7 +282,7 @@ class _SuggestionDetailScreenState
                           ),
                           const SizedBox(height: AppSpacing.xs),
                           AppPressable(
-                            semanticLabel: 'Open address',
+                            semanticLabel: 'Get directions to ${suggestion.address}',
                             onTap: () {},
                             child: Container(
                               padding:

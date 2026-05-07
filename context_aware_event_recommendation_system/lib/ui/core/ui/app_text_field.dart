@@ -14,6 +14,7 @@ class AppTextField extends StatelessWidget {
   final Widget? suffixIcon;
   final Widget? prefixIcon;
   final bool enabled;
+  final bool autofocus;
   final int maxLines;
   final FocusNode? focusNode;
   final VoidCallback? onEditingComplete;
@@ -32,6 +33,7 @@ class AppTextField extends StatelessWidget {
     this.suffixIcon,
     this.prefixIcon,
     this.enabled = true,
+    this.autofocus = false,
     this.maxLines = 1,
     this.focusNode,
     this.onEditingComplete,
@@ -50,6 +52,7 @@ class AppTextField extends StatelessWidget {
         onChanged: onChanged,
         validator: validator,
         enabled: enabled,
+        autofocus: autofocus,
         maxLines: maxLines,
         focusNode: focusNode,
         onEditingComplete: onEditingComplete,

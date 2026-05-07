@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -98,7 +99,20 @@ class DashboardScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: AppSpacing.md),
                     for (var i = 0; i < suggestions.length; i++) ...[
-                      Dismissible(
+                      Semantics(
+                        customSemanticsActions: {
+                          const CustomSemanticsAction(label: 'Dismiss'): () {
+                            ref
+                                .read(dismissedSuggestionsProvider.notifier)
+                                .dismiss(suggestions[i].id);
+                            AppSnackbar.show(
+                              context,
+                              message: "Got it — we'll suggest fewer like that",
+                              kind: SnackKind.info,
+                            );
+                          },
+                        },
+                        child: Dismissible(
                         key: ValueKey(suggestions[i].id),
                         direction: DismissDirection.endToStart,
                         background: const _DismissBackground(),
@@ -120,6 +134,7 @@ class DashboardScreen extends ConsumerWidget {
                             'suggestion',
                             pathParameters: {'id': suggestions[i].id},
                           ),
+                        ),
                         ),
                       ),
                       const SizedBox(height: AppSpacing.md),
@@ -186,7 +201,9 @@ class _SwipeHint extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.swipe_left, size: 14, color: theme.colorScheme.onSurfaceVariant),
+          ExcludeSemantics(
+            child: Icon(Icons.swipe_left, size: 14, color: theme.colorScheme.onSurfaceVariant),
+          ),
           const SizedBox(width: AppSpacing.xxs),
           Flexible(
             child: Text(

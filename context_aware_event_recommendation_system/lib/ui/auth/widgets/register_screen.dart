@@ -153,6 +153,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         controller: _nameController,
                         label: AppStrings.fullName,
                         textInputAction: TextInputAction.next,
+                        autofocus: true,
                         validator: Validators.name,
                       ),
                       const SizedBox(height: AppSpacing.md),
@@ -295,8 +296,18 @@ class _TermsCheckbox extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final secondaryText = theme.colorScheme.onSurfaceVariant;
-    return AppPressable(
-      semanticLabel: 'Agree to Terms of Service and Privacy Policy',
+    // Semantics(excludeSemantics) replaces all descendant nodes so screen
+    // readers see one button node with the correct checked state instead of
+    // a nested hierarchy that omits toggle status.
+    return Semantics(
+      checked: value,
+      label: value
+          ? 'Terms of Service and Privacy Policy, agreed'
+          : 'Agree to Terms of Service and Privacy Policy',
+      button: true,
+      onTap: () => onChanged(!value),
+      excludeSemantics: true,
+      child: AppPressable(
       onTap: () => onChanged(!value),
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.xs),
@@ -349,6 +360,7 @@ class _TermsCheckbox extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }

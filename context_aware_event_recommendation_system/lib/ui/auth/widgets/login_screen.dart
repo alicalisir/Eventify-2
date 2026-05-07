@@ -102,6 +102,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         label: AppStrings.email,
                         keyboardType: TextInputType.emailAddress,
                         textInputAction: TextInputAction.next,
+                        autofocus: true,
                         validator: Validators.email,
                       ),
                       const SizedBox(height: AppSpacing.md),

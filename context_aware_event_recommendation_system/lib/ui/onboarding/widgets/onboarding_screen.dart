@@ -6,6 +6,8 @@ import '../../../config/constants/app_colors.dart';
 import '../../../config/constants/app_spacing.dart';
 import '../../../config/constants/app_strings.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../core/motion/app_curves.dart';
+import '../../core/motion/app_durations.dart';
 import '../../core/ui/app_button.dart';
 import '../../core/ui/app_snackbar.dart';
 import '../../core/ui/brand_mark.dart';
@@ -97,11 +99,16 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   void _advance() {
     if (_page < _slides.length - 1) {
-      _pageController.animateToPage(
-        _page + 1,
-        duration: const Duration(milliseconds: 280),
-        curve: Curves.easeOut,
-      );
+      final noMotion = MediaQuery.disableAnimationsOf(context);
+      if (noMotion) {
+        _pageController.jumpToPage(_page + 1);
+      } else {
+        _pageController.animateToPage(
+          _page + 1,
+          duration: AppDurations.standard,
+          curve: AppCurves.decelerate,
+        );
+      }
     } else {
       _completeAndGo();
     }
@@ -123,8 +130,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       } else {
         await ref.read(onboardingProvider.notifier).grantNotifications();
       }
-      // Small delay to let user see the granted state.
-      await Future.delayed(const Duration(milliseconds: 350));
+      await Future.delayed(AppDurations.slow);
       if (!mounted) return;
       _advance();
     } else {
@@ -183,7 +189,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 children: List.generate(_slides.length, (i) {
                   final active = i == _page;
                   return AnimatedContainer(
-                    duration: const Duration(milliseconds: 220),
+                    duration: MediaQuery.disableAnimationsOf(context)
+                        ? Duration.zero
+                        : AppDurations.quick,
+                    curve: AppCurves.standard,
                     margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
                     width: active ? 28 : 8,
                     height: 8,
