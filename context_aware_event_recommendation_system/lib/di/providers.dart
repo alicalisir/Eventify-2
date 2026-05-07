@@ -1,3 +1,4 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -9,6 +10,7 @@ import '../data/repositories/suggestion_repository.dart';
 import '../data/services/auth_service.dart';
 import '../data/services/context_service.dart';
 import '../data/services/location_service.dart';
+import '../data/services/weather_service.dart';
 
 /// Bootstrapped in main.dart via ProviderScope.overrides before runApp.
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
@@ -41,10 +43,15 @@ final contextServiceProvider = Provider<ContextService>(
   (ref) => ContextService(),
 );
 
+final weatherServiceProvider = Provider<WeatherService>((ref) {
+  return WeatherService(dotenv.env['OPENWEATHER_API_KEY'] ?? '');
+});
+
 final contextRepositoryProvider = Provider<ContextRepository>((ref) {
   return ContextRepository(
     ref.watch(contextServiceProvider),
     ref.watch(locationRepositoryProvider),
+    ref.watch(weatherServiceProvider),
   );
 });
 

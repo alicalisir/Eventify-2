@@ -4,13 +4,15 @@ import '../../domain/models/context_state.dart';
 import '../../domain/models/persona_model.dart';
 import '../../utils/app_logger.dart';
 import '../services/context_service.dart';
+import '../services/weather_service.dart';
 import 'location_repository.dart';
 
 class ContextRepository {
-  ContextRepository(this._service, this._location);
+  ContextRepository(this._service, this._location, this._weather);
 
   final ContextService _service;
   final LocationRepository _location;
+  final WeatherService _weather;
 
   static const _contextTtl = Duration(minutes: 2);
   static const _personaTtl = Duration(minutes: 15);
@@ -31,7 +33,17 @@ class ContextRepository {
 
     final position = await _location.getCurrentPosition();
     final locationLabel = position != null
-        ? await _location.getAddressLabel(position.latitude, position.longitude)
+        ? await _location.getAddressLabel(
+            position.latitude,
+            position.longitude,
+          )
+        : null;
+
+    final weatherData = position != null
+        ? await _weather.getCurrentWeather(
+            position.latitude,
+            position.longitude,
+          )
         : null;
 
     assert(() {
@@ -41,7 +53,8 @@ class ContextRepository {
           '${position.longitude.toStringAsFixed(5)} | '
           'speed: ${position.speed.toStringAsFixed(1)} m/s | '
           'accuracy: ${position.accuracy.toStringAsFixed(0)} m | '
-          'address: $locationLabel',
+          'address: $locationLabel | '
+          'weather: ${weatherData?.summary ?? 'unavailable'}',
         );
       } else {
         AppLogger.d(
@@ -54,6 +67,7 @@ class ContextRepository {
 
     final notificationsGranted = await Permission.notification.isGranted;
     final speed = position?.speed ?? 0;
+
     final fresh = ContextState(
       greeting: _greeting(now.hour),
       contextDescription: _buildDescription(speed, now),
@@ -62,10 +76,15 @@ class ContextRepository {
       lastUpdated: now,
       locationLabel: locationLabel,
       activityLabel: _activityLabel(speed),
+      weather: weatherData?.summary,
     );
+
     AppLogger.i(
-      '[Context] Context refreshed → ${fresh.greeting}, ${fresh.activityLabel}, location: ${fresh.locationLabel ?? 'unavailable'}',
+      '[Context] Refreshed → ${fresh.greeting}, ${fresh.activityLabel}, '
+      'location: ${fresh.locationLabel ?? 'unavailable'}, '
+      'weather: ${fresh.weather ?? 'unavailable'}',
     );
+
     _cachedContext = fresh;
     _contextExpiresAt = now.add(_contextTtl);
     return fresh;
