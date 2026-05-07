@@ -11,7 +11,8 @@
       "Bash(flutter test *)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Huawei\\\\Desktop\\\\Klasorlerim\\\\Projelerim\\\\context_aware_event_recommendation_system\" -Directory)",
       "Bash(Select-Object Name)",
-      "Bash(dart format *)"
+      "Bash(dart format *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Huawei\\\\Desktop\\\\Klasorlerim\\\\Projelerim\\\\context_aware_event_recommendation_system\" -Recurse -Directory)"
     ]
   }
 }

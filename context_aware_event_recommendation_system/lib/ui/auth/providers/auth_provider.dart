@@ -6,6 +6,7 @@ import 'package:context_aware_event_recommendation_system/domain/models/user_mod
 import 'package:context_aware_event_recommendation_system/utils/app_logger.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 export 'package:context_aware_event_recommendation_system/di/providers.dart'
     show sharedPreferencesProvider;
@@ -13,7 +14,7 @@ export 'package:context_aware_event_recommendation_system/di/providers.dart'
 part 'auth_provider.freezed.dart';
 part 'auth_provider.g.dart';
 
-enum AuthStatus { initial, authenticated, unauthenticated, loading }
+enum AuthStatus { initial, authenticated, unauthenticated, loading, passwordRecovery }
 
 @freezed
 abstract class AuthState with _$AuthState {
@@ -27,7 +28,18 @@ abstract class AuthState with _$AuthState {
 @Riverpod(keepAlive: true)
 class Auth extends _$Auth {
   @override
-  AuthState build() => const AuthState();
+  AuthState build() {
+    final subscription = Supabase.instance.client.auth.onAuthStateChange.listen(
+      (data) {
+        if (data.event == AuthChangeEvent.passwordRecovery) {
+          AppLogger.i('[Auth] Password recovery session detected');
+          state = state.copyWith(status: AuthStatus.passwordRecovery);
+        }
+      },
+    );
+    ref.onDispose(subscription.cancel);
+    return const AuthState();
+  }
 
   Future<void> restoreSession() async {
     final user = await ref.read(authRepositoryProvider).restoreSession();
@@ -108,7 +120,54 @@ class Auth extends _$Auth {
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
 
+  Future<bool> sendPasswordReset(String email) async {
+    state = state.copyWith(status: AuthStatus.loading, error: null);
+    try {
+      await ref.read(authRepositoryProvider).sendPasswordReset(email);
+      AppLogger.i('[Auth] Password reset email sent to $email');
+      state = state.copyWith(status: AuthStatus.unauthenticated);
+      return true;
+    } catch (e, s) {
+      AppLogger.e('[Auth] sendPasswordReset failed', e, s);
+      state = state.copyWith(
+        status: AuthStatus.unauthenticated,
+        error: _classify(e),
+      );
+      return false;
+    }
+  }
+
+  Future<bool> updatePassword(String newPassword) async {
+    state = state.copyWith(status: AuthStatus.loading, error: null);
+    try {
+      await ref.read(authRepositoryProvider).updatePassword(newPassword);
+      final user = await ref.read(authRepositoryProvider).restoreSession();
+      AppLogger.i('[Auth] Password updated successfully');
+      state = AuthState(status: AuthStatus.authenticated, user: user);
+      return true;
+    } catch (e, s) {
+      AppLogger.e('[Auth] updatePassword failed', e, s);
+      state = state.copyWith(
+        status: AuthStatus.passwordRecovery,
+        error: _classify(e),
+      );
+      return false;
+    }
+  }
+
   static AppError _classify(Object e) {
+    if (e is AuthException) {
+      final msg = e.message.toLowerCase();
+      if (msg.contains('invalid login') ||
+          msg.contains('invalid credentials') ||
+          msg.contains('email not confirmed')) {
+        return const AuthError();
+      }
+      if (msg.contains('network') || msg.contains('timeout')) {
+        return const NetworkError();
+      }
+      return const AuthError();
+    }
     if (e is SocketException || e is HttpException) return const NetworkError();
     final msg = e.toString().toLowerCase();
     if (msg.contains('socket') ||

@@ -137,11 +137,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       Align(
                         alignment: Alignment.centerRight,
                         child: TextButton(
-                          onPressed: () => AppSnackbar.show(
-                            context,
-                            message: 'Reset link sent to your email',
-                            kind: SnackKind.info,
-                          ),
+                          onPressed: () => context.pushNamed('forgot-password'),
                           child: const Text(AppStrings.forgotPassword),
                         ),
                       ),

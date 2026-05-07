@@ -12,6 +12,21 @@ abstract final class AppStrings {
   static const String invalidCredentials =
       'Invalid credentials. Please try again.';
 
+  // Forgot / Reset Password
+  static const String forgotPasswordTitle = 'Forgot Password?';
+  static const String forgotPasswordSubtitle =
+      'Enter your email and we\'ll send you a reset link.';
+  static const String sendResetLink = 'Send Reset Link';
+  static const String resetLinkSent =
+      'Check your email for the reset link.';
+  static const String backToLogin = 'Back to Login';
+  static const String resetPasswordTitle = 'Set New Password';
+  static const String resetPasswordSubtitle =
+      'Enter a new password for your account.';
+  static const String newPassword = 'New Password';
+  static const String updatePassword = 'Update Password';
+  static const String passwordUpdated = 'Password updated successfully!';
+
   // Register
   static const String createAccountTitle = 'Create Account';
   static const String startJourney = 'Start your personalized journey';

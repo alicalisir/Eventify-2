@@ -1,36 +1,42 @@
-import 'dart:ui';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'config/app.dart';
 import 'ui/auth/providers/auth_provider.dart';
-import 'utils/app_logger.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  FlutterError.onError = (details) {
-    AppLogger.e(
-      '[Flutter] ${details.exceptionAsString()}',
-      details.exception,
-      details.stack,
-    );
-  };
+  await dotenv.load();
 
-  PlatformDispatcher.instance.onError = (error, stack) {
-    AppLogger.e('[Dart] Uncaught error', error, stack);
-    return true;
-  };
+  await Supabase.initialize(
+    url: dotenv.env['SUPABASE_URL']!,
+    anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
+    debug: kDebugMode,
+  );
 
-  // Preload Google Fonts to avoid blocking the main thread
+  await SentryFlutter.init((options) {
+    options.dsn = dotenv.env['SENTRY_DSN'] ?? '';
+    options.environment = kDebugMode ? 'development' : 'production';
+    options.tracesSampleRate = 0.2;
+    options.debug = kDebugMode;
+  });
+
+  await _bootstrap();
+}
+
+Future<void> _bootstrap() async {
   try {
     await Future.wait([
       GoogleFonts.pendingFonts([GoogleFonts.poppins(), GoogleFonts.inter()]),
     ]);
   } catch (e) {
-    // Fonts will be loaded on demand if preloading fails
     debugPrint('Failed to preload fonts: $e');
   }
 
@@ -40,7 +46,6 @@ Future<void> main() async {
     overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
   );
 
-  // Hydrate persisted session before the router runs its first redirect.
   await container.read(authProvider.notifier).restoreSession();
 
   runApp(

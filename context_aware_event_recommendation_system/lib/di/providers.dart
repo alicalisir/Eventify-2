@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../data/repositories/auth_repository.dart';
 import '../data/repositories/context_repository.dart';
@@ -16,13 +17,16 @@ final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
   );
 });
 
-final authServiceProvider = Provider<AuthService>((ref) => AuthService());
+final supabaseClientProvider = Provider<SupabaseClient>((ref) {
+  return Supabase.instance.client;
+});
+
+final authServiceProvider = Provider<AuthService>((ref) {
+  return AuthService(ref.watch(supabaseClientProvider));
+});
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
-  return AuthRepository(
-    ref.watch(authServiceProvider),
-    ref.watch(sharedPreferencesProvider),
-  );
+  return AuthRepository(ref.watch(authServiceProvider));
 });
 
 final locationServiceProvider = Provider<LocationService>(

@@ -1,56 +1,40 @@
-import 'dart:convert';
-
-import 'package:shared_preferences/shared_preferences.dart';
-
 import '../../domain/models/user_model.dart';
 import '../services/auth_service.dart';
 
-/// Owns the authenticated user lifecycle: sign-in/up/out via [AuthService]
-/// plus session persistence so the user stays signed in across restarts.
+/// Owns the authenticated user lifecycle: sign-in/up/out via [AuthService].
+/// Session persistence is handled automatically by supabase_flutter.
 class AuthRepository {
-  AuthRepository(this._authService, this._prefs);
+  AuthRepository(this._authService);
 
   final AuthService _authService;
-  final SharedPreferences _prefs;
-
-  static const _userKey = 'auth.current_user';
 
   Future<UserModel?> signIn(String email, String password) async {
-    final user = await _authService.signIn(email, password);
-    if (user != null) await _persist(user);
-    return user;
+    return _authService.signIn(email, password);
   }
 
   Future<UserModel?> signUp(String name, String email, String password) async {
-    final user = await _authService.signUp(name, email, password);
-    if (user != null) await _persist(user);
-    return user;
+    return _authService.signUp(name, email, password);
   }
 
   Future<void> signOut() async {
     await _authService.signOut();
-    await _prefs.remove(_userKey);
   }
 
-  /// Hydrates the previously persisted user, if any.
+  /// Checks for an active Supabase session and fetches the user profile.
   Future<UserModel?> restoreSession() async {
-    final raw = _prefs.getString(_userKey);
-    if (raw == null) return null;
-    try {
-      return UserModel.fromJson(jsonDecode(raw) as Map<String, dynamic>);
-    } catch (_) {
-      await _prefs.remove(_userKey);
-      return null;
-    }
+    return _authService.getSessionUser();
   }
 
   Future<UserModel> markOnboardingCompleted(UserModel user) async {
-    final updated = user.copyWith(hasCompletedOnboarding: true);
-    await _persist(updated);
-    return updated;
+    await _authService.updateOnboardingCompleted(user.id);
+    return user.copyWith(hasCompletedOnboarding: true);
   }
 
-  Future<void> _persist(UserModel user) async {
-    await _prefs.setString(_userKey, jsonEncode(user.toJson()));
+  Future<void> sendPasswordReset(String email) async {
+    await _authService.sendPasswordReset(email);
+  }
+
+  Future<void> updatePassword(String newPassword) async {
+    await _authService.updatePassword(newPassword);
   }
 }

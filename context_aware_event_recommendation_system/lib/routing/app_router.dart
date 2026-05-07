@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../ui/auth/providers/auth_provider.dart';
+import '../ui/auth/widgets/forgot_password_screen.dart';
 import '../ui/auth/widgets/login_screen.dart';
 import '../ui/auth/widgets/register_screen.dart';
+import '../ui/auth/widgets/reset_password_screen.dart';
 import '../ui/core/motion/app_transitions.dart';
 import '../ui/error/widgets/error_screen.dart';
 import '../ui/home/widgets/dashboard_screen.dart';
@@ -12,16 +14,6 @@ import '../ui/onboarding/widgets/onboarding_screen.dart';
 import '../ui/profile/widgets/profile_screen.dart';
 import '../ui/suggestion/widgets/suggestion_detail_screen.dart';
 
-/// GoRouter configuration.
-///
-/// Routes:
-/// - /login → LoginScreen
-/// - /register → RegisterScreen
-/// - /onboarding → OnboardingScreen
-/// - /dashboard → DashboardScreen
-/// - /suggestion/:id → SuggestionDetailScreen
-/// - /profile → ProfileScreen
-/// - /error?kind=offline|location → ErrorScreen
 final routerProvider = Provider<GoRouter>((ref) {
   final authListenable = _AuthRouterListenable(ref);
   ref.onDispose(authListenable.dispose);
@@ -33,11 +25,19 @@ final routerProvider = Provider<GoRouter>((ref) {
       final auth = ref.read(authProvider);
       final loc = state.matchedLocation;
 
-      // Don't bounce the user mid sign-in/up.
-      if (auth.status == AuthStatus.loading) return null;
+      if (auth.status == AuthStatus.loading ||
+          auth.status == AuthStatus.initial) {
+        return null;
+      }
 
-      final atAuthRoute = loc == '/login' || loc == '/register';
-      final atOnboarding = loc == '/onboarding';
+      // Password recovery flow takes priority.
+      if (auth.status == AuthStatus.passwordRecovery) {
+        return loc == '/reset-password' ? null : '/reset-password';
+      }
+
+      final atAuthRoute = loc == '/login' ||
+          loc == '/register' ||
+          loc == '/forgot-password';
 
       if (auth.status != AuthStatus.authenticated) {
         return atAuthRoute ? null : '/login';
@@ -45,10 +45,10 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       final user = auth.user;
       if (user != null && !user.hasCompletedOnboarding) {
-        return atOnboarding ? null : '/onboarding';
+        return loc == '/onboarding' ? null : '/onboarding';
       }
 
-      if (atAuthRoute || atOnboarding) return '/dashboard';
+      if (atAuthRoute || loc == '/onboarding') return '/dashboard';
       return null;
     },
     routes: [
@@ -66,6 +66,22 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => AppTransitions.fadeThroughPage(
           pageKey: state.pageKey,
           child: const RegisterScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/forgot-password',
+        name: 'forgot-password',
+        pageBuilder: (context, state) => AppTransitions.fadeThroughPage(
+          pageKey: state.pageKey,
+          child: const ForgotPasswordScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/reset-password',
+        name: 'reset-password',
+        pageBuilder: (context, state) => AppTransitions.fadeThroughPage(
+          pageKey: state.pageKey,
+          child: const ResetPasswordScreen(),
         ),
       ),
       GoRoute(
@@ -125,8 +141,6 @@ final routerProvider = Provider<GoRouter>((ref) {
   );
 });
 
-/// Bridges Riverpod's [authProvider] to a [Listenable] so GoRouter can
-/// re-evaluate redirects on sign-in / sign-out.
 class _AuthRouterListenable extends ChangeNotifier {
   _AuthRouterListenable(Ref ref) {
     ref.listen<AuthState>(authProvider, (_, _) => notifyListeners());
