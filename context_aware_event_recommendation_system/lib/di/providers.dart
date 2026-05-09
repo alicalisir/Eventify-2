@@ -6,10 +6,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../data/repositories/auth_repository.dart';
 import '../data/repositories/context_repository.dart';
 import '../data/repositories/location_repository.dart';
+import '../data/repositories/places_repository.dart';
 import '../data/repositories/suggestion_repository.dart';
 import '../data/services/auth_service.dart';
 import '../data/services/context_service.dart';
+import '../data/services/gps_collection_service.dart';
 import '../data/services/location_service.dart';
+import '../data/services/places_service.dart';
 import '../data/services/weather_service.dart';
 
 /// Bootstrapped in main.dart via ProviderScope.overrides before runApp.
@@ -43,8 +46,25 @@ final contextServiceProvider = Provider<ContextService>(
   (ref) => ContextService(),
 );
 
+final gpsCollectionServiceProvider = Provider<GpsCollectionService>((ref) {
+  final service = GpsCollectionService(ref.watch(supabaseClientProvider));
+  ref.onDispose(service.stop);
+  return service;
+});
+
 final weatherServiceProvider = Provider<WeatherService>((ref) {
   return WeatherService(dotenv.env['OPENWEATHER_API_KEY'] ?? '');
+});
+
+final placesServiceProvider = Provider<PlacesService>((ref) {
+  return PlacesService(dotenv.env['GOOGLE_PLACES_API_KEY'] ?? '');
+});
+
+final placesRepositoryProvider = Provider<PlacesRepository>((ref) {
+  return PlacesRepository(
+    ref.watch(placesServiceProvider),
+    ref.watch(locationRepositoryProvider),
+  );
 });
 
 final contextRepositoryProvider = Provider<ContextRepository>((ref) {
@@ -52,6 +72,7 @@ final contextRepositoryProvider = Provider<ContextRepository>((ref) {
     ref.watch(contextServiceProvider),
     ref.watch(locationRepositoryProvider),
     ref.watch(weatherServiceProvider),
+    ref.watch(placesRepositoryProvider),
   );
 });
 
@@ -59,5 +80,6 @@ final suggestionRepositoryProvider = Provider<SuggestionRepository>((ref) {
   return SuggestionRepository(
     ref.watch(contextServiceProvider),
     ref.watch(sharedPreferencesProvider),
+    ref.watch(contextRepositoryProvider),
   );
 });

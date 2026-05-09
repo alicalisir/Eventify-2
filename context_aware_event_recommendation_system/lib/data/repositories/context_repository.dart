@@ -6,13 +6,20 @@ import '../../utils/app_logger.dart';
 import '../services/context_service.dart';
 import '../services/weather_service.dart';
 import 'location_repository.dart';
+import 'places_repository.dart';
 
 class ContextRepository {
-  ContextRepository(this._service, this._location, this._weather);
+  ContextRepository(
+    this._service,
+    this._location,
+    this._weather,
+    this._places,
+  );
 
   final ContextService _service;
   final LocationRepository _location;
   final WeatherService _weather;
+  final PlacesRepository _places;
 
   static const _contextTtl = Duration(minutes: 2);
   static const _personaTtl = Duration(minutes: 15);
@@ -67,6 +74,12 @@ class ContextRepository {
 
     final notificationsGranted = await Permission.notification.isGranted;
     final speed = position?.speed ?? 0;
+    final isStationary = speed < 0.5;
+
+    // Fetch nearby places only when stationary to avoid unnecessary API calls.
+    final nearbyPlaces = (position != null && isStationary)
+        ? await _places.getNearbyPlaces()
+        : const [];
 
     final fresh = ContextState(
       greeting: _greeting(now.hour),
@@ -77,12 +90,14 @@ class ContextRepository {
       locationLabel: locationLabel,
       activityLabel: _activityLabel(speed),
       weather: weatherData?.summary,
+      nearbyPlaces: List.unmodifiable(nearbyPlaces),
     );
 
     AppLogger.i(
       '[Context] Refreshed → ${fresh.greeting}, ${fresh.activityLabel}, '
       'location: ${fresh.locationLabel ?? 'unavailable'}, '
-      'weather: ${fresh.weather ?? 'unavailable'}',
+      'weather: ${fresh.weather ?? 'unavailable'}, '
+      'places: ${nearbyPlaces.length}',
     );
 
     _cachedContext = fresh;

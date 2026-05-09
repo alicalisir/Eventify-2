@@ -1,13 +1,22 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../domain/models/llm_context_payload.dart';
 import '../../domain/models/suggestion_model.dart';
+import '../../utils/app_logger.dart';
+import '../../utils/llm_prompt_builder.dart';
 import '../services/context_service.dart';
+import 'context_repository.dart';
 
 class SuggestionRepository {
-  SuggestionRepository(this._contextService, this._prefs);
+  SuggestionRepository(
+    this._contextService,
+    this._prefs,
+    this._contextRepository,
+  );
 
   final ContextService _contextService;
   final SharedPreferences _prefs;
+  final ContextRepository _contextRepository;
 
   static const _dismissedKey = 'suggestions.dismissed_ids';
   static const _cacheTtl = Duration(minutes: 5);
@@ -32,6 +41,31 @@ class SuggestionRepository {
   void invalidateCache() {
     _cached = null;
     _cacheExpiresAt = null;
+  }
+
+  /// Builds the LLM context payload from live context + persona data.
+  ///
+  /// In Faz 3, [LlmService] will receive this payload and return real suggestions.
+  /// Call [LlmPromptBuilder.build] on the result to get the ready-to-send prompt.
+  Future<LlmContextPayload> buildLlmPayload() async {
+    final context = await _contextRepository.getCurrentContext();
+    final persona = await _contextRepository.getUserPersona();
+
+    final payload = LlmContextPayload(
+      persona: persona,
+      context: context,
+      nearbyPlaces: context.nearbyPlaces,
+      builtAt: DateTime.now(),
+    );
+
+    AppLogger.d(
+      '[Suggestion] LLM payload built — '
+      '${persona.traits.length} traits, '
+      '${context.nearbyPlaces.length} places\n'
+      '${LlmPromptBuilder.build(payload)}',
+    );
+
+    return payload;
   }
 
   Future<Set<String>> getDismissedIds() async {

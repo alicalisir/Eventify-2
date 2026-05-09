@@ -1,6 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../../config/constants/app_strings.dart';
+import 'place_model.dart';
 
 part 'context_state.freezed.dart';
 
@@ -21,8 +22,11 @@ abstract class ContextState with _$ContextState {
     /// Motion state derived from GPS speed (e.g. "Stationary", "Walking").
     @Default('Stationary') String activityLabel,
 
-    /// Optional weather summary from a future weather service (e.g. "21° Clear").
+    /// Optional weather summary (e.g. "21° Clear").
     String? weather,
+
+    /// Nearby venues fetched from Google Places — populated only when stationary.
+    @Default(<PlaceModel>[]) List<PlaceModel> nearbyPlaces,
   }) = _ContextState;
 
   static ContextState initial() {
