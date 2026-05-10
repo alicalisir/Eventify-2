@@ -1,0 +1,10 @@
+# backend ML data
+backend/MLPipeline/outputs/
+backend/MLPipeline/catboost_info/
+
+
+# general
+*.csv
+*.tsv
+__pycache__/
+.env
