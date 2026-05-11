@@ -4,8 +4,10 @@ import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../utils/app_logger.dart';
+import 'app_usage_service.dart';
 
 /// Periodically collects GPS pings and uploads them to Supabase.
+/// Every 12th tick (≈ once per hour) also triggers app usage collection.
 ///
 /// Speed → movement_state thresholds match the synthetic training data:
 ///   < 0.5 m/s  → stationary
@@ -14,11 +16,15 @@ import '../../utils/app_logger.dart';
 ///   < 20.0 m/s → transit
 ///   ≥ 20.0 m/s → vehicle
 class GpsCollectionService {
-  GpsCollectionService(this._client);
+  GpsCollectionService(this._client, this._appUsage);
 
   final SupabaseClient _client;
+  final AppUsageService _appUsage;
 
   static const _interval = Duration(minutes: 5);
+  static const _appUsageEveryNTicks = 12; // every 60 minutes
+
+  int _tickCount = 0;
 
   Timer? _timer;
   String? _currentUserId;
@@ -42,11 +48,18 @@ class GpsCollectionService {
     _timer = null;
     _currentUserId = null;
     _stationaryStartTime = null;
+    _tickCount = 0;
     AppLogger.i('[GpsCollection] Stopped');
   }
 
   Future<void> _collectAndUpload() async {
     final userId = _currentUserId;
+    _tickCount++;
+
+    // Collect app usage once per hour (every _appUsageEveryNTicks GPS ticks)
+    if (userId != null && _tickCount % _appUsageEveryNTicks == 0) {
+      await _appUsage.collectAndUpload(userId);
+    }
     if (userId == null) return;
 
     try {

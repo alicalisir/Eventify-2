@@ -8,7 +8,9 @@ import '../data/repositories/context_repository.dart';
 import '../data/repositories/location_repository.dart';
 import '../data/repositories/places_repository.dart';
 import '../data/repositories/suggestion_repository.dart';
+import '../data/services/app_usage_service.dart';
 import '../data/services/auth_service.dart';
+import '../data/services/backend_service.dart';
 import '../data/services/context_service.dart';
 import '../data/services/gps_collection_service.dart';
 import '../data/services/location_service.dart';
@@ -42,12 +44,27 @@ final locationRepositoryProvider = Provider<LocationRepository>((ref) {
   return LocationRepository(ref.watch(locationServiceProvider));
 });
 
-final contextServiceProvider = Provider<ContextService>(
-  (ref) => ContextService(),
-);
+final backendServiceProvider = Provider<BackendService>((ref) {
+  final url = dotenv.env['BACKEND_URL'] ?? '';
+  return BackendService(url);
+});
+
+final contextServiceProvider = Provider<ContextService>((ref) {
+  return ContextService(
+    ref.watch(backendServiceProvider),
+    ref.watch(supabaseClientProvider),
+  );
+});
+
+final appUsageServiceProvider = Provider<AppUsageService>((ref) {
+  return AppUsageService(ref.watch(supabaseClientProvider));
+});
 
 final gpsCollectionServiceProvider = Provider<GpsCollectionService>((ref) {
-  final service = GpsCollectionService(ref.watch(supabaseClientProvider));
+  final service = GpsCollectionService(
+    ref.watch(supabaseClientProvider),
+    ref.watch(appUsageServiceProvider),
+  );
   ref.onDispose(service.stop);
   return service;
 });

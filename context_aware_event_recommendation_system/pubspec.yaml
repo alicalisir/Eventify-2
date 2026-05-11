@@ -56,6 +56,9 @@ dependencies:
   geolocator: ^14.0.2
   permission_handler: ^12.0.1
 
+  # App usage statistics (Android UsageStatsManager)
+  app_usage: ^4.1.0
+
   # Immutable models
   freezed_annotation: ^3.0.0
   json_annotation: ^4.9.0
