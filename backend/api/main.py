@@ -56,6 +56,8 @@ with open(_FEATURES_FILE) as f:
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ["SUPABASE_ANON_KEY"]
 GOOGLE_PLACES_KEY = os.environ.get("GOOGLE_PLACES_API_KEY", "")
+# Local Mistral via Ollama — run: ollama pull mistral && ollama serve
+MISTRAL_URL = os.environ.get("MISTRAL_URL", "http://localhost:11434")
 _SUPA_HEADERS = {
     "apikey": SUPABASE_KEY,
     "Authorization": f"Bearer {SUPABASE_KEY}",
@@ -589,10 +591,174 @@ def _fetch_screen_events(user_id: str) -> pd.DataFrame:
     })
     return pd.DataFrame(rows) if rows else pd.DataFrame()
 
+# ─────────────────────────────────────────── LLM (local Mistral / Ollama) ────
+
+_LLM_SYSTEM = (
+    "Sen kişiselleştirilmiş etkinlik öneri asistanısın. "
+    "Verilen kullanıcı profili, güncel bağlam ve yakın mekan listesine göre "
+    "Türkçe olarak tam olarak 3 etkinlik önerisi üret. "
+    "Sadece geçerli JSON dizisi döndür, başka hiçbir metin yazma."
+)
+
+_MOV_LABELS = {
+    "stationary": "Hareketsiz", "walking": "Yürüyor",
+    "cycling": "Bisiklet sürüyor", "transit": "Toplu taşımada",
+    "vehicle": "Araçta",
+}
+_CAT_LABELS = {
+    "social": "sosyal medya", "gaming": "oyun", "streaming": "dizi/film",
+    "music": "müzik", "productivity": "iş/verimlilik", "education": "eğitim",
+    "shopping": "alışveriş", "news": "haber", "fitness": "fitness",
+    "messaging": "mesajlaşma", "video": "video", "reading": "okuma",
+    "browser": "web gezintisi", "short_video": "kısa video",
+}
+_TIME_LABELS = [
+    (0, 6, "Gece"), (6, 9, "Sabah erken"), (9, 12, "Sabah"),
+    (12, 14, "Öğle"), (14, 17, "Öğleden sonra"), (17, 20, "Akşam üstü"),
+    (20, 24, "Gece"),
+]
+
+
+def _build_llm_prompt(
+    persona_class: str,
+    meta: dict,
+    raw_places: list[dict],
+    ctx: dict,
+    now: datetime,
+) -> str:
+    hour = now.hour
+    time_label = next((l for a, b, l in _TIME_LABELS if a <= hour < b), "Gece")
+
+    traits_str = ", ".join(
+        f"{t['label']} (%{int(t['confidence'] * 100)})" for t in meta["traits"]
+    )
+    prefs = meta["preferences"]
+    prefs_str = (
+        f"açık hava={prefs.get('outdoor', 0):.1f}, "
+        f"sosyal={prefs.get('social', 0):.1f}, "
+        f"yemek={prefs.get('food', 0):.1f}, "
+        f"kültür={prefs.get('culture', 0):.1f}"
+    )
+
+    movement = _MOV_LABELS.get(ctx.get("movement_state", "stationary"), "Hareketsiz")
+    top_cat = _CAT_LABELS.get(ctx.get("top_app_category", ""), "belirsiz")
+
+    places_lines = []
+    for i, p in enumerate(raw_places[:8]):
+        name = (p.get("displayName") or {}).get("text", "?")
+        types = p.get("types") or []
+        cat = next((_TYPE_TO_CATEGORY.get(t) for t in types if t in _TYPE_TO_CATEGORY), "Mekan")
+        addr = p.get("shortFormattedAddress", "")
+        rating = p.get("rating")
+        r_str = f" ★{rating:.1f}" if rating else ""
+        places_lines.append(f"{i + 1}. {name} — {cat}{r_str} — {addr}")
+
+    places_str = "\n".join(places_lines) or "Yakın mekan bulunamadı."
+
+    return f"""## Kullanıcı Profili
+Persona: {meta['display']} ({persona_class})
+Özellikler: {traits_str}
+Tercihler: {prefs_str}
+
+## Güncel Bağlam
+Zaman: {time_label} ({hour:02d}:{now.minute:02d})
+Hareket durumu: {movement}
+Son 24 saatte ağırlıklı uygulama türü: {top_cat}
+
+## Yakındaki Mekanlar (1.5 km içinde)
+{places_str}
+
+## Görev
+Bu kullanıcı için en uygun 3 mekanı seç ve etkinlik öner. JSON formatında döndür:
+[
+  {{
+    "title": "kısa etkinlik başlığı",
+    "description": "1-2 cümle açıklama",
+    "rationale": "neden bu kullanıcıya uygun (1 cümle)",
+    "category": "Movement|Recharge|Learning|Social|Health",
+    "venue_index": 0,
+    "estimated_minutes": 30
+  }}
+]
+venue_index, yukarıdaki numaralı listede hangi mekanı seçtiğini belirtir (0-indexed)."""
+
+
+def _call_mistral(
+    persona_class: str,
+    meta: dict,
+    raw_places: list[dict],
+    ctx: dict,
+    now: datetime,
+) -> Optional[list[dict]]:
+    if not raw_places:
+        return None
+    try:
+        prompt = _build_llm_prompt(persona_class, meta, raw_places, ctx, now)
+        with httpx.Client(timeout=30) as client:
+            resp = client.post(
+                f"{MISTRAL_URL}/v1/chat/completions",
+                json={
+                    "model": "mistral",
+                    "messages": [
+                        {"role": "system", "content": _LLM_SYSTEM},
+                        {"role": "user", "content": prompt},
+                    ],
+                    "temperature": 0.7,
+                    "stream": False,
+                },
+            )
+        if resp.status_code != 200:
+            return None
+        text = resp.json()["choices"][0]["message"]["content"].strip()
+        start, end = text.find("["), text.rfind("]") + 1
+        if start == -1 or end == 0:
+            return None
+        parsed = json.loads(text[start:end])
+        return parsed if isinstance(parsed, list) else None
+    except Exception:
+        return None
+
+
+def _llm_to_suggestions(
+    llm_items: list[dict],
+    raw_places: list[dict],
+    user_lat: float,
+    user_lon: float,
+    now_str: str,
+) -> list[SuggestionResponse]:
+    results = []
+    for item in llm_items[:3]:
+        idx = item.get("venue_index", 0)
+        if not (0 <= idx < len(raw_places)):
+            idx = 0
+        place = raw_places[idx]
+        loc = place.get("location") or {}
+        place_lat = float(loc.get("latitude", 0))
+        place_lon = float(loc.get("longitude", 0))
+        distance_km = _haversine_km(user_lat, user_lon, place_lat, place_lon)
+        addr = place.get("shortFormattedAddress") or ""
+        walking_min = item.get("estimated_minutes") or max(1, int((distance_km / 5.0) * 60))
+        results.append(SuggestionResponse(
+            id=f"llm_{place.get('id', str(idx))}",
+            title=item.get("title", ""),
+            description=item.get("description", ""),
+            rationale=item.get("rationale", ""),
+            category=item.get("category", "Recharge"),
+            distance=round(distance_km, 1),
+            estimated_minutes=walking_min,
+            address=addr or None,
+            latitude=place_lat,
+            longitude=place_lon,
+            tags=[],
+            created_at=now_str,
+        ))
+    return results
+
+
 # ─────────────────────────────────────────── classification ──────────────────
 
-def _classify(user_id: str) -> tuple[str, dict, int]:
-    """Returns (persona_class, meta_dict, signals_today)."""
+def _classify(user_id: str) -> tuple[str, dict, int, dict]:
+    """Returns (persona_class, meta_dict, signals_today, context_summary)."""
     gps    = _fetch_gps(user_id)
     apps   = _fetch_app_sessions(user_id)
     screen = _fetch_screen_events(user_id)
@@ -614,7 +780,32 @@ def _classify(user_id: str) -> tuple[str, dict, int]:
     pred_idx = int(_model.predict(X)[0])
     persona_class = _label_classes[pred_idx]
     meta = _PERSONA_META.get(persona_class, _PERSONA_META["HIBRIT"])
-    return persona_class, meta, signals_today
+
+    # Build lightweight context summary for LLM prompt
+    context_summary: dict = {}
+
+    # Latest movement state from most recent GPS ping
+    if not gps.empty:
+        context_summary["movement_state"] = str(gps.iloc[0].get("movement_state", "stationary"))
+    else:
+        context_summary["movement_state"] = "stationary"
+
+    # Dominant app category in the last 24 h
+    if not apps.empty:
+        cutoff = pd.Timestamp.now(tz="UTC") - pd.Timedelta(hours=24)
+        apps_ts = apps.copy()
+        apps_ts["ts"] = pd.to_datetime(apps_ts["timestamp"], utc=True, errors="coerce")
+        recent = apps_ts[apps_ts["ts"] >= cutoff]
+        source = recent if not recent.empty else apps_ts
+        if "category" in source.columns and not source.empty:
+            top = source.groupby("category")["duration_min"].sum().idxmax()
+            context_summary["top_app_category"] = str(top)
+        else:
+            context_summary["top_app_category"] = "unknown"
+    else:
+        context_summary["top_app_category"] = "unknown"
+
+    return persona_class, meta, signals_today, context_summary
 
 # ─────────────────────────────────────────── routes ──────────────────────────
 
@@ -629,7 +820,7 @@ def health():
 
 @app.get("/api/persona/{user_id}", response_model=PersonaResponse)
 def get_persona(user_id: str):
-    persona_class, meta, signals_today = _classify(user_id)
+    persona_class, meta, signals_today, _ = _classify(user_id)
     return PersonaResponse(
         persona_id=persona_class,
         persona_name=meta["display"],
@@ -646,13 +837,24 @@ def get_recommendations(
     lat: Optional[float] = Query(None),
     lon: Optional[float] = Query(None),
 ):
-    persona_class, meta, _ = _classify(user_id)
-    now_str = datetime.now(timezone.utc).isoformat()
+    persona_class, meta, _, ctx = _classify(user_id)
+    now = datetime.now(timezone.utc)
+    now_str = now.isoformat()
 
-    # When GPS provided, fetch real nearby venues from Google Places.
+    # When GPS provided, fetch real nearby venues and generate LLM recommendations.
     if lat is not None and lon is not None and GOOGLE_PLACES_KEY:
         place_types = _PERSONA_PLACE_TYPES.get(persona_class, _PERSONA_PLACE_TYPES["HIBRIT"])
         raw_places = _fetch_google_places(lat, lon, place_types)
+
+        # Tier 1: LLM-enriched recommendations (persona + places + app context → Mistral)
+        if raw_places:
+            llm_items = _call_mistral(persona_class, meta, raw_places, ctx, now)
+            if llm_items:
+                suggestions = _llm_to_suggestions(llm_items, raw_places, lat, lon, now_str)
+                if suggestions:
+                    return suggestions
+
+        # Tier 2: Direct Places results without LLM enrichment
         place_suggestions = [
             s
             for i, p in enumerate(raw_places)
@@ -661,7 +863,7 @@ def get_recommendations(
         if place_suggestions:
             return place_suggestions[:6]
 
-    # Fallback: static persona-based recommendations (no GPS or Places key).
+    # Tier 3: Static persona-based recommendations (offline fallback)
     return [
         SuggestionResponse(
             id=f"{persona_class}_{i}",

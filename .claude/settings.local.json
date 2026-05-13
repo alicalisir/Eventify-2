@@ -14,7 +14,12 @@
       "Bash(dart format *)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Huawei\\\\Desktop\\\\Klasorlerim\\\\Projelerim\\\\context_aware_event_recommendation_system\" -Recurse -Directory)",
       "Bash(xargs cat *)",
-      "PowerShell(flutter doctor *)"
+      "PowerShell(flutter doctor *)",
+      "Bash(uvicorn main:app --host 0.0.0.0 --port 8000)",
+      "Bash(curl -s http://localhost:8000/health)",
+      "Bash(curl -s \"http://localhost:8000/api/recommendations/test-user-id?lat=41.0082&lon=28.9784\")",
+      "Bash(python -m json.tool)",
+      "Bash(python -m py_compile main.py)"
     ]
   }
 }

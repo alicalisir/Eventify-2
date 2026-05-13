@@ -15,21 +15,24 @@ class ContextAwareApp extends ConsumerWidget {
     final router = ref.watch(routerProvider);
     final authState = ref.watch(authProvider);
 
-    // Start GPS immediately if session was already restored before the widget
-    // tree was built (restoreSession runs before runApp, so ref.listen misses
-    // the initial authenticated state).
+    // Start GPS + screen tracking immediately if already authenticated.
     final gps = ref.read(gpsCollectionServiceProvider);
+    final screenEvents = ref.read(screenEventServiceProvider);
     if (authState.status == AuthStatus.authenticated && authState.user != null) {
       gps.start(authState.user!.id);
+      screenEvents.start();
     }
 
-    // Also handle future auth state changes (login / logout).
+    // Handle future auth state changes (login / logout).
     ref.listen<AuthState>(authProvider, (previous, next) {
       final gps = ref.read(gpsCollectionServiceProvider);
+      final screenEvents = ref.read(screenEventServiceProvider);
       if (next.status == AuthStatus.authenticated && next.user != null) {
         gps.start(next.user!.id);
+        screenEvents.start();
       } else if (next.status == AuthStatus.unauthenticated) {
         gps.stop();
+        screenEvents.stop();
       }
     });
 

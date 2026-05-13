@@ -15,6 +15,7 @@ import '../data/services/context_service.dart';
 import '../data/services/gps_collection_service.dart';
 import '../data/services/location_service.dart';
 import '../data/services/places_service.dart';
+import '../data/services/screen_event_service.dart';
 import '../data/services/weather_service.dart';
 
 /// Bootstrapped in main.dart via ProviderScope.overrides before runApp.
@@ -61,10 +62,15 @@ final appUsageServiceProvider = Provider<AppUsageService>((ref) {
   return AppUsageService(ref.watch(supabaseClientProvider));
 });
 
+final screenEventServiceProvider = Provider<ScreenEventService>((ref) {
+  return ScreenEventService(ref.watch(supabaseClientProvider));
+});
+
 final gpsCollectionServiceProvider = Provider<GpsCollectionService>((ref) {
   final service = GpsCollectionService(
     ref.watch(supabaseClientProvider),
     ref.watch(appUsageServiceProvider),
+    ref.watch(screenEventServiceProvider),
   );
   ref.onDispose(service.stop);
   return service;
