@@ -13,8 +13,17 @@ class ContextAwareApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
+    final authState = ref.watch(authProvider);
 
-    // Start GPS collection when authenticated, stop on sign-out.
+    // Start GPS immediately if session was already restored before the widget
+    // tree was built (restoreSession runs before runApp, so ref.listen misses
+    // the initial authenticated state).
+    final gps = ref.read(gpsCollectionServiceProvider);
+    if (authState.status == AuthStatus.authenticated && authState.user != null) {
+      gps.start(authState.user!.id);
+    }
+
+    // Also handle future auth state changes (login / logout).
     ref.listen<AuthState>(authProvider, (previous, next) {
       final gps = ref.read(gpsCollectionServiceProvider);
       if (next.status == AuthStatus.authenticated && next.user != null) {

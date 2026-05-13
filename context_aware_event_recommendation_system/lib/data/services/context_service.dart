@@ -4,24 +4,33 @@ import '../../domain/models/context_state.dart';
 import '../../domain/models/persona_model.dart';
 import '../../domain/models/suggestion_model.dart';
 import '../../utils/app_logger.dart';
+import '../repositories/location_repository.dart';
 import 'backend_service.dart';
 
 class ContextService {
-  ContextService(this._backend, this._supabase);
+  ContextService(this._backend, this._supabase, this._location);
 
   final BackendService _backend;
   final SupabaseClient _supabase;
+  final LocationRepository _location;
 
   String? get _userId => _supabase.auth.currentUser?.id;
 
   /// Returns AI-generated suggestions from the backend.
+  /// Passes current GPS coordinates so the backend can fetch real nearby venues.
   /// Falls back to hardcoded mock data when the backend is unreachable.
   Future<List<SuggestionModel>> getSuggestions() async {
     final userId = _userId;
     if (userId != null) {
-      final suggestions = await _backend.getRecommendations(userId);
+      final position = await _location.getCurrentPosition();
+      final suggestions = await _backend.getRecommendations(
+        userId,
+        lat: position?.latitude,
+        lon: position?.longitude,
+      );
       if (suggestions.isNotEmpty) {
-        AppLogger.i('[Context] ${suggestions.length} suggestions from backend');
+        AppLogger.i('[Context] ${suggestions.length} suggestions from backend '
+            '(gps: ${position != null ? '${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}' : 'unavailable'})');
         return suggestions;
       }
     }

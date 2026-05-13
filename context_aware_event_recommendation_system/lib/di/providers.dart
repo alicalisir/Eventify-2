@@ -53,6 +53,7 @@ final contextServiceProvider = Provider<ContextService>((ref) {
   return ContextService(
     ref.watch(backendServiceProvider),
     ref.watch(supabaseClientProvider),
+    ref.watch(locationRepositoryProvider),
   );
 });
 

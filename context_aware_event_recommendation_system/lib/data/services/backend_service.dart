@@ -47,9 +47,19 @@ class BackendService {
     }
   }
 
-  Future<List<SuggestionModel>> getRecommendations(String userId) async {
+  Future<List<SuggestionModel>> getRecommendations(
+    String userId, {
+    double? lat,
+    double? lon,
+  }) async {
     try {
-      final uri = Uri.parse('$_baseUrl/api/recommendations/$userId');
+      var uri = Uri.parse('$_baseUrl/api/recommendations/$userId');
+      if (lat != null && lon != null) {
+        uri = uri.replace(queryParameters: {
+          'lat': lat.toStringAsFixed(6),
+          'lon': lon.toStringAsFixed(6),
+        });
+      }
       final response = await http.get(uri).timeout(_timeout);
 
       if (response.statusCode != 200) {

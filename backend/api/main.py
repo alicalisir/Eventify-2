@@ -9,6 +9,7 @@ and classifies the user with the pre-trained CatBoost model.
 from __future__ import annotations
 
 import json
+import math as _math
 import os
 import sys
 from datetime import datetime, timezone
@@ -20,7 +21,7 @@ import numpy as np
 import pandas as pd
 from catboost import CatBoostClassifier
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -53,7 +54,8 @@ with open(_FEATURES_FILE) as f:
 # ─────────────────────────────────────────── Supabase REST ───────────────────
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
-SUPABASE_KEY = os.environ["SUPABASE_ANON_KEY"]
+SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ["SUPABASE_ANON_KEY"]
+GOOGLE_PLACES_KEY = os.environ.get("GOOGLE_PLACES_API_KEY", "")
 _SUPA_HEADERS = {
     "apikey": SUPABASE_KEY,
     "Authorization": f"Bearer {SUPABASE_KEY}",
@@ -71,6 +73,161 @@ def _supa_get(table: str, params: dict) -> list[dict]:
         if resp.status_code == 200:
             return resp.json() or []
         return []
+
+# ─────────────────────────────────────────── Google Places ───────────────────
+
+_PLACES_URL = "https://places.googleapis.com/v1/places:searchNearby"
+_PLACES_FIELD_MASK = (
+    "places.id,places.displayName,places.types,"
+    "places.location,places.shortFormattedAddress,places.rating"
+)
+
+# Venue types each persona prefers (Google Places New API type strings)
+_PERSONA_PLACE_TYPES: dict[str, list[str]] = {
+    "ERKENCI":         ["cafe", "park", "gym", "bakery", "restaurant"],
+    "EVCIMEN":         ["cafe", "restaurant", "book_store", "library", "park"],
+    "GECE_KUSU":       ["bar", "night_club", "restaurant", "movie_theater", "cafe"],
+    "HIBRIT":          ["cafe", "restaurant", "park", "museum", "bar"],
+    "ICERIK_TUKETICI": ["movie_theater", "museum", "library", "cafe", "art_gallery"],
+    "KRIZ_DUZENSIZ":   ["cafe", "park", "restaurant", "book_store", "spa"],
+    "OGRENCI":         ["library", "cafe", "book_store", "museum", "park"],
+    "OYUNCU":          ["cafe", "restaurant", "park", "shopping_mall", "movie_theater"],
+    "PROFESYONEL":     ["restaurant", "cafe", "bar", "museum", "performing_arts_theater"],
+    "SEYYAH":          ["park", "museum", "tourist_attraction", "art_gallery", "performing_arts_theater"],
+    "SOSYAL":          ["restaurant", "bar", "cafe", "performing_arts_theater", "park"],
+    "SPORCU":          ["gym", "park", "sports_complex", "restaurant", "cafe"],
+}
+
+_TYPE_TO_CATEGORY: dict[str, str] = {
+    "cafe": "Recharge", "coffee_shop": "Recharge", "restaurant": "Recharge",
+    "bakery": "Recharge", "shopping_mall": "Recharge",
+    "bar": "Social", "night_club": "Social", "performing_arts_theater": "Social",
+    "park": "Movement", "tourist_attraction": "Movement", "hiking_area": "Movement",
+    "gym": "Health", "sports_complex": "Health", "fitness_center": "Health",
+    "museum": "Learning", "art_gallery": "Learning", "library": "Learning",
+    "movie_theater": "Learning", "book_store": "Learning",
+}
+
+_TYPE_TO_TAGS: dict[str, list[str]] = {
+    "cafe": ["Kafe", "İçecek"], "coffee_shop": ["Kafe", "Kahve"],
+    "restaurant": ["Yemek", "Restoran"], "bakery": ["Fırın", "Tatlı"],
+    "bar": ["Bar", "Sosyal"], "night_club": ["Gece", "Müzik"],
+    "performing_arts_theater": ["Tiyatro", "Kültür"],
+    "park": ["Park", "Açık Hava"],
+    "gym": ["Spor", "Fitness"], "sports_complex": ["Spor", "Aktif"],
+    "museum": ["Müze", "Kültür"], "art_gallery": ["Sanat", "Galeri"],
+    "library": ["Kütüphane", "Sessiz"], "movie_theater": ["Sinema", "Film"],
+    "book_store": ["Kitapçı", "Okuma"], "shopping_mall": ["AVM", "Alışveriş"],
+    "tourist_attraction": ["Keşif", "Gezi"],
+}
+
+_CATEGORY_TO_PREF_KEY: dict[str, str] = {
+    "Recharge": "food", "Social": "social",
+    "Movement": "outdoor", "Health": "outdoor", "Learning": "culture",
+}
+
+
+def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    dlat = _math.radians(lat2 - lat1)
+    dlon = _math.radians(lon2 - lon1)
+    a = (
+        _math.sin(dlat / 2) ** 2
+        + _math.cos(_math.radians(lat1))
+        * _math.cos(_math.radians(lat2))
+        * _math.sin(dlon / 2) ** 2
+    )
+    return 2 * 6371.0 * _math.asin(_math.sqrt(a))
+
+
+def _fetch_google_places(lat: float, lon: float, types: list[str]) -> list[dict]:
+    if not GOOGLE_PLACES_KEY:
+        return []
+    try:
+        with httpx.Client(timeout=10) as client:
+            resp = client.post(
+                _PLACES_URL,
+                json={
+                    "locationRestriction": {
+                        "circle": {
+                            "center": {"latitude": lat, "longitude": lon},
+                            "radius": 1500.0,
+                        }
+                    },
+                    "includedTypes": types[:5],
+                    "maxResultCount": 10,
+                    "rankPreference": "DISTANCE",
+                },
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Goog-Api-Key": GOOGLE_PLACES_KEY,
+                    "X-Goog-FieldMask": _PLACES_FIELD_MASK,
+                },
+            )
+        if resp.status_code == 200:
+            return resp.json().get("places", [])
+    except Exception:
+        pass
+    return []
+
+
+def _place_to_suggestion(
+    place: dict,
+    user_lat: float,
+    user_lon: float,
+    meta: dict,
+    idx: int,
+    now_str: str,
+) -> Optional[SuggestionResponse]:
+    try:
+        name = (place.get("displayName") or {}).get("text", "")
+        if not name:
+            return None
+
+        loc = place.get("location") or {}
+        place_lat = float(loc.get("latitude", 0))
+        place_lon = float(loc.get("longitude", 0))
+        distance_km = _haversine_km(user_lat, user_lon, place_lat, place_lon)
+
+        types: list[str] = place.get("types") or []
+        category = next(
+            (_TYPE_TO_CATEGORY[t] for t in types if t in _TYPE_TO_CATEGORY),
+            "Recharge",
+        )
+        tags = next(
+            (_TYPE_TO_TAGS[t] for t in types if t in _TYPE_TO_TAGS),
+            [],
+        )
+        address = place.get("shortFormattedAddress") or ""
+        rating = place.get("rating")
+        rating_str = f" — {rating:.1f}★" if rating else ""
+
+        walking_min = max(1, int((distance_km / 5.0) * 60))
+
+        pref_key = _CATEGORY_TO_PREF_KEY.get(category, "food")
+        pref_score = meta["preferences"].get(pref_key, 0.5)
+
+        rationale = (
+            f"Sana {distance_km:.1f} km yakında{rating_str}. "
+            f"Bu tür mekanlar senin profil tipine {int(pref_score * 100)}% uyuyor."
+        )
+
+        return SuggestionResponse(
+            id=f"place_{place.get('id', str(idx))}",
+            title=name,
+            description=address or name,
+            rationale=rationale,
+            category=category,
+            distance=round(distance_km, 1),
+            estimated_minutes=walking_min,
+            address=address or None,
+            latitude=place_lat,
+            longitude=place_lon,
+            tags=tags,
+            created_at=now_str,
+        )
+    except Exception:
+        return None
+
 
 # ─────────────────────────────────────────── persona catalogue ───────────────
 # Each persona class from the model maps to human-readable traits,
@@ -484,9 +641,27 @@ def get_persona(user_id: str):
 
 
 @app.get("/api/recommendations/{user_id}", response_model=list[SuggestionResponse])
-def get_recommendations(user_id: str):
+def get_recommendations(
+    user_id: str,
+    lat: Optional[float] = Query(None),
+    lon: Optional[float] = Query(None),
+):
     persona_class, meta, _ = _classify(user_id)
     now_str = datetime.now(timezone.utc).isoformat()
+
+    # When GPS provided, fetch real nearby venues from Google Places.
+    if lat is not None and lon is not None and GOOGLE_PLACES_KEY:
+        place_types = _PERSONA_PLACE_TYPES.get(persona_class, _PERSONA_PLACE_TYPES["HIBRIT"])
+        raw_places = _fetch_google_places(lat, lon, place_types)
+        place_suggestions = [
+            s
+            for i, p in enumerate(raw_places)
+            if (s := _place_to_suggestion(p, lat, lon, meta, i, now_str)) is not None
+        ]
+        if place_suggestions:
+            return place_suggestions[:6]
+
+    # Fallback: static persona-based recommendations (no GPS or Places key).
     return [
         SuggestionResponse(
             id=f"{persona_class}_{i}",

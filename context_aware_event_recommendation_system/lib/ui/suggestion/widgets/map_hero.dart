@@ -41,7 +41,7 @@ class _MapHeroState extends State<MapHero> with SingleTickerProviderStateMixin {
     final theme = Theme.of(context);
     final hue = s.category.categoryHue;
     final base = HSLColor.fromAHSL(1, hue, 0.50, 0.85).toColor();
-    final deep = HSLColor.fromAHSL(1, hue + 20, 0.60, 0.72).toColor();
+    final deep = HSLColor.fromAHSL(1, (hue + 20) % 360, 0.60, 0.72).toColor();
 
     return SizedBox(
       height: widget.height,

@@ -189,6 +189,7 @@ class AppUsageService {
           'app_name': info.packageName,
           'category': category,
           'duration_min': durationMin,
+          'state': 'foreground',
         });
 
         estimatedUnlocks++;
