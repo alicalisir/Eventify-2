@@ -166,7 +166,7 @@ class AppUsageService {
 
   /// Collects app usage for the last [windowHours] hours and uploads to Supabase.
   /// Should be called periodically (e.g. every hour alongside GPS collection).
-  Future<void> collectAndUpload(String userId, {int windowHours = 1}) async {
+  Future<void> collectAndUpload(String userId, {int windowHours = 24}) async {
     try {
       final end = DateTime.now();
       final start = end.subtract(Duration(hours: windowHours));
@@ -185,7 +185,7 @@ class AppUsageService {
 
         sessions.add({
           'user_id': userId,
-          'timestamp': start.toIso8601String(),
+          'timestamp': info.lastForeground.toIso8601String(),
           'app_name': info.packageName,
           'category': category,
           'duration_min': durationMin,
@@ -196,7 +196,9 @@ class AppUsageService {
       }
 
       if (sessions.isNotEmpty) {
-        await _client.from('app_sessions').insert(sessions);
+        await _client
+            .from('app_sessions')
+            .upsert(sessions, onConflict: 'user_id,app_name,timestamp');
         AppLogger.i('[AppUsage] Uploaded ${sessions.length} sessions');
       }
 

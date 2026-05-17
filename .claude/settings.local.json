@@ -19,7 +19,8 @@
       "Bash(curl -s http://localhost:8000/health)",
       "Bash(curl -s \"http://localhost:8000/api/recommendations/test-user-id?lat=41.0082&lon=28.9784\")",
       "Bash(python -m json.tool)",
-      "Bash(python -m py_compile main.py)"
+      "Bash(python -m py_compile main.py)",
+      "PowerShell(cd \"C:\\\\Users\\\\alief\\\\Desktop\\\\Context-Aware-Event-Recommendation-System\"; Get-ChildItem -Force | Select-Object Name, @{Name=\"Type\"; Expression={if \\($_.PSIsContainer\\) {\"DIR\"} else {\"FILE\"}}} | Format-Table -AutoSize)"
     ]
   }
 }

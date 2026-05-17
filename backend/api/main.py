@@ -715,6 +715,9 @@ def _call_mistral(
             return None
         parsed = json.loads(text[start:end])
         return parsed if isinstance(parsed, list) else None
+    except httpx.ConnectError as e:
+        logger.warning("[mistral] Bağlantı kurulamadı → %s: %s", MISTRAL_URL, e)
+        return None
     except Exception:
         return None
 
@@ -816,6 +819,16 @@ def health():
         "model": str(_MODEL_FILE.name),
         "personas": len(_label_classes),
     }
+
+
+@app.get("/api/health/llm")
+def health_llm():
+    try:
+        with httpx.Client(timeout=5) as c:
+            r = c.get(f"{MISTRAL_URL}/api/tags")
+            return {"url": MISTRAL_URL, "status": r.status_code, "models": r.json().get("models", [])}
+    except Exception as e:
+        return {"url": MISTRAL_URL, "status": "unreachable", "error": str(e)}
 
 
 @app.get("/api/persona/{user_id}", response_model=PersonaResponse)
