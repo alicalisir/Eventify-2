@@ -10,6 +10,10 @@ class ActivityRecognitionReceiver : BroadcastReceiver() {
         const val PREFS_NAME = "activity_recognition"
         const val PREFS_KEY  = "current_state"
         const val ACTION     = "com.example.caers.ACTIVITY_RECOGNITION"
+
+        // Bridge key for Dart background service to read via SharedPreferences
+        private const val FLUTTER_PREFS = "FlutterSharedPreferences"
+        private const val FLUTTER_KEY   = "flutter.activity_recognition_state"
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -17,20 +21,24 @@ class ActivityRecognitionReceiver : BroadcastReceiver() {
         val result = ActivityRecognitionResult.extractResult(intent) ?: return
         val activity = result.mostProbableActivity
 
-        // Confidence threshold — ignore low-confidence readings
         if (activity.confidence < 50) return
 
         val state = when (activity.type) {
             DetectedActivity.WALKING,
             DetectedActivity.ON_FOOT,
-            DetectedActivity.RUNNING  -> "walking"
+            DetectedActivity.RUNNING   -> "walking"
             DetectedActivity.ON_BICYCLE -> "cycling"
             DetectedActivity.IN_VEHICLE -> "vehicle"
             DetectedActivity.STILL      -> "stationary"
-            else                        -> return  // UNKNOWN / TILTING — keep previous
+            else                        -> return
         }
 
+        // Write to native prefs (used by MainActivity MethodChannel)
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit().putString(PREFS_KEY, state).apply()
+
+        // Write to FlutterSharedPreferences for Dart background service
+        context.getSharedPreferences(FLUTTER_PREFS, Context.MODE_PRIVATE)
+            .edit().putString(FLUTTER_KEY, state).apply()
     }
 }

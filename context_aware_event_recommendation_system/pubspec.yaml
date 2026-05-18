@@ -68,6 +68,9 @@ dependencies:
   supabase_flutter: ^2.9.1
   flutter_dotenv: ^6.0.1
 
+  # Background data collection (persistent ForegroundService)
+  flutter_background_service: ^5.0.8
+
   # Logging
   logger: ^2.5.0
 

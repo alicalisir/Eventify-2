@@ -14,6 +14,10 @@ class MainActivity : FlutterActivity() {
     private companion object {
         const val SCREEN_CHANNEL   = "com.example.caers/screen_events"
         const val ACTIVITY_CHANNEL = "com.example.caers/activity_recognition"
+
+        // Mirrors ScreenEventService bridge constants
+        const val FLUTTER_PREFS    = "FlutterSharedPreferences"
+        const val SCREEN_BUFFER_KEY = "flutter.screen_events_buffer"
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -42,14 +46,12 @@ class MainActivity : FlutterActivity() {
                         result.success(null)
                     }
                     "getPendingEvents" -> {
-                        val prefs = getSharedPreferences(
-                            ScreenEventService.PREFS_NAME, Context.MODE_PRIVATE
-                        )
-                        result.success(prefs.getString(ScreenEventService.PREFS_KEY, "[]"))
+                        val prefs = getSharedPreferences(FLUTTER_PREFS, Context.MODE_PRIVATE)
+                        result.success(prefs.getString(SCREEN_BUFFER_KEY, "[]"))
                     }
                     "clearEvents" -> {
-                        getSharedPreferences(ScreenEventService.PREFS_NAME, Context.MODE_PRIVATE)
-                            .edit().putString(ScreenEventService.PREFS_KEY, "[]").apply()
+                        getSharedPreferences(FLUTTER_PREFS, Context.MODE_PRIVATE)
+                            .edit().putString(SCREEN_BUFFER_KEY, "[]").apply()
                         result.success(null)
                     }
                     else -> result.notImplemented()

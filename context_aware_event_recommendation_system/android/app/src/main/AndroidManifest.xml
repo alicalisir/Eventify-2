@@ -19,9 +19,13 @@
     <!-- Foreground service -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
 
     <!-- Activity recognition (runtime permission on Android 10+) -->
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION"/>
+
+    <!-- Boot restart -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
 
     <application
         android:label="context_aware_event_recommendation_system"
@@ -47,11 +51,17 @@
             </intent-filter>
         </activity>
 
-        <!-- Screen event background service -->
+        <!-- Native screen event service (captures SCREEN_ON/OFF/USER_PRESENT) -->
         <service
             android:name=".ScreenEventService"
             android:exported="false"
             android:foregroundServiceType="dataSync"/>
+
+        <!-- flutter_background_service: add location type so GPS works from ForegroundService -->
+        <service
+            android:name="id.flutter.flutter_background_service.BackgroundService"
+            android:foregroundServiceType="location|dataSync"
+            tools:node="merge"/>
 
         <!-- Activity recognition receiver -->
         <receiver
@@ -59,6 +69,15 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="com.example.caers.ACTIVITY_RECOGNITION"/>
+            </intent-filter>
+        </receiver>
+
+        <!-- Boot receiver: restarts ScreenEventService after device reboot -->
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
             </intent-filter>
         </receiver>
 

@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'config/app.dart';
+import 'data/services/background_service.dart';
 import 'ui/auth/providers/auth_provider.dart';
 
 Future<void> main() async {
@@ -21,12 +22,20 @@ Future<void> main() async {
     debug: kDebugMode,
   );
 
+  // Store Supabase credentials so background service can init independently
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString('supabase_url', dotenv.env['SUPABASE_URL']!);
+  await prefs.setString('supabase_anon_key', dotenv.env['SUPABASE_ANON_KEY']!);
+
   await SentryFlutter.init((options) {
     options.dsn = dotenv.env['SENTRY_DSN'] ?? '';
     options.environment = kDebugMode ? 'development' : 'production';
     options.tracesSampleRate = 0.2;
     options.debug = kDebugMode;
   });
+
+  // Start persistent background service (GPS + app usage + screen events)
+  await initBackgroundService();
 
   await _bootstrap();
 }

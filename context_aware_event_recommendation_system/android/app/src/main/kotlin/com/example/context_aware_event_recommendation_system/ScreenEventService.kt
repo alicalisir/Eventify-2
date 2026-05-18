@@ -14,15 +14,18 @@ class ScreenEventService : Service() {
     companion object {
         const val CHANNEL_ID  = "caers_tracking"
         const val NOTIF_ID    = 1001
-        const val PREFS_NAME  = "screen_events_buffer"
-        const val PREFS_KEY   = "events"
+
+        // Writes to FlutterSharedPreferences so the Dart background isolate can read
+        // via SharedPreferences.getInstance().getString('screen_events_buffer')
+        private const val FLUTTER_PREFS = "FlutterSharedPreferences"
+        private const val FLUTTER_KEY   = "flutter.screen_events_buffer"
     }
 
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             val type = when (intent.action) {
-                Intent.ACTION_SCREEN_ON   -> "on"
-                Intent.ACTION_SCREEN_OFF  -> "off"
+                Intent.ACTION_SCREEN_ON    -> "on"
+                Intent.ACTION_SCREEN_OFF   -> "off"
                 Intent.ACTION_USER_PRESENT -> "unlock"
                 else -> return
             }
@@ -56,13 +59,13 @@ class ScreenEventService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun bufferEvent(eventType: String) {
-        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val arr = JSONArray(prefs.getString(PREFS_KEY, "[]") ?: "[]")
+        val prefs = getSharedPreferences(FLUTTER_PREFS, Context.MODE_PRIVATE)
+        val arr = JSONArray(prefs.getString(FLUTTER_KEY, "[]") ?: "[]")
         arr.put(JSONObject().apply {
             put("event_type", eventType)
             put("timestamp", Instant.now().toString())
         })
-        prefs.edit().putString(PREFS_KEY, arr.toString()).apply()
+        prefs.edit().putString(FLUTTER_KEY, arr.toString()).apply()
     }
 
     private fun buildNotification(): Notification =
