@@ -731,7 +731,7 @@ def _llm_to_suggestions(
 ) -> list[SuggestionResponse]:
     results = []
     for item in llm_items[:3]:
-        idx = item.get("venue_index", 0)
+        idx = item.get("venue_index") or 0
         if not (0 <= idx < len(raw_places)):
             idx = 0
         place = raw_places[idx]

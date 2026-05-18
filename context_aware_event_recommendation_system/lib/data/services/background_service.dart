@@ -45,24 +45,64 @@ void onStart(ServiceInstance service) async {
   final key = prefs.getString(_kSupabaseKey);
 
   if (url == null || key == null) {
-    AppLogger.w('[BgService] Supabase credentials not found — waiting for app launch');
-    // Retry after 30s in case app hasn't stored creds yet (cold boot before first login)
-    await Future.delayed(const Duration(seconds: 30));
-    await prefs.reload();
-    if (prefs.getString(_kSupabaseUrl) == null) return;
+    // Credentials not stored yet (auto-start before first app launch).
+    // The timer below will keep ticking; once the user logs in and main app
+    // stores credentials, the next reload() will find them.
+    AppLogger.w('[BgService] Supabase credentials not set yet — waiting for first login');
+    // Run a lightweight loop that retries until credentials appear
+    Timer.periodic(const Duration(seconds: 10), (retryTimer) async {
+      await prefs.reload();
+      if (prefs.getString(_kSupabaseUrl) != null) {
+        retryTimer.cancel();
+        onStart(service); // re-enter with credentials now available
+      }
+    });
+    return;
   }
 
+  final supabaseUrl = prefs.getString(_kSupabaseUrl)!;
+  AppLogger.d('[BgService] Connecting to Supabase: ${supabaseUrl.replaceAll('https://', '').split('.').first}');
   await Supabase.initialize(
-    url: prefs.getString(_kSupabaseUrl)!,
+    url: supabaseUrl,
     anonKey: prefs.getString(_kSupabaseKey)!,
   );
   final client = Supabase.instance.client;
+
+  // Verify session was auto-restored; if not, attempt manual recovery.
+  if (client.auth.currentSession == null) {
+    final stored = prefs.getString('supabase.auth.token');
+    if (stored != null) {
+      try {
+        await client.auth.recoverSession(stored);
+        AppLogger.d('[BgService] Session recovered: ${client.auth.currentUser?.email}');
+      } catch (e) {
+        AppLogger.w('[BgService] Session recovery failed: $e');
+      }
+    } else {
+      AppLogger.w('[BgService] No stored session — inserts will be blocked by RLS');
+    }
+  } else {
+    AppLogger.d('[BgService] Session auto-restored: ${client.auth.currentSession!.user.email}');
+  }
+
+  // Force token refresh — the stored access token may be expired.
+  try {
+    await client.auth.refreshSession();
+    AppLogger.d('[BgService] Token refreshed ok');
+  } catch (e) {
+    AppLogger.w('[BgService] Token refresh failed: $e');
+  }
+
   final appUsage = AppUsageService(client);
 
   Future<void> tick() async {
     await prefs.reload(); // read latest userId / activity state from main isolate writes
     final userId = prefs.getString(_kUserIdKey);
-    if (userId == null) return; // not logged in
+    if (userId == null) {
+      AppLogger.w('[BgService] Tick #$_tickCount — no userId, skipping');
+      return;
+    }
+    AppLogger.d('[BgService] Tick #$_tickCount userId=${userId.substring(0, 8)}… auth=${Supabase.instance.client.auth.currentSession != null ? "ok" : "none"}');
 
     _tickCount++;
 
@@ -114,7 +154,7 @@ Future<void> _collectGps(
         ? now.difference(_stationaryStart!).inSeconds.toDouble()
         : 0.0;
 
-    await client.from('gps_pings').insert({
+    final inserted = await client.from('gps_pings').insert({
       'user_id': userId,
       'timestamp': now.toIso8601String(),
       'latitude': position.latitude,
@@ -123,15 +163,16 @@ Future<void> _collectGps(
       'speed_mps': speedMps,
       'movement_state': movementState,
       'dwell_time_s': dwellTimeS,
-    });
+    }).select();
 
+    AppLogger.d('[BgService] GPS insert → ${inserted.length} row(s), id=${inserted.isNotEmpty ? inserted.first['id'] : "none"}, ts=${inserted.isNotEmpty ? inserted.first['timestamp'] : "none"}');
     AppLogger.d(
       '[BgService] GPS ✓ $movementState | '
       '${speedMps.toStringAsFixed(1)} m/s | '
       'dwell ${dwellTimeS.toStringAsFixed(0)}s',
     );
-  } catch (e) {
-    AppLogger.w('[BgService] GPS collection failed', e);
+  } catch (e, st) {
+    AppLogger.w('[BgService] GPS collection failed: $e\n$st');
   }
 }
 

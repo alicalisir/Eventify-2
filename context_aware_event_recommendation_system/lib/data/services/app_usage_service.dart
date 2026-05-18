@@ -174,7 +174,6 @@ class AppUsageService {
       final usage = await AppUsage().getAppUsage(start, end);
 
       final sessions = <Map<String, dynamic>>[];
-      int estimatedUnlocks = 0;
 
       for (final info in usage) {
         final durationMin = info.usage.inSeconds / 60.0;
@@ -191,8 +190,6 @@ class AppUsageService {
           'duration_min': durationMin,
           'state': 'foreground',
         });
-
-        estimatedUnlocks++;
       }
 
       if (sessions.isNotEmpty) {
@@ -201,42 +198,9 @@ class AppUsageService {
             .upsert(sessions, onConflict: 'user_id,app_name,timestamp');
         AppLogger.i('[AppUsage] Uploaded ${sessions.length} sessions');
       }
-
-      // Upload estimated screen events derived from app usage.
-      await _uploadScreenEvents(userId, start, estimatedUnlocks);
     } catch (e) {
       AppLogger.w('[AppUsage] Failed to collect/upload', e);
     }
   }
 
-  // Screen events are estimated because true screen-state tracking requires
-  // a native foreground service. Each app that was used is treated as one
-  // unlock cycle; notifications are estimated at 3× unlocks.
-  Future<void> _uploadScreenEvents(
-    String userId,
-    DateTime windowStart,
-    int estimatedUnlocks,
-  ) async {
-    if (estimatedUnlocks == 0) return;
-
-    final events = <Map<String, dynamic>>[];
-    final base = windowStart.toIso8601String();
-
-    for (var i = 0; i < estimatedUnlocks; i++) {
-      events.add({'user_id': userId, 'timestamp': base, 'event_type': 'unlock'});
-      events.add({'user_id': userId, 'timestamp': base, 'event_type': 'on'});
-      events.add({'user_id': userId, 'timestamp': base, 'event_type': 'off'});
-    }
-    // Notifications: rough 3× unlock rate
-    for (var i = 0; i < estimatedUnlocks * 3; i++) {
-      events.add({
-        'user_id': userId,
-        'timestamp': base,
-        'event_type': 'notification',
-      });
-    }
-
-    await _client.from('screen_events').insert(events);
-    AppLogger.d('[AppUsage] Estimated $estimatedUnlocks unlocks uploaded');
-  }
 }

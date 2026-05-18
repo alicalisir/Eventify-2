@@ -10,7 +10,7 @@ class BackendService {
   BackendService(this._baseUrl);
 
   final String _baseUrl;
-  static const _timeout = Duration(seconds: 15);
+  static const _timeout = Duration(seconds: 40);
 
   Future<PersonaModel?> getPersona(String userId) async {
     try {

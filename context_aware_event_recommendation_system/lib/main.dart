@@ -27,15 +27,14 @@ Future<void> main() async {
   await prefs.setString('supabase_url', dotenv.env['SUPABASE_URL']!);
   await prefs.setString('supabase_anon_key', dotenv.env['SUPABASE_ANON_KEY']!);
 
-  await SentryFlutter.init((options) {
-    options.dsn = dotenv.env['SENTRY_DSN'] ?? '';
-    options.environment = kDebugMode ? 'development' : 'production';
-    options.tracesSampleRate = 0.2;
-    options.debug = kDebugMode;
-  });
-
-  // Start persistent background service (GPS + app usage + screen events)
-  await initBackgroundService();
+  try {
+    await SentryFlutter.init((options) {
+      options.dsn = dotenv.env['SENTRY_DSN'] ?? '';
+      options.environment = kDebugMode ? 'development' : 'production';
+      options.tracesSampleRate = 0.2;
+      options.debug = kDebugMode;
+    });
+  } catch (_) {}
 
   await _bootstrap();
 }
@@ -55,12 +54,17 @@ Future<void> _bootstrap() async {
     overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
   );
 
-  await container.read(authProvider.notifier).restoreSession();
-
+  // Run app immediately — router waits at /login while auth is initial.
+  // Session restore runs async so a slow network never blocks the UI.
   runApp(
     UncontrolledProviderScope(
       container: container,
       child: const ContextAwareApp(),
     ),
   );
+
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    container.read(authProvider.notifier).restoreSession();
+    initBackgroundService().ignore();
+  });
 }
