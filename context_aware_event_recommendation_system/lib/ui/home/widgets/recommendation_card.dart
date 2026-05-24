@@ -252,7 +252,7 @@ class _RecommendationCardState extends ConsumerState<RecommendationCard> {
                             ? theme.colorScheme.error
                             : theme.colorScheme.onSurfaceVariant,
                       ),
-                      tooltip: _liked ? 'Beğenildi' : 'Beğen',
+                      tooltip: _liked ? 'Liked' : 'Like',
                       iconSize: 20,
                       onPressed: _handleLike,
                     ),
@@ -261,7 +261,7 @@ class _RecommendationCardState extends ConsumerState<RecommendationCard> {
                         Icons.close,
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
-                      tooltip: 'Kapat',
+                      tooltip: 'Dismiss',
                       iconSize: 20,
                       onPressed: _handleDismiss,
                     ),

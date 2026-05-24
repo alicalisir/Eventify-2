@@ -77,15 +77,15 @@ const _totalPages = 5;
 // ---------------------------------------------------------------------------
 
 const _interestCategories = [
-  (label: 'Spor & Hareket', icon: Icons.directions_run),
-  (label: 'Yeme-İçme', icon: Icons.restaurant),
-  (label: 'Sanat & Kültür', icon: Icons.palette),
-  (label: 'Doğa & Açık Hava', icon: Icons.park),
-  (label: 'Eğlence & Gece', icon: Icons.nightlife),
-  (label: 'Eğitim & Atölye', icon: Icons.school),
-  (label: 'Müzik & Konser', icon: Icons.music_note),
-  (label: 'Aile & Çocuk', icon: Icons.family_restroom),
-  (label: 'Sakin & Solo', icon: Icons.self_improvement),
+  (label: 'Sports & Activity', icon: Icons.directions_run),
+  (label: 'Food & Drink', icon: Icons.restaurant),
+  (label: 'Arts & Culture', icon: Icons.palette),
+  (label: 'Nature & Outdoors', icon: Icons.park),
+  (label: 'Entertainment & Nightlife', icon: Icons.nightlife),
+  (label: 'Education & Workshops', icon: Icons.school),
+  (label: 'Music & Concerts', icon: Icons.music_note),
+  (label: 'Family & Kids', icon: Icons.family_restroom),
+  (label: 'Calm & Solo', icon: Icons.self_improvement),
 ];
 
 // ---------------------------------------------------------------------------
@@ -293,14 +293,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       return Column(
         children: [
           AppButton(
-            text: 'Devam Et',
+            text: 'Continue',
             onPressed: enough ? _advance : null,
           ),
           if (!enough)
             Padding(
               padding: const EdgeInsets.only(top: AppSpacing.sm),
               child: Text(
-                'En az 3 ilgi alanı seç (${_interests.length}/3)',
+                'Select at least 3 interests (${_interests.length}/3)',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
@@ -375,12 +375,12 @@ class _InterestsPage extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'İlgini çeken\naktiviteler',
+            'What are you\ninto?',
             style: theme.textTheme.headlineMedium,
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'En az 3 ilgi alanı seç — önerilerini kişiselleştirmek için kullanılacak.',
+            'Pick at least 3 interests — used to personalise your recommendations.',
             style: theme.textTheme.bodyLarge?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -452,35 +452,34 @@ class _ConsentPage extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.lg),
           Text(
-            'Kişisel Verilerinin\nKorunması',
+            'Your data,\nyour control',
             style: theme.textTheme.headlineMedium,
           ),
           const SizedBox(height: AppSpacing.md),
           Text(
-            'KVKK (6698 sayılı Kişisel Verilerin Korunması Kanunu) kapsamında '
-            'senden açık rıza alıyoruz.',
+            'We need your consent to process personal data for personalised recommendations.',
             style: theme.textTheme.bodyLarge?.copyWith(color: secondaryText),
           ),
           const SizedBox(height: AppSpacing.lg),
           _InfoTile(
             icon: Icons.location_on_outlined,
-            title: 'Konum verisi',
-            body: 'Yakın etkinlik ve mekan önerileri için kullanılır. '
-                '3 ondalık basamakla (~110m hassasiyet) saklanır.',
+            title: 'Location data',
+            body: 'Used to suggest nearby events and places. '
+                'Stored at 3 decimal precision (~110 m accuracy).',
           ),
           const SizedBox(height: AppSpacing.sm),
           const _InfoTile(
             icon: Icons.cloud_outlined,
-            title: 'Sunucu konumu',
-            body: 'Yapay zeka modeli kendi GPU sunucumuzda çalışır — '
-                'veriler üçüncü taraf AI şirketleriyle paylaşılmaz.',
+            title: 'On-device AI',
+            body: 'The AI model runs on our own GPU server — '
+                'your data is never shared with third-party AI providers.',
           ),
           const SizedBox(height: AppSpacing.sm),
           const _InfoTile(
             icon: Icons.delete_outline,
-            title: 'Verilerini sil',
-            body: 'Profil ekranından istediğin zaman tüm verilerini '
-                'kalıcı olarak silebilirsin.',
+            title: 'Delete your data',
+            body: 'You can permanently delete all your data at any '
+                'time from the profile screen.',
           ),
           const SizedBox(height: AppSpacing.lg),
           Card(
@@ -494,16 +493,16 @@ class _ConsentPage extends StatelessWidget {
               onChanged: (v) => onChanged(v ?? false),
               controlAffinity: ListTileControlAffinity.leading,
               title: Text(
-                'Kişisel verilerimin yukarıda açıklanan amaçlarla '
-                'işlenmesine açık rıza veriyorum.',
+                'I consent to my personal data being processed '
+                'for the purposes described above.',
                 style: theme.textTheme.bodyMedium,
               ),
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Rıza vermeden devam edemezsin. İstediğin zaman profil '
-            'ekranından rızanı geri alabilirsin.',
+            'Consent is required to continue. You can withdraw it '
+            'at any time from the profile screen.',
             style: theme.textTheme.labelSmall?.copyWith(color: secondaryText),
           ),
         ],
