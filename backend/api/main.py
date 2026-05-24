@@ -30,14 +30,11 @@ load_dotenv()
 # ─────────────────────────────────────────── paths ───────────────────────────
 
 _API_DIR     = Path(__file__).resolve().parent
-_ML_DIR      = _API_DIR.parent / "MLPipeline"
-_MODEL_DIR   = _ML_DIR / "outputs" / "model"
+_MODEL_DIR   = _API_DIR / "model"
 _MODEL_FILE  = _MODEL_DIR / "catboost_persona.cbm"
 _ENCODER_FILE= _MODEL_DIR / "label_encoder.json"
 _FEATURES_FILE = _MODEL_DIR / "feature_columns.json"
 
-# Make the MLPipeline package importable so we can reuse feature_engineering.py
-sys.path.insert(0, str(_ML_DIR))
 from feature_engineering import extract_user_features  # noqa: E402
 
 # ─────────────────────────────────────────── load model ──────────────────────
