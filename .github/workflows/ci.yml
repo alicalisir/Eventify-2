@@ -19,7 +19,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version-file: context_aware_event_recommendation_system/pubspec.yaml
+          flutter-version: 'any'
           channel: stable
           cache: true
 
