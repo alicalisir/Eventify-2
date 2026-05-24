@@ -10,8 +10,8 @@ import '../data/repositories/places_repository.dart';
 import '../data/repositories/suggestion_repository.dart';
 import '../data/services/auth_service.dart';
 import '../data/services/context_service.dart';
-import '../data/services/gps_collection_service.dart';
 import '../data/services/feedback_service.dart';
+import '../data/services/gps_collection_service.dart';
 import '../data/services/llm_service.dart';
 import '../data/services/location_service.dart';
 import '../data/services/places_service.dart';
@@ -87,6 +87,7 @@ final llmServiceProvider = Provider<LlmService>((ref) {
     ref.watch(supabaseClientProvider),
     ref.watch(locationRepositoryProvider),
     ref.watch(weatherServiceProvider),
+    ref.watch(placesRepositoryProvider),
   );
 });
 

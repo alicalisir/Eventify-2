@@ -1,3 +1,13 @@
+export interface NearbyPlace {
+  id: string;
+  name: string;
+  types: string[];
+  distance_m: number;
+  address?: string;
+  rating?: number;
+  price_level?: string;
+}
+
 export interface RecommendRequest {
   lat: number;
   lng: number;
@@ -10,6 +20,7 @@ export interface RecommendRequest {
   user_interests: string[];
   recent_dismissed_titles: string[];
   recent_liked_categories: string[];
+  nearby_places?: NearbyPlace[];
 }
 
 export interface PersonaJson {

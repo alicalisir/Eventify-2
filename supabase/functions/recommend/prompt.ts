@@ -1,4 +1,4 @@
-import type { RecommendRequest, PersonaJson, NearbyEvent } from "./types.ts";
+import type { RecommendRequest, PersonaJson, NearbyEvent, NearbyPlace } from "./types.ts";
 
 export const SYSTEM_PROMPT = `You are a context-aware event recommendation assistant for a Turkish audience.
 
@@ -49,6 +49,7 @@ export function buildUserMessage(
   req: RecommendRequest,
   persona: PersonaJson | null,
   events: NearbyEvent[],
+  places: NearbyPlace[],
 ): string {
   const dayNames = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"];
   const dayName = dayNames[req.day_of_week] ?? "Bilinmeyen";
@@ -89,6 +90,17 @@ export function buildUserMessage(
     ? req.recent_dismissed_titles.join(", ")
     : "Yok";
 
+  const placesBlock = places.length > 0
+    ? places
+        .map((p) => {
+          const primaryType = p.types[0] ?? "place";
+          const rating = p.rating != null ? ` | ★${p.rating.toFixed(1)}` : "";
+          const price = p.price_level ? ` | ${p.price_level}` : "";
+          return `- [${p.id}] ${p.name} | ${primaryType} | ${Math.round(p.distance_m)}m${rating}${price}`;
+        })
+        .join("\n")
+    : "Yakın mekan bulunamadı.";
+
   return `KULLANICI DURUMU:
 - Saat: ${timeStr} ${dayName}
 - Konum: ${req.city}
@@ -102,6 +114,9 @@ export function buildUserMessage(
 
 YAKIN ETKİNLİKLER (${events.length}):
 ${eventsBlock}
+
+YAKIN MEKANLAR (${places.length}):
+${placesBlock}
 
 3 öneri üret.`;
 }

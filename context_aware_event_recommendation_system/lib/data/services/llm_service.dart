@@ -3,14 +3,16 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../domain/models/suggestion_model.dart';
 import '../../utils/app_logger.dart';
 import '../repositories/location_repository.dart';
-import '../services/weather_service.dart';
+import '../repositories/places_repository.dart';
+import '../services/weather_service.dart' show WeatherData, WeatherService;
 
 class LlmService {
-  LlmService(this._supabase, this._location, this._weather);
+  LlmService(this._supabase, this._location, this._weather, this._places);
 
   final SupabaseClient _supabase;
   final LocationRepository _location;
   final WeatherService _weather;
+  final PlacesRepository _places;
 
   Future<List<SuggestionModel>> getSuggestions() async {
     final position = await _location.getCurrentPosition();
@@ -18,9 +20,14 @@ class LlmService {
     final lat = position?.latitude ?? 41.0082;
     final lng = position?.longitude ?? 28.9784;
 
-    final weatherData = position != null
-        ? await _weather.getCurrentWeather(lat, lng)
-        : null;
+    // Weather ve places paralel çalışsın
+    final weatherFuture = position != null
+        ? _weather.getCurrentWeather(lat, lng)
+        : Future<WeatherData?>.value(null);
+    final placesFuture = _places.getNearbyPlaces();
+
+    final WeatherData? weatherData = await weatherFuture;
+    final nearbyPlaces = await placesFuture;
 
     final locationLabel = position != null
         ? await _location.getAddressLabel(lat, lng)
@@ -29,6 +36,25 @@ class LlmService {
     final city = _extractCity(locationLabel) ?? 'İstanbul';
     final now = DateTime.now();
 
+    final placesPayload = nearbyPlaces
+        .map(
+          (p) => <String, dynamic>{
+            'id': p.id,
+            'name': p.name,
+            'types': p.types,
+            'distance_m': p.distanceMeters.round(),
+            if (p.address != null) 'address': p.address,
+            if (p.rating != null) 'rating': p.rating,
+            if (p.priceLevel != null) 'price_level': p.priceLevel,
+          },
+        )
+        .toList();
+
+    AppLogger.i(
+      '[LlmService] ${nearbyPlaces.length} mekan yüklendi '
+      '(places API)',
+    );
+
     final body = {
       'lat': lat,
       'lng': lng,
@@ -36,11 +62,12 @@ class LlmService {
       'weather_condition': weatherData?.condition ?? 'clear',
       'weather_temp_c': weatherData?.temperature ?? 20,
       'hour': now.hour,
-      'day_of_week': now.weekday - 1, // Dart: 1=Mon → 0=Mon
+      'day_of_week': now.weekday - 1,
       'motion_state': _motionState(position?.speed ?? 0),
       'user_interests': <String>[],
       'recent_dismissed_titles': <String>[],
       'recent_liked_categories': <String>[],
+      'nearby_places': placesPayload,
     };
 
     AppLogger.i(

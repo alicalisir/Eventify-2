@@ -106,26 +106,47 @@ async function handleRequest(req: Request): Promise<Response> {
 
   const nearbyEvents: NearbyEvent[] = events ?? [];
 
-  // --- Recent dismissed titles ---
-  const { data: dismissedRows } = await supabase
-    .from("user_feedback")
-    .select("suggestion_snapshot")
-    .eq("user_id", userId)
-    .eq("action", "dismiss")
-    .gt("created_at", new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString());
+  // --- Recent dismissed titles + liked categories ---
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
+
+  const [{ data: dismissedRows }, { data: likedRows }] = await Promise.all([
+    supabase
+      .from("user_feedback")
+      .select("suggestion_snapshot")
+      .eq("user_id", userId)
+      .eq("action", "dismiss")
+      .gt("created_at", sevenDaysAgo),
+    supabase
+      .from("user_feedback")
+      .select("suggestion_snapshot")
+      .eq("user_id", userId)
+      .eq("action", "like")
+      .gt("created_at", thirtyDaysAgo),
+  ]);
 
   const dismissedTitles: string[] = (dismissedRows ?? [])
     .map((r: { suggestion_snapshot: Record<string, unknown> }) => String(r.suggestion_snapshot?.title ?? ""))
     .filter(Boolean);
 
+  const likedCategories: string[] = [
+    ...new Set(
+      (likedRows ?? [])
+        .map((r: { suggestion_snapshot: Record<string, unknown> }) => String(r.suggestion_snapshot?.category ?? ""))
+        .filter(Boolean),
+    ),
+  ];
+
   const enrichedBody: RecommendRequest = {
     ...body,
     user_interests: userInterests,
     recent_dismissed_titles: dismissedTitles,
+    recent_liked_categories: likedCategories,
   };
 
   // --- Build prompt ---
-  const userMessage = buildUserMessage(enrichedBody, persona, nearbyEvents);
+  const nearbyPlaces = body.nearby_places ?? [];
+  const userMessage = buildUserMessage(enrichedBody, persona, nearbyEvents, nearbyPlaces);
 
   // --- LLM call ---
   let llmProvider = "unknown";
