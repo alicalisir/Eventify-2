@@ -11,6 +11,7 @@ import '../data/repositories/suggestion_repository.dart';
 import '../data/services/auth_service.dart';
 import '../data/services/context_service.dart';
 import '../data/services/gps_collection_service.dart';
+import '../data/services/feedback_service.dart';
 import '../data/services/llm_service.dart';
 import '../data/services/location_service.dart';
 import '../data/services/places_service.dart';
@@ -75,6 +76,10 @@ final contextRepositoryProvider = Provider<ContextRepository>((ref) {
     ref.watch(weatherServiceProvider),
     ref.watch(placesRepositoryProvider),
   );
+});
+
+final feedbackServiceProvider = Provider<FeedbackService>((ref) {
+  return FeedbackService(ref.watch(supabaseClientProvider));
 });
 
 final llmServiceProvider = Provider<LlmService>((ref) {
