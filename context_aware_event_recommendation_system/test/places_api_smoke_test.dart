@@ -1,4 +1,4 @@
-/// Smoke test — calls the real Google Places API with Istanbul coordinates.
+/// Smoke test — calls the real Google Places API with Kocaeli (İzmit) coordinates.
 /// Run with: dart run test/places_api_smoke_test.dart
 ///
 /// Standalone — no Flutter dependency. Reads API key directly from .env.
@@ -13,11 +13,11 @@ Future<void> main() async {
   final apiKey = _readEnvKey('GOOGLE_PLACES_API_KEY');
   if (apiKey.isEmpty) _fail('GOOGLE_PLACES_API_KEY is empty in .env');
 
-  const lat = 40.780909;
-  const lon = 29.928341;
-  const radius = 1000;
+  const lat = 40.7654; // İzmit centre
+  const lon = 29.9408;
+  const radius = 1500;
 
-  print('🔍 Fetching places near ($lat, $lon), radius: ${radius}m ...\n');
+  print('🔍 Fetching places near ($lat, $lon) — Kocaeli/İzmit, radius: ${radius}m ...\n');
 
   final response = await http
       .post(
