@@ -3,7 +3,9 @@ package com.example.context_aware_event_recommendation_system
 import android.app.*
 import android.content.*
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import androidx.core.app.NotificationCompat
 import org.json.JSONArray
 import org.json.JSONObject
@@ -19,6 +21,14 @@ class ScreenEventService : Service() {
         // via SharedPreferences.getInstance().getString('screen_events_buffer')
         private const val FLUTTER_PREFS = "FlutterSharedPreferences"
         private const val FLUTTER_KEY   = "flutter.screen_events_buffer"
+    }
+
+    private val handler = Handler(Looper.getMainLooper())
+    private val appUsageRunnable = object : Runnable {
+        override fun run() {
+            AppUsageCollector.collectAndBuffer(applicationContext)
+            handler.postDelayed(this, 60 * 60 * 1000L)
+        }
     }
 
     private val screenReceiver = object : BroadcastReceiver() {
@@ -47,11 +57,17 @@ class ScreenEventService : Service() {
             addAction(Intent.ACTION_USER_PRESENT)
         }
         registerReceiver(screenReceiver, filter)
+
+        // Immediate first collection, then every 60 min
+        AppUsageCollector.collectAndBuffer(applicationContext)
+        handler.postDelayed(appUsageRunnable, 60 * 60 * 1000L)
+
         return START_STICKY
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        handler.removeCallbacks(appUsageRunnable)
         runCatching { unregisterReceiver(screenReceiver) }
         stopForeground(true)
     }

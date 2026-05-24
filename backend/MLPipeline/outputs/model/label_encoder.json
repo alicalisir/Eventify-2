@@ -1,0 +1,17 @@
+{
+  "classes": [
+    "ERKENCI",
+    "EVCIMEN",
+    "GECE_KUSU",
+    "HIBRIT",
+    "ICERIK_TUKETICI",
+    "KRIZ_DUZENSIZ",
+    "OGRENCI",
+    "OYUNCU",
+    "PROFESYONEL",
+    "SEYYAH",
+    "SOSYAL",
+    "SPORCU"
+  ],
+  "feature_set": "telemetry"
+}

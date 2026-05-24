@@ -8,7 +8,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../utils/app_logger.dart';
-import 'app_usage_service.dart';
 
 const _kUserIdKey = 'current_user_id';
 const _kSupabaseUrl = 'supabase_url';
@@ -93,8 +92,6 @@ void onStart(ServiceInstance service) async {
     AppLogger.w('[BgService] Token refresh failed: $e');
   }
 
-  final appUsage = AppUsageService(client);
-
   Future<void> tick() async {
     await prefs.reload(); // read latest userId / activity state from main isolate writes
     final userId = prefs.getString(_kUserIdKey);
@@ -106,10 +103,15 @@ void onStart(ServiceInstance service) async {
 
     _tickCount++;
 
-    // Every 12 ticks ≈ 60 min: app usage + screen event flush
-    if (_tickCount % 12 == 0) {
-      await appUsage.collectAndUpload(userId);
+    // Every ~60 min: app usage + screen event flush.
+    // Time-based so it survives service restarts (tick counter resets each restart).
+    final lastAppUsageMs = prefs.getInt('last_app_usage_ts') ?? 0;
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    if (nowMs - lastAppUsageMs > 60 * 60 * 1000) {
+      AppLogger.d('[BgService] Hourly flush triggered');
+      await _flushAppUsage(userId, prefs, client);
       await _flushScreenEvents(userId, prefs, client);
+      await prefs.setInt('last_app_usage_ts', nowMs);
     }
 
     await _collectGps(userId, prefs, client);
@@ -173,6 +175,39 @@ Future<void> _collectGps(
     );
   } catch (e, st) {
     AppLogger.w('[BgService] GPS collection failed: $e\n$st');
+  }
+}
+
+Future<void> _flushAppUsage(
+  String userId,
+  SharedPreferences prefs,
+  SupabaseClient client,
+) async {
+  try {
+    // AppUsageCollector.kt writes to FlutterSharedPreferences key
+    // "flutter.app_usage_buffer" — readable here as 'app_usage_buffer'
+    final bufferJson = prefs.getString('app_usage_buffer') ?? '[]';
+    final raw = jsonDecode(bufferJson) as List<dynamic>;
+    if (raw.isEmpty) return;
+
+    final sessions = raw
+        .map((e) => {
+              'user_id': userId,
+              'app_name': (e as Map)['app_name'] as String,
+              'category': e['category'] as String,
+              'duration_min': (e['duration_min'] as num).toDouble(),
+              'timestamp': e['timestamp'] as String,
+              'state': e['state'] as String,
+            })
+        .toList();
+
+    await client
+        .from('app_sessions')
+        .upsert(sessions, onConflict: 'user_id,app_name,timestamp');
+    await prefs.remove('app_usage_buffer');
+    AppLogger.i('[BgService] Flushed ${sessions.length} app usage sessions');
+  } catch (e) {
+    AppLogger.w('[BgService] App usage flush failed: $e');
   }
 }
 
