@@ -107,7 +107,7 @@ void onStart(ServiceInstance service) async {
     // Time-based so it survives service restarts (tick counter resets each restart).
     final lastAppUsageMs = prefs.getInt('last_app_usage_ts') ?? 0;
     final nowMs = DateTime.now().millisecondsSinceEpoch;
-    if (nowMs - lastAppUsageMs > 60 * 60 * 1000) {
+    if (nowMs - lastAppUsageMs > 5 * 60 * 1000) {
       AppLogger.d('[BgService] Hourly flush triggered');
       await _flushAppUsage(userId, prefs, client);
       await _flushScreenEvents(userId, prefs, client);

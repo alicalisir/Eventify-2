@@ -172,15 +172,21 @@ class AppUsageService {
       final start = end.subtract(Duration(hours: windowHours));
 
       final usage = await AppUsage().getAppUsage(start, end);
+      AppLogger.d('[AppUsage] Raw entries from UsageStatsManager: ${usage.length}');
+
+      if (usage.isEmpty) {
+        AppLogger.w('[AppUsage] No usage data — PACKAGE_USAGE_STATS permission may not be granted');
+        return;
+      }
 
       final sessions = <Map<String, dynamic>>[];
 
       for (final info in usage) {
         final durationMin = info.usage.inSeconds / 60.0;
-        if (durationMin < 0.5) continue; // skip < 30 seconds
+        if (durationMin < 0.5) continue;
 
         final category = _category(info.packageName);
-        if (category == null) continue; // skip uncategorised system apps
+        if (category == null) continue;
 
         sessions.add({
           'user_id': userId,
@@ -192,11 +198,15 @@ class AppUsageService {
         });
       }
 
+      AppLogger.d('[AppUsage] Sessions after filter: ${sessions.length} / ${usage.length} raw');
+
       if (sessions.isNotEmpty) {
         await _client
             .from('app_sessions')
             .upsert(sessions, onConflict: 'user_id,app_name,timestamp');
         AppLogger.i('[AppUsage] Uploaded ${sessions.length} sessions');
+      } else {
+        AppLogger.w('[AppUsage] All ${usage.length} apps filtered out (no matching category)');
       }
     } catch (e) {
       AppLogger.w('[AppUsage] Failed to collect/upload', e);

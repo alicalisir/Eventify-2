@@ -27,7 +27,7 @@ class ScreenEventService : Service() {
     private val appUsageRunnable = object : Runnable {
         override fun run() {
             AppUsageCollector.collectAndBuffer(applicationContext)
-            handler.postDelayed(this, 60 * 60 * 1000L)
+            handler.postDelayed(this, 5 * 60 * 1000L)
         }
     }
 
@@ -60,7 +60,7 @@ class ScreenEventService : Service() {
 
         // Immediate first collection, then every 60 min
         AppUsageCollector.collectAndBuffer(applicationContext)
-        handler.postDelayed(appUsageRunnable, 60 * 60 * 1000L)
+        handler.postDelayed(appUsageRunnable, 5 * 60 * 1000L)
 
         return START_STICKY
     }

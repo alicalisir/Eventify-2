@@ -74,9 +74,9 @@ class ContextRepository {
 
     final notificationsGranted = await Permission.notification.isGranted;
     final speed = position?.speed ?? 0;
-    final isStationary = speed < 0.5;
+    final isStationary = speed < 1.5;
 
-    // Fetch nearby places only when stationary to avoid unnecessary API calls.
+    // Fetch nearby places when not actively moving (walking speed or below).
     final nearbyPlaces = (position != null && isStationary)
         ? await _places.getNearbyPlaces()
         : const [];

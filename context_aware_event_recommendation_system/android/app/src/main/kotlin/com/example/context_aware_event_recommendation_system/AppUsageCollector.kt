@@ -163,7 +163,8 @@ object AppUsageCollector {
                 context.packageName
             )
         }
-        return mode == AppOpsManager.MODE_ALLOWED
+        // MIUI returns MODE_DEFAULT (3) when permission is granted via UI — treat as allowed
+        return mode == AppOpsManager.MODE_ALLOWED || mode == AppOpsManager.MODE_DEFAULT
     }
 
     fun collectAndBuffer(context: Context) {

@@ -23,7 +23,8 @@
       "PowerShell(cd \"C:\\\\Users\\\\alief\\\\Desktop\\\\Context-Aware-Event-Recommendation-System\"; Get-ChildItem -Force | Select-Object Name, @{Name=\"Type\"; Expression={if \\($_.PSIsContainer\\) {\"DIR\"} else {\"FILE\"}}} | Format-Table -AutoSize)",
       "Bash(flutter build *)",
       "Bash(flutter devices *)",
-      "Bash(flutter run *)"
+      "Bash(flutter run *)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\alief\\\\Desktop\\\\Context-Aware-Event-Recommendation-System\\\\backend\\\\MLPipeline\\\\outputs\\\\model\\\\\" | ForEach-Object { \"$\\($_.Name\\) - $\\([math]::Round\\($_.Length/1MB,2\\)\\) MB\" })"
     ]
   }
 }
