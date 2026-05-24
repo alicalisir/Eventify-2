@@ -19,7 +19,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.11.4
+  sdk: ^3.11.0
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -56,6 +56,9 @@ dependencies:
   geolocator: ^14.0.2
   permission_handler: ^12.0.1
 
+  # App usage statistics (Android UsageStatsManager)
+  app_usage: ^4.1.0
+
   # Immutable models
   freezed_annotation: ^3.0.0
   json_annotation: ^4.9.0
@@ -64,6 +67,9 @@ dependencies:
   # Backend
   supabase_flutter: ^2.9.1
   flutter_dotenv: ^6.0.1
+
+  # Background data collection (persistent ForegroundService)
+  flutter_background_service: ^5.0.8
 
   # Logging
   logger: ^2.5.0

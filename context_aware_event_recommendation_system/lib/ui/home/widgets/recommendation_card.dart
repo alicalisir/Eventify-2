@@ -26,7 +26,7 @@ class RecommendationCard extends StatelessWidget {
     final divider = theme.dividerColor;
     final hue = suggestion.category.categoryHue;
     final base = HSLColor.fromAHSL(1, hue, 0.55, 0.85).toColor();
-    final accent = HSLColor.fromAHSL(1, hue + 25, 0.55, 0.78).toColor();
+    final accent = HSLColor.fromAHSL(1, (hue + 25) % 360, 0.55, 0.78).toColor();
     final iconTint = HSLColor.fromAHSL(1, hue, 0.55, 0.50).toColor();
     final categoryTint = HSLColor.fromAHSL(1, hue, 0.65, 0.45).toColor();
 

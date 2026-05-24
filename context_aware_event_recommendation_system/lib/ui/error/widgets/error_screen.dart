@@ -134,7 +134,7 @@ class _IllustrationTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final base = HSLColor.fromAHSL(1, hue, 0.55, 0.86).toColor();
-    final accent = HSLColor.fromAHSL(1, hue + 20, 0.55, 0.78).toColor();
+    final accent = HSLColor.fromAHSL(1, (hue + 20) % 360, 0.55, 0.78).toColor();
     final iconColor = HSLColor.fromAHSL(1, hue, 0.55, 0.50).toColor();
     return Container(
       width: 160,
