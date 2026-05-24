@@ -1,4 +1,4 @@
--- Curated seed: Istanbul (28 events) + Ankara (14 events) = 42 events
+-- Curated seed: Istanbul (28 events) + Kocaeli (14 events) = 42 events
 -- starts_at values use now() + interval — seed data always stays valid
 -- is_recurring = true events have starts_at/ends_at intentionally null
 
@@ -314,146 +314,162 @@ values
  array['street art', 'tour', 'Karaköy', 'art'], 0.66),
 
 -- ═══════════════════════════════════════════════
---  ANKARA — MUSIC
+--  KOCAELI — MUSIC
 -- ═══════════════════════════════════════════════
 ('curated',
- 'Presidential Symphony Orchestra Concert',
- 'CSO monthly subscription concert. International soloists.',
- 'music', 'classical',
- 'CSO Ada Ankara', 'Çukurambar Mah., Çankaya', 'Ankara',
- 39.9051, 32.8229,
- now() + interval '11 days', now() + interval '11 days' + interval '2 hours 30 minutes',
- true, true, 100, 500, 'TRY',
- array['symphony', 'classical music', 'CSO', 'Ankara'], 0.87),
-
-('curated',
- 'Ankara Jazz Festival',
- 'National and international jazz artists in outdoor and indoor venues.',
+ 'Jazz Night — Kocaeli Cultural Centre',
+ 'Live jazz performances at the city cultural centre. Every Friday evening.',
  'music', 'jazz',
- 'Kızılay Meydanı & Çeşitli Mekanlar', 'Çankaya, Ankara', 'Ankara',
- 39.9199, 32.8543,
- now() + interval '20 days', now() + interval '23 days',
- false, false, 0, 200, 'TRY',
- array['jazz', 'festival', 'Ankara', 'open air'], 0.79),
+ 'Kocaeli Kültür Merkezi', 'İzmit Meydan, İzmit', 'Kocaeli',
+ 40.7654, 29.9408,
+ now() + interval '4 days', now() + interval '4 days' + interval '3 hours',
+ true, true, 100, 200, 'TRY',
+ array['jazz', 'live music', 'İzmit'], 0.71),
 
 ('curated',
- 'Acoustic Night — Keyifli Mekan',
- 'Weekly acoustic performance at Kızılay''s popular bar stage.',
- 'music', 'acoustic',
- 'Keyifli Mekan', 'Konur Sok., Kızılay', 'Ankara',
- 39.9215, 32.8560,
- now() + interval '3 days', now() + interval '3 days' + interval '3 hours',
- true, true, 100, 150, 'TRY',
- array['acoustic', 'live music', 'Kızılay'], 0.63),
+ 'Gulf Open-Air Concert — Körfez',
+ 'Free open-air concert series on the İzmit Bay waterfront.',
+ 'music', 'pop',
+ 'Körfez Sahil Parkı', 'Körfez, Kocaeli', 'Kocaeli',
+ 40.7731, 29.7892,
+ now() + interval '6 days', now() + interval '6 days' + interval '2 hours 30 minutes',
+ true, false, 0, 0, 'TRY',
+ array['open air', 'concert', 'free', 'waterfront'], 0.74),
 
 -- ═══════════════════════════════════════════════
---  ANKARA — CULTURE & ARTS
+--  KOCAELI — CULTURE & ARTS
 -- ═══════════════════════════════════════════════
 ('curated',
- 'Museum of Anatolian Civilisations',
- 'One of the world''s richest archaeology museums. Hittite, Phrygian, Urartian artefacts.',
+ 'Kocaeli Museum — Archaeology & Ethnography',
+ 'Regional archaeological finds and Ottoman-era ethnographic collection.',
  'culture', 'museum',
- 'Anadolu Medeniyetleri Müzesi', 'Gözcü Sok. No:2, Ulus', 'Ankara',
- 39.9395, 32.8602,
+ 'Kocaeli Müzesi', 'Hürriyet Cad. No:1, İzmit', 'Kocaeli',
+ 40.7649, 29.9377,
  null, null,
- true, true, 70, 130, 'TRY',
- array['archaeology', 'museum', 'Hittite', 'historic'], 0.94),
+ true, true, 40, 80, 'TRY',
+ array['archaeology', 'museum', 'history'], 0.78),
 
 ('curated',
- 'State Theatres — Contemporary Play',
- 'Contemporary Turkish theatre at the Grand Theatre.',
- 'culture', 'theatre',
- 'Ankara Devlet Tiyatrosu Büyük Tiyatro', 'Atatürk Bulv., Ulus', 'Ankara',
- 39.9340, 32.8598,
- now() + interval '4 days', now() + interval '4 days' + interval '2 hours',
- true, true, 60, 150, 'TRY',
- array['theatre', 'state', 'Ankara', 'Ulus'], 0.78),
+ 'Seka Park — Industrial Heritage Museum',
+ 'Former SEKA paper factory transformed into an open-air museum and park. Free entry.',
+ 'culture', 'museum',
+ 'Seka Kağıt Müzesi', 'Yenişehir Mah., İzmit', 'Kocaeli',
+ 40.7665, 29.9372,
+ null, null,
+ true, false, 0, 0, 'TRY',
+ array['industrial heritage', 'museum', 'free', 'park'], 0.82),
 
 ('curated',
- 'CerModern Art Centre Exhibition',
- 'Seasonal exhibition at Turkey''s leading contemporary art venue.',
- 'culture', 'exhibition',
- 'CerModern', 'Altınsoy Cad., Demirtepe', 'Ankara',
- 39.9235, 32.8492,
+ 'Kocaeli City Museum — Urban History',
+ 'The story of Kocaeli from ancient Nicomedia to the modern city.',
+ 'culture', 'museum',
+ 'Kocaeli Şehir Müzesi', 'İzmit Meydan, İzmit', 'Kocaeli',
+ 40.7651, 29.9398,
+ null, null,
+ true, true, 30, 60, 'TRY',
+ array['city history', 'museum', 'İzmit'], 0.69),
+
+-- ═══════════════════════════════════════════════
+--  KOCAELI — OUTDOORS & NATURE
+-- ═══════════════════════════════════════════════
+('curated',
+ 'Sapanca Lake Nature Walk',
+ 'Scenic trail around one of Turkey''s cleanest freshwater lakes. Stunning forest views.',
+ 'outdoor', 'nature walk',
+ 'Sapanca Gölü', 'Sapanca, Kocaeli', 'Kocaeli',
+ 40.6903, 30.2671,
+ null, null,
+ true, false, 0, 0, 'TRY',
+ array['lake', 'nature', 'hiking', 'free'], 0.91),
+
+('curated',
+ 'Kartepe Mountain Hiking Trail',
+ 'Forested trails on Kartepe with panoramic views of İzmit Bay. All fitness levels.',
+ 'outdoor', 'hiking',
+ 'Kartepe Dağı', 'Kartepe, Kocaeli', 'Kocaeli',
+ 40.7193, 29.9100,
+ null, null,
+ true, false, 0, 0, 'TRY',
+ array['hiking', 'mountain', 'nature', 'free'], 0.87),
+
+('curated',
+ 'İzmit Bay Sunset Boat Tour',
+ '90-minute sunset cruise across the Gulf of İzmit. Departs from İzmit pier.',
+ 'outdoor', 'boat',
+ 'İzmit İskelesi', 'Yalılar Mah., İzmit', 'Kocaeli',
+ 40.7645, 29.9350,
+ now() + interval '2 days', now() + interval '2 days' + interval '1 hours 30 minutes',
+ true, true, 150, 250, 'TRY',
+ array['boat', 'gulf', 'sunset'], 0.83),
+
+-- ═══════════════════════════════════════════════
+--  KOCAELI — FOOD & DRINK
+-- ═══════════════════════════════════════════════
+('curated',
+ 'Pişmaniye Festival — İzmit',
+ 'Kocaeli''s iconic cotton candy dessert festival. Tastings, workshops and street food.',
+ 'food', 'festival',
+ 'İzmit Meydan', 'Cumhuriyet Cad., İzmit', 'Kocaeli',
+ 40.7654, 29.9408,
+ now() + interval '10 days', now() + interval '12 days',
+ false, false, 0, 0, 'TRY',
+ array['festival', 'local food', 'street food', 'free'], 0.79),
+
+('curated',
+ 'İzmit Food Tour — Gulf Flavours',
+ 'Guided tasting tour of İzmit''s best local spots. Pişmaniye, balık ekmek and more.',
+ 'food', 'food tour',
+ 'İzmit Çarşısı', 'Hürriyet Cad., İzmit', 'Kocaeli',
+ 40.7648, 29.9415,
+ null, null,
+ true, true, 250, 250, 'TRY',
+ array['food tour', 'local cuisine', 'İzmit'], 0.75),
+
+-- ═══════════════════════════════════════════════
+--  KOCAELI — SPORTS
+-- ═══════════════════════════════════════════════
+('curated',
+ 'Sabancı Park Morning Run',
+ 'Weekly group run through Sabancı Cultural Park along the seafront. Every Sunday 08:00.',
+ 'sports', 'running',
+ 'Sabancı Kültür Parkı', 'İzmit Sahili, İzmit', 'Kocaeli',
+ 40.7660, 29.9330,
+ null, null,
+ true, false, 0, 0, 'TRY',
+ array['running', 'park', 'morning', 'free'], 0.72),
+
+-- ═══════════════════════════════════════════════
+--  KOCAELI — WORKSHOPS
+-- ═══════════════════════════════════════════════
+('curated',
+ 'Traditional Tile Art Workshop — İzmit',
+ 'Beginner course in Iznik-style tile painting. Materials included. 3-hour session.',
+ 'workshop', 'tile art',
+ 'İzmit Sanat Atölyesi', 'Yenişehir Mah., İzmit', 'Kocaeli',
+ 40.7670, 29.9390,
+ now() + interval '7 days', now() + interval '7 days' + interval '3 hours',
+ true, true, 300, 450, 'TRY',
+ array['tile art', 'workshop', 'crafts'], 0.67),
+
+-- ═══════════════════════════════════════════════
+--  KOCAELI — FAMILY
+-- ═══════════════════════════════════════════════
+('curated',
+ 'Kocaeli Zoo & Animal Park',
+ 'Large animal park with over 100 species. Picnic areas and children''s playground.',
+ 'family', 'zoo',
+ 'Kocaeli Hayvan Parkı', 'Başiskele, Kocaeli', 'Kocaeli',
+ 40.7580, 29.9530,
  null, null,
  true, true, 50, 100, 'TRY',
- array['contemporary art', 'exhibition', 'Ankara'], 0.76),
+ array['zoo', 'children', 'family', 'animals'], 0.85),
 
--- ═══════════════════════════════════════════════
---  ANKARA — OUTDOORS & NATURE
--- ═══════════════════════════════════════════════
 ('curated',
- 'Eymir Lake Cycling & Hiking',
- '14 km cycling and hiking route around the lake. Bike rental available.',
- 'outdoor', 'cycling',
- 'Eymir Gölü', 'ODTÜ Yerleşkesi, Gölbaşı', 'Ankara',
- 39.8640, 32.7773,
+ 'Kartepe Family Picnic & Sledging',
+ 'Family day out on Kartepe mountain. Picnic spots, nature trails and seasonal sledging.',
+ 'family', 'picnic',
+ 'Kartepe Dağı Piknik Alanı', 'Kartepe, Kocaeli', 'Kocaeli',
+ 40.7210, 29.9115,
  null, null,
- true, false, 0, 40, 'TRY',
- array['cycling', 'lake', 'nature', 'hiking'], 0.88),
-
-('curated',
- 'Atatürk Forest Farm Morning Run',
- 'Weekly group run in the vast green space of AOÇ. Every Sunday at 08:00.',
- 'outdoor', 'running',
- 'Atatürk Orman Çiftliği', 'AOÇ Giriş, Yenimahalle', 'Ankara',
- 39.9511, 32.8095,
- null, null,
- true, false, 0, 0, 'TRY',
- array['running', 'forest', 'morning', 'free'], 0.71),
-
-('curated',
- 'Gençlik Park Open-Air Concert',
- 'Free municipal concerts in the park throughout summer.',
- 'outdoor', 'concert',
- 'Gençlik Parkı', 'Ulus, Altındağ', 'Ankara',
- 39.9385, 32.8551,
- now() + interval '7 days', now() + interval '7 days' + interval '2 hours',
- true, false, 0, 0, 'TRY',
- array['open air', 'concert', 'free', 'park'], 0.73),
-
--- ═══════════════════════════════════════════════
---  ANKARA — FOOD & WORKSHOPS
--- ═══════════════════════════════════════════════
-('curated',
- 'Ankara Gastronomy Festival',
- 'Ankara kebab, testi kebab, Beypazarı simit and local flavours festival.',
- 'food', 'festival',
- 'ATO Congresium', 'Mevlana Bulv., Yenimahalle', 'Ankara',
- 39.9402, 32.8136,
- now() + interval '18 days', now() + interval '20 days',
- false, false, 0, 0, 'TRY',
- array['festival', 'Ankara cuisine', 'gastronomy'], 0.72),
-
-('curated',
- 'Calligraphy Workshop — Çankaya',
- 'Beginner course in traditional Ottoman calligraphy. Materials included.',
- 'workshop', 'calligraphy',
- 'Çankaya Kültür Merkezi', 'Çankaya Cad., Çankaya', 'Ankara',
- 39.9042, 32.8653,
- now() + interval '12 days', now() + interval '12 days' + interval '3 hours',
- true, true, 200, 350, 'TRY',
- array['calligraphy', 'art', 'workshop', 'Ottoman'], 0.61),
-
--- ═══════════════════════════════════════════════
---  ANKARA — FAMILY
--- ═══════════════════════════════════════════════
-('curated',
- 'METU Technopark Science Festival',
- 'Interactive science experiments and robotics demonstrations for children.',
- 'family', 'science',
- 'ODTÜ Teknokent', 'ODTÜ Kampüsü, Çankaya', 'Ankara',
- 39.8913, 32.7793,
- now() + interval '15 days', now() + interval '15 days' + interval '6 hours',
- false, false, 0, 0, 'TRY',
- array['science', 'children', 'robotics', 'free'], 0.77),
-
-('curated',
- 'Children''s Nature Camp — Eymir',
- 'Half-day nature discovery activity for ages 7-12. Expert guide included.',
- 'family', 'nature',
- 'Eymir Gölü', 'ODTÜ Yerleşkesi, Gölbaşı', 'Ankara',
- 39.8621, 32.7768,
- now() + interval '8 days', now() + interval '8 days' + interval '4 hours',
- true, true, 150, 250, 'TRY',
- array['children', 'nature', 'camp', 'family'], 0.69);
+ true, false, 0, 30, 'TRY',
+ array['picnic', 'mountain', 'family', 'nature'], 0.80);
