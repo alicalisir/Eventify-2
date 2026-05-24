@@ -50,8 +50,9 @@ with open(_FEATURES_FILE) as f:
 
 # ─────────────────────────────────────────── Supabase REST ───────────────────
 
-SUPABASE_URL = os.environ["SUPABASE_URL"]
-SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ["SUPABASE_ANON_KEY"]
+SUPABASE_URL = os.environ["SUPABASE_URL"].strip()
+SUPABASE_KEY = (os.environ.get("SUPABASE_SERVICE_KEY") or os.environ["SUPABASE_ANON_KEY"]).strip()
+print(f"[startup] SUPABASE_URL={SUPABASE_URL!r}", flush=True)
 GOOGLE_PLACES_KEY = os.environ.get("GOOGLE_PLACES_API_KEY", "")
 # Local Mistral via Ollama — run: ollama pull mistral && ollama serve
 MISTRAL_URL = os.environ.get("MISTRAL_URL", "http://localhost:11434")
