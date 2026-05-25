@@ -18,6 +18,22 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+/** Maps onboarding interest labels → event DB categories used in nearby_events RPC. */
+function normalizeInterest(label: string): string {
+  const map: Record<string, string> = {
+    "music & concerts": "music",
+    "sports & activity": "sports",
+    "arts & culture": "culture",
+    "food & drink": "food",
+    "nature & outdoors": "outdoor",
+    "education & workshops": "workshop",
+    "family & kids": "family",
+    "entertainment & nightlife": "music",
+    "calm & solo": "culture",
+  };
+  return map[label.toLowerCase()] ?? label.toLowerCase();
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: CORS_HEADERS });
@@ -75,7 +91,8 @@ async function handleRequest(req: Request): Promise<Response> {
 
   const persona: PersonaJson | null = userData?.persona_json ?? null;
   const personaVersion = persona?.model_version ?? "no-persona";
-  const userInterests: string[] = userData?.interests ?? body.user_interests ?? [];
+  const rawInterests: string[] = userData?.interests ?? body.user_interests ?? [];
+  const userInterests: string[] = rawInterests.map(normalizeInterest);
 
   // --- Cache check ---
   const cacheKey = buildCacheKeySync(userId, body, personaVersion);

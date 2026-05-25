@@ -8,16 +8,20 @@ import '../../utils/app_logger.dart';
 extension SuggestionCategoryX on String {
   IconData get categoryIcon {
     switch (toLowerCase()) {
-      case 'movement':
-        return Icons.directions_walk_outlined;
-      case 'recharge':
-        return Icons.local_cafe_outlined;
-      case 'learning':
-        return Icons.menu_book_outlined;
-      case 'social':
-        return Icons.people_outline;
-      case 'health':
-        return Icons.favorite_outline;
+      case 'music':
+        return Icons.music_note_outlined;
+      case 'sports':
+        return Icons.directions_run_outlined;
+      case 'culture':
+        return Icons.museum_outlined;
+      case 'food':
+        return Icons.restaurant_outlined;
+      case 'outdoor':
+        return Icons.park_outlined;
+      case 'workshop':
+        return Icons.build_outlined;
+      case 'family':
+        return Icons.family_restroom_outlined;
       default:
         AppLogger.w(
           'SuggestionCategoryX: unknown category "$this", using fallback icon',
@@ -29,16 +33,20 @@ extension SuggestionCategoryX on String {
   /// HSL hue (0–360) used for card hero gradient and icon tint.
   double get categoryHue {
     switch (toLowerCase()) {
-      case 'movement':
+      case 'music':
+        return 280;
+      case 'sports':
         return 150;
-      case 'recharge':
+      case 'culture':
+        return 220;
+      case 'food':
         return 30;
-      case 'learning':
-        return 270;
-      case 'social':
-        return 210;
-      case 'health':
-        return 340;
+      case 'outdoor':
+        return 120;
+      case 'workshop':
+        return 45;
+      case 'family':
+        return 200;
       default:
         return 250;
     }
