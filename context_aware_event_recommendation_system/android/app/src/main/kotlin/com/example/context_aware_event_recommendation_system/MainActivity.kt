@@ -14,6 +14,7 @@ class MainActivity : FlutterActivity() {
     private companion object {
         const val SCREEN_CHANNEL   = "com.example.caers/screen_events"
         const val ACTIVITY_CHANNEL = "com.example.caers/activity_recognition"
+        const val APP_INFO_CHANNEL = "com.example.caers/app_info"
 
         // Mirrors ScreenEventService bridge constants
         const val FLUTTER_PREFS    = "FlutterSharedPreferences"
@@ -24,6 +25,7 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         registerScreenChannel(flutterEngine)
         registerActivityChannel(flutterEngine)
+        registerAppInfoChannel(flutterEngine)
     }
 
     // ─────────────────────────────────────── Screen events ───────────────────
@@ -53,6 +55,31 @@ class MainActivity : FlutterActivity() {
                         getSharedPreferences(FLUTTER_PREFS, Context.MODE_PRIVATE)
                             .edit().putString(SCREEN_BUFFER_KEY, "[]").apply()
                         result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+    }
+
+    // ─────────────────────────────────────── App info ────────────────────────
+
+    private fun registerAppInfoChannel(flutterEngine: FlutterEngine) {
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, APP_INFO_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "getAppCategory" -> {
+                        val packageName = call.argument<String>("packageName") ?: ""
+                        try {
+                            val info = packageManager.getApplicationInfo(packageName, 0)
+                            val category = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                info.category
+                            } else {
+                                -1
+                            }
+                            result.success(category)
+                        } catch (e: Exception) {
+                            result.success(-1)
+                        }
                     }
                     else -> result.notImplemented()
                 }
