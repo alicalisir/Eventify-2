@@ -9,6 +9,7 @@ and classifies the user with the pre-trained CatBoost model.
 from __future__ import annotations
 
 import json
+import logging
 import math as _math
 import os
 import sys
@@ -27,6 +28,9 @@ from pydantic import BaseModel
 
 load_dotenv()
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s | %(message)s")
+logger = logging.getLogger("caers.api")
+
 # ─────────────────────────────────────────── paths ───────────────────────────
 
 _API_DIR     = Path(__file__).resolve().parent
@@ -36,6 +40,7 @@ _ENCODER_FILE= _MODEL_DIR / "label_encoder.json"
 _FEATURES_FILE = _MODEL_DIR / "feature_columns.json"
 
 from feature_engineering import extract_user_features  # noqa: E402
+from episodes import compute_episode_shares  # noqa: E402
 
 # ─────────────────────────────────────────── load model ──────────────────────
 
@@ -772,6 +777,15 @@ def _classify(user_id: str) -> tuple[str, dict, int, dict]:
         signals_today = int((gps["ts"].dt.date == today).sum())
 
     feat = extract_user_features(user_id, gps, apps, screen, episode_user=None)
+
+    # Episode features production'da boş gelir (etiketli veri yok). Kural tabanlı
+    # episode detector ile 15 ep_share_* + episodes_per_day değerlerini doldur.
+    # Hata olursa sıfır bırak — request'i bozma.
+    try:
+        ep_feats = compute_episode_shares(gps, apps, screen)
+        feat.update(ep_feats)
+    except Exception as e:
+        logger.warning("[episodes] inference failed for %s: %s", user_id, e)
 
     # Build feature vector in the exact column order the model expects
     row = {col: feat.get(col, 0.0) for col in _feature_columns}
