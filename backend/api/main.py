@@ -843,6 +843,32 @@ def health_llm():
         return {"url": MISTRAL_URL, "status": "unreachable", "error": str(e)}
 
 
+@app.get("/api/debug/episodes/{user_id}")
+def debug_episodes(user_id: str):
+    gps    = _fetch_gps(user_id)
+    apps   = _fetch_app_sessions(user_id)
+    screen = _fetch_screen_events(user_id)
+
+    try:
+        ep_shares = compute_episode_shares(gps, apps, screen)
+    except Exception as e:
+        return {"error": str(e), "user_id": user_id}
+
+    active = {k: round(v, 4) for k, v in ep_shares.items() if v > 0}
+    all_shares = {k: round(v, 4) for k, v in ep_shares.items()}
+
+    return {
+        "user_id": user_id,
+        "data_summary": {
+            "gps_rows": len(gps),
+            "app_rows": len(apps),
+            "screen_rows": len(screen),
+        },
+        "active_episodes": active,
+        "all_episode_shares": all_shares,
+    }
+
+
 @app.get("/api/persona/{user_id}", response_model=PersonaResponse)
 def get_persona(user_id: str):
     persona_class, meta, signals_today, _ = _classify(user_id)
