@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../config/constants/app_colors.dart';
 import '../../../config/constants/app_spacing.dart';
 import '../../../config/constants/app_strings.dart';
+import '../../../di/providers.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../core/motion/app_curves.dart';
 import '../../core/motion/app_durations.dart';
@@ -13,17 +14,16 @@ import '../../core/ui/app_snackbar.dart';
 import '../../core/ui/brand_mark.dart';
 import '../providers/onboarding_provider.dart';
 
-/// Single onboarding slide blueprint.
+// ---------------------------------------------------------------------------
+// Slide blueprint (slides 0-2)
+// ---------------------------------------------------------------------------
+
 class _Slide {
   final IconData icon;
   final double hue;
   final String title;
   final String description;
-
-  /// CTA label when permission isn't yet granted.
   final String ctaLabel;
-
-  /// Permission key — null for the intro slide.
   final _Permission? permission;
 
   const _Slide({
@@ -67,7 +67,31 @@ const _slides = <_Slide>[
   ),
 ];
 
-/// Onboarding screen — three slides + permission dialogs + granted state.
+// Page indices for new steps
+const _interestsPageIndex = 3;
+const _consentPageIndex = 4;
+const _totalPages = 5;
+
+// ---------------------------------------------------------------------------
+// Interest categories
+// ---------------------------------------------------------------------------
+
+const _interestCategories = [
+  (label: 'Sports & Activity', icon: Icons.directions_run),
+  (label: 'Food & Drink', icon: Icons.restaurant),
+  (label: 'Arts & Culture', icon: Icons.palette),
+  (label: 'Nature & Outdoors', icon: Icons.park),
+  (label: 'Entertainment & Nightlife', icon: Icons.nightlife),
+  (label: 'Education & Workshops', icon: Icons.school),
+  (label: 'Music & Concerts', icon: Icons.music_note),
+  (label: 'Family & Kids', icon: Icons.family_restroom),
+  (label: 'Calm & Solo', icon: Icons.self_improvement),
+];
+
+// ---------------------------------------------------------------------------
+// OnboardingScreen
+// ---------------------------------------------------------------------------
+
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -78,6 +102,10 @@ class OnboardingScreen extends ConsumerStatefulWidget {
 class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final _pageController = PageController();
   int _page = 0;
+
+  // Collected from new steps
+  Set<String> _interests = {};
+  bool _consentGiven = false;
 
   @override
   void dispose() {
@@ -93,6 +121,18 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   Future<void> _completeAndGo() async {
+    final user = ref.read(authProvider).user;
+    if (user != null) {
+      try {
+        await ref.read(authServiceProvider).updateInterestsAndConsent(
+          userId: user.id,
+          interests: _interests.toList(),
+          consentAt: _consentGiven ? DateTime.now() : null,
+        );
+      } catch (_) {
+        // non-blocking — don't prevent onboarding completion
+      }
+    }
     await ref.read(authProvider.notifier).completeOnboarding();
     ref.read(onboardingProvider.notifier).complete();
     if (!mounted) return;
@@ -100,7 +140,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   void _advance() {
-    if (_page < _slides.length - 1) {
+    if (_page < _totalPages - 1) {
       final noMotion = MediaQuery.disableAnimationsOf(context);
       if (noMotion) {
         _pageController.jumpToPage(_page + 1);
@@ -149,12 +189,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final state = ref.watch(onboardingProvider);
     final theme = Theme.of(context);
     final secondaryText = theme.colorScheme.onSurfaceVariant;
+    final isConsentPage = _page == _consentPageIndex;
 
     return Scaffold(
       body: SafeArea(
         child: Column(
           children: [
-            // Header: brand + skip
+            // Header: brand + skip (hidden on consent page)
             Padding(
               padding: const EdgeInsets.symmetric(
                 vertical: AppSpacing.md,
@@ -164,23 +205,43 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 children: [
                   const BrandMark(),
                   const Spacer(),
-                  TextButton(
-                    onPressed: _completeAndGo,
-                    style: TextButton.styleFrom(foregroundColor: secondaryText),
-                    child: const Text(AppStrings.skip),
-                  ),
+                  if (!isConsentPage)
+                    TextButton(
+                      onPressed: _completeAndGo,
+                      style: TextButton.styleFrom(
+                        foregroundColor: secondaryText,
+                      ),
+                      child: const Text(AppStrings.skip),
+                    ),
                 ],
               ),
             ),
             Expanded(
               child: PageView.builder(
                 controller: _pageController,
-                itemCount: _slides.length,
+                itemCount: _totalPages,
                 onPageChanged: (i) {
                   setState(() => _page = i);
-                  ref.read(onboardingProvider.notifier).setPage(i);
+                  if (i < _slides.length) {
+                    ref.read(onboardingProvider.notifier).setPage(i);
+                  }
                 },
-                itemBuilder: (_, i) => _SlideView(slide: _slides[i]),
+                itemBuilder: (_, i) {
+                  if (i < _slides.length) {
+                    return _SlideView(slide: _slides[i]);
+                  }
+                  if (i == _interestsPageIndex) {
+                    return _InterestsPage(
+                      selected: _interests,
+                      onChanged: (updated) =>
+                          setState(() => _interests = updated),
+                    );
+                  }
+                  return _ConsentPage(
+                    checked: _consentGiven,
+                    onChanged: (v) => setState(() => _consentGiven = v),
+                  );
+                },
               ),
             ),
             // Page indicators
@@ -188,7 +249,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               padding: const EdgeInsets.all(AppSpacing.md),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(_slides.length, (i) {
+                children: List.generate(_totalPages, (i) {
                   final active = i == _page;
                   return AnimatedContainer(
                     duration: MediaQuery.disableAnimationsOf(context)
@@ -201,7 +262,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     width: active ? 28 : 8,
                     height: 8,
                     decoration: BoxDecoration(
-                      color: active ? AppColors.primary : theme.dividerColor,
+                      color:
+                          active ? AppColors.primary : theme.dividerColor,
                       borderRadius: BorderRadius.circular(AppSpacing.xxs),
                     ),
                   );
@@ -225,6 +287,38 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   Widget _buildCta(OnboardingState state) {
+    // Interests page
+    if (_page == _interestsPageIndex) {
+      final enough = _interests.length >= 3;
+      return Column(
+        children: [
+          AppButton(
+            text: 'Continue',
+            onPressed: enough ? _advance : null,
+          ),
+          if (!enough)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.sm),
+              child: Text(
+                'Select at least 3 interests (${_interests.length}/3)',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+        ],
+      );
+    }
+
+    // Consent page
+    if (_page == _consentPageIndex) {
+      return AppButton(
+        text: AppStrings.getStarted,
+        onPressed: _consentGiven ? _completeAndGo : null,
+      );
+    }
+
+    // Original slides 0-2
     final slide = _slides[_page];
     final granted = _granted(state, slide.permission);
     if (granted) {
@@ -238,16 +332,15 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     return Column(
       children: [
         AppButton(
-          text: _page == _slides.length - 1
-              ? AppStrings.getStarted
-              : slide.ctaLabel,
+          text: _page == _slides.length - 1 ? AppStrings.next : slide.ctaLabel,
           onPressed: () => _handleCta(slide),
         ),
         if (_page > 0)
           TextButton(
             onPressed: _advance,
             style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
+              foregroundColor:
+                  Theme.of(context).colorScheme.onSurfaceVariant,
             ),
             child: const Text('Not now'),
           ),
@@ -255,6 +348,211 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// Interests page
+// ---------------------------------------------------------------------------
+
+class _InterestsPage extends StatelessWidget {
+  const _InterestsPage({
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final Set<String> selected;
+  final ValueChanged<Set<String>> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.xl,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'What are you\ninto?',
+            style: theme.textTheme.headlineMedium,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Pick at least 3 interests — used to personalise your recommendations.',
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: _interestCategories.map((cat) {
+              final isSelected = selected.contains(cat.label);
+              return FilterChip(
+                avatar: Icon(
+                  cat.icon,
+                  size: 18,
+                  color: isSelected
+                      ? theme.colorScheme.onSecondaryContainer
+                      : theme.colorScheme.onSurfaceVariant,
+                ),
+                label: Text(cat.label),
+                selected: isSelected,
+                onSelected: (v) {
+                  final next = Set<String>.from(selected);
+                  if (v) {
+                    next.add(cat.label);
+                  } else {
+                    next.remove(cat.label);
+                  }
+                  onChanged(next);
+                },
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Consent page
+// ---------------------------------------------------------------------------
+
+class _ConsentPage extends StatelessWidget {
+  const _ConsentPage({
+    required this.checked,
+    required this.onChanged,
+  });
+
+  final bool checked;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final secondaryText = theme.colorScheme.onSurfaceVariant;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.xl,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.privacy_tip_outlined,
+            size: 48,
+            color: AppColors.primary,
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Text(
+            'Your data,\nyour control',
+            style: theme.textTheme.headlineMedium,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            'We need your consent to process personal data for personalised recommendations.',
+            style: theme.textTheme.bodyLarge?.copyWith(color: secondaryText),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          _InfoTile(
+            icon: Icons.location_on_outlined,
+            title: 'Location data',
+            body: 'Used to suggest nearby events and places. '
+                'Stored at 3 decimal precision (~110 m accuracy).',
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          const _InfoTile(
+            icon: Icons.cloud_outlined,
+            title: 'On-device AI',
+            body: 'The AI model runs on our own GPU server — '
+                'your data is never shared with third-party AI providers.',
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          const _InfoTile(
+            icon: Icons.delete_outline,
+            title: 'Delete your data',
+            body: 'You can permanently delete all your data at any '
+                'time from the profile screen.',
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Card(
+            elevation: 0,
+            color: theme.colorScheme.surfaceContainerHighest,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.borderRadiusSm),
+            ),
+            child: CheckboxListTile(
+              value: checked,
+              onChanged: (v) => onChanged(v ?? false),
+              controlAffinity: ListTileControlAffinity.leading,
+              title: Text(
+                'I consent to my personal data being processed '
+                'for the purposes described above.',
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Consent is required to continue. You can withdraw it '
+            'at any time from the profile screen.',
+            style: theme.textTheme.labelSmall?.copyWith(color: secondaryText),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoTile extends StatelessWidget {
+  const _InfoTile({
+    required this.icon,
+    required this.title,
+    required this.body,
+  });
+
+  final IconData icon;
+  final String title;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: AppColors.primary),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: theme.textTheme.labelLarge),
+              const SizedBox(height: 2),
+              Text(
+                body,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Existing widgets (unchanged)
+// ---------------------------------------------------------------------------
 
 class _SlideView extends StatelessWidget {
   final _Slide slide;
@@ -292,7 +590,6 @@ class _SlideView extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.xs),
-          // Subtle hue accent — dot + label visible in semantic tree only.
           Semantics(
             container: true,
             child: SizedBox(
@@ -333,9 +630,7 @@ class _IllustrationTile extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Striped overlay for the "calm intelligence" texture.
           Positioned.fill(child: CustomPaint(painter: _StripePainter())),
-          // Inner card with the icon.
           Container(
             width: 110,
             height: 110,
@@ -453,7 +748,8 @@ class _PermissionDialog extends StatelessWidget {
                       onPressed: () => Navigator.of(context).pop(true),
                       style: TextButton.styleFrom(
                         foregroundColor: AppColors.primary,
-                        textStyle: const TextStyle(fontWeight: FontWeight.w600),
+                        textStyle:
+                            const TextStyle(fontWeight: FontWeight.w600),
                         shape: const RoundedRectangleBorder(),
                         minimumSize: const Size.fromHeight(48),
                       ),

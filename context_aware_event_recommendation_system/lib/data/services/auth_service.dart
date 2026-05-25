@@ -65,6 +65,17 @@ class AuthService {
         .update({'has_completed_onboarding': true}).eq('id', userId);
   }
 
+  Future<void> updateInterestsAndConsent({
+    required String userId,
+    required List<String> interests,
+    DateTime? consentAt,
+  }) async {
+    await _client.from('users').update({
+      'interests': interests,
+      if (consentAt != null) 'consent_given_at': consentAt.toIso8601String(),
+    }).eq('id', userId);
+  }
+
   Future<UserModel?> _fetchUserProfile(
     String id,
     String fallbackEmail,

@@ -12,7 +12,9 @@ import '../data/services/app_usage_service.dart';
 import '../data/services/auth_service.dart';
 import '../data/services/backend_service.dart';
 import '../data/services/context_service.dart';
+import '../data/services/feedback_service.dart';
 import '../data/services/gps_collection_service.dart';
+import '../data/services/llm_service.dart';
 import '../data/services/location_service.dart';
 import '../data/services/places_service.dart';
 import '../data/services/screen_event_service.dart';
@@ -100,10 +102,24 @@ final contextRepositoryProvider = Provider<ContextRepository>((ref) {
   );
 });
 
+final feedbackServiceProvider = Provider<FeedbackService>((ref) {
+  return FeedbackService(ref.watch(supabaseClientProvider));
+});
+
+final llmServiceProvider = Provider<LlmService>((ref) {
+  return LlmService(
+    ref.watch(supabaseClientProvider),
+    ref.watch(locationRepositoryProvider),
+    ref.watch(weatherServiceProvider),
+    ref.watch(placesRepositoryProvider),
+  );
+});
+
 final suggestionRepositoryProvider = Provider<SuggestionRepository>((ref) {
   return SuggestionRepository(
     ref.watch(contextServiceProvider),
     ref.watch(sharedPreferencesProvider),
     ref.watch(contextRepositoryProvider),
+    ref.watch(llmServiceProvider),
   );
 });

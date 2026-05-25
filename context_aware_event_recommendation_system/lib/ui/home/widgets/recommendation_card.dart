@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../../config/constants/app_colors.dart';
 import '../../../config/constants/app_spacing.dart';
+import '../../../di/providers.dart';
 import '../../../domain/models/suggestion_category.dart';
 import '../../../domain/models/suggestion_model.dart';
 import '../../core/ui/app_pressable.dart';
 import '../../core/ui/tag.dart';
+import '../providers/context_provider.dart';
+import 'rationale_chip_row.dart';
 
-/// Suggestion card — hero strip + body + AI rationale band + meta tags.
-/// Priority cards (the first one) get an accent halo.
-class RecommendationCard extends StatelessWidget {
+class RecommendationCard extends ConsumerStatefulWidget {
   final SuggestionModel suggestion;
   final VoidCallback? onTap;
   final bool priority;
@@ -21,26 +24,52 @@ class RecommendationCard extends StatelessWidget {
   });
 
   @override
+  ConsumerState<RecommendationCard> createState() => _RecommendationCardState();
+}
+
+class _RecommendationCardState extends ConsumerState<RecommendationCard> {
+  bool _liked = false;
+
+  void _handleLike() {
+    final next = !_liked;
+    setState(() => _liked = next);
+    ref.read(feedbackServiceProvider).logAction(
+      suggestionId: widget.suggestion.id,
+      action: next ? 'like' : 'dislike',
+      suggestion: widget.suggestion,
+    );
+  }
+
+  void _handleDismiss() {
+    ref.read(dismissedSuggestionsProvider.notifier).dismiss(widget.suggestion.id);
+    ref.read(feedbackServiceProvider).logAction(
+      suggestionId: widget.suggestion.id,
+      action: 'dismiss',
+      suggestion: widget.suggestion,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final divider = theme.dividerColor;
-    final hue = suggestion.category.categoryHue;
+    final hue = widget.suggestion.category.categoryHue;
     final base = HSLColor.fromAHSL(1, hue, 0.55, 0.85).toColor();
     final accent = HSLColor.fromAHSL(1, (hue + 25) % 360, 0.55, 0.78).toColor();
     final iconTint = HSLColor.fromAHSL(1, hue, 0.55, 0.50).toColor();
     final categoryTint = HSLColor.fromAHSL(1, hue, 0.65, 0.45).toColor();
 
     return AppPressable(
-      semanticLabel: 'Open suggestion: ${suggestion.title}',
-      onTap: onTap,
+      semanticLabel: 'Open suggestion: ${widget.suggestion.title}',
+      onTap: widget.onTap,
       child: Container(
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(AppSpacing.borderRadiusLg),
           border: Border.all(
-            color: priority ? AppColors.featuredCardBorder : divider,
+            color: widget.priority ? AppColors.featuredCardBorder : divider,
           ),
-          boxShadow: priority
+          boxShadow: widget.priority
               ? [
                   BoxShadow(
                     color: AppColors.featuredCardShadow,
@@ -85,7 +114,7 @@ class RecommendationCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(AppSpacing.pill),
                       ),
                       child: Text(
-                        suggestion.category.toUpperCase(),
+                        widget.suggestion.category.toUpperCase(),
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: categoryTint,
                           fontWeight: FontWeight.w600,
@@ -112,7 +141,7 @@ class RecommendationCard extends StatelessWidget {
                         ],
                       ),
                       child: Icon(
-                        suggestion.category.categoryIcon,
+                        widget.suggestion.category.categoryIcon,
                         size: 28,
                         color: iconTint,
                       ),
@@ -122,14 +151,22 @@ class RecommendationCard extends StatelessWidget {
               ),
               // Body
               Padding(
-                padding: const EdgeInsets.all(AppSpacing.md),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  AppSpacing.md,
+                  AppSpacing.md,
+                  AppSpacing.sm,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(suggestion.title, style: theme.textTheme.titleMedium),
+                    Text(
+                      widget.suggestion.title,
+                      style: theme.textTheme.titleMedium,
+                    ),
                     const SizedBox(height: AppSpacing.xs),
                     Text(
-                      suggestion.description,
+                      widget.suggestion.description,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -158,7 +195,7 @@ class RecommendationCard extends StatelessWidget {
                           const SizedBox(width: AppSpacing.xs),
                           Expanded(
                             child: Text(
-                              suggestion.rationale,
+                              widget.suggestion.rationale,
                               style: theme.textTheme.labelSmall?.copyWith(
                                 color: AppColors.accent,
                                 height: 1.5,
@@ -169,24 +206,64 @@ class RecommendationCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: AppSpacing.sm),
-                    // Tags
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        if (suggestion.distance != null)
-                          Tag(
-                            icon: Icons.place,
-                            label:
-                                '${suggestion.distance!.toStringAsFixed(1)} km',
-                          ),
-                        if (suggestion.estimatedMinutes != null)
-                          Tag(
-                            icon: Icons.schedule,
-                            label: '${suggestion.estimatedMinutes} min',
-                          ),
-                        ...suggestion.tags.take(2).map((t) => Tag(label: t)),
-                      ],
+                    // Rationale signals
+                    if (widget.suggestion.tags.isNotEmpty) ...[
+                      RationaleChipRow(signals: widget.suggestion.tags),
+                      const SizedBox(height: AppSpacing.xs),
+                    ],
+                    // Distance / duration meta tags
+                    if (widget.suggestion.distance != null ||
+                        widget.suggestion.estimatedMinutes != null)
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          if (widget.suggestion.distance != null)
+                            Tag(
+                              icon: Icons.place,
+                              label:
+                                  '${widget.suggestion.distance!.toStringAsFixed(1)} km',
+                            ),
+                          if (widget.suggestion.estimatedMinutes != null)
+                            Tag(
+                              icon: Icons.schedule,
+                              label: '${widget.suggestion.estimatedMinutes} min',
+                            ),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+              // Action bar
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  0,
+                  AppSpacing.xs,
+                  AppSpacing.xs,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        _liked ? Icons.favorite : Icons.favorite_border,
+                        color: _liked
+                            ? theme.colorScheme.error
+                            : theme.colorScheme.onSurfaceVariant,
+                      ),
+                      tooltip: _liked ? 'Liked' : 'Like',
+                      iconSize: 20,
+                      onPressed: _handleLike,
+                    ),
+                    IconButton(
+                      icon: Icon(
+                        Icons.close,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      tooltip: 'Dismiss',
+                      iconSize: 20,
+                      onPressed: _handleDismiss,
                     ),
                   ],
                 ),

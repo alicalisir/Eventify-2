@@ -13,6 +13,7 @@
       "Bash(Select-Object Name)",
       "Bash(dart format *)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Huawei\\\\Desktop\\\\Klasorlerim\\\\Projelerim\\\\context_aware_event_recommendation_system\" -Recurse -Directory)",
+      "WebSearch",
       "Bash(xargs cat *)",
       "PowerShell(flutter doctor *)",
       "Bash(uvicorn main:app --host 0.0.0.0 --port 8000)",

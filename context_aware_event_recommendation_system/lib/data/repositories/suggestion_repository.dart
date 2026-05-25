@@ -5,6 +5,7 @@ import '../../domain/models/suggestion_model.dart';
 import '../../utils/app_logger.dart';
 import '../../utils/llm_prompt_builder.dart';
 import '../services/context_service.dart';
+import '../services/llm_service.dart';
 import 'context_repository.dart';
 
 class SuggestionRepository {
@@ -12,11 +13,13 @@ class SuggestionRepository {
     this._contextService,
     this._prefs,
     this._contextRepository,
+    this._llmService,
   );
 
   final ContextService _contextService;
   final SharedPreferences _prefs;
   final ContextRepository _contextRepository;
+  final LlmService _llmService;
 
   static const _dismissedKey = 'suggestions.dismissed_ids';
   static const _cacheTtl = Duration(minutes: 5);
@@ -29,12 +32,19 @@ class SuggestionRepository {
     if (_cached != null &&
         _cacheExpiresAt != null &&
         now.isBefore(_cacheExpiresAt!)) {
+      AppLogger.d('[SuggestionRepository] In-memory cache hit');
       return _cached!;
     }
-    final fresh = await _contextService.getSuggestions();
-    _cached = fresh;
-    _cacheExpiresAt = now.add(_cacheTtl);
-    return fresh;
+    try {
+      final fresh = await _llmService.getSuggestions();
+      _cached = fresh;
+      _cacheExpiresAt = now.add(_cacheTtl);
+      return fresh;
+    } catch (e, s) {
+      AppLogger.e('[SuggestionRepository] LLM failed, falling back to mock', e);
+      AppLogger.d('[SuggestionRepository] Stack', s);
+      return _contextService.getSuggestions();
+    }
   }
 
   /// Busts the in-memory cache so the next [getSuggestions] hits the service.
