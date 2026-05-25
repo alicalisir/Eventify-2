@@ -1,3 +1,7 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../domain/models/suggestion_model.dart';
@@ -7,33 +11,60 @@ import '../repositories/places_repository.dart';
 import '../services/weather_service.dart' show WeatherData, WeatherService;
 
 class LlmService {
-  LlmService(this._supabase, this._location, this._weather, this._places);
+  LlmService(
+    this._supabase,
+    this._location,
+    this._weather,
+    this._places, {
+    required String supabaseUrl,
+    required String supabaseAnonKey,
+  })  : _functionUrl = '$supabaseUrl/functions/v1/recommend',
+        _supabaseAnonKey = supabaseAnonKey;
 
   final SupabaseClient _supabase;
   final LocationRepository _location;
   final WeatherService _weather;
   final PlacesRepository _places;
+  final String _functionUrl;
+  final String _supabaseAnonKey;
 
+  // ── Public API ────────────────────────────────────────────────────────────
+
+  /// SSE streaming — yields each suggestion as it arrives from the LLM.
+  Stream<SuggestionModel> getSuggestionsStream() {
+    return _streamSuggestions();
+  }
+
+  /// Non-streaming fallback — awaits the full SSE stream and returns the list.
   Future<List<SuggestionModel>> getSuggestions() async {
-    final position = await _location.getCurrentPosition();
+    final results = <SuggestionModel>[];
+    await for (final s in _streamSuggestions()) {
+      results.add(s);
+    }
+    return results;
+  }
 
+  // ── Implementation ────────────────────────────────────────────────────────
+
+  Stream<SuggestionModel> _streamSuggestions() async* {
+    final position = await _location.getCurrentPosition();
     final lat = position?.latitude ?? 41.0082;
     final lng = position?.longitude ?? 28.9784;
 
-    // Weather ve places paralel çalışsın
+    // Start both fetches in parallel, then await each with correct types
     final weatherFuture = position != null
         ? _weather.getCurrentWeather(lat, lng)
         : Future<WeatherData?>.value(null);
     final placesFuture = _places.getNearbyPlaces();
 
-    final WeatherData? weatherData = await weatherFuture;
+    final weatherData = await weatherFuture;
     final nearbyPlaces = await placesFuture;
 
     final locationLabel = position != null
         ? await _location.getAddressLabel(lat, lng)
         : null;
 
-    final city = _extractCity(locationLabel) ?? 'İstanbul';
+    final city = _extractCity(locationLabel) ?? 'Istanbul';
     final now = DateTime.now();
 
     final placesPayload = nearbyPlaces
@@ -42,7 +73,7 @@ class LlmService {
             'id': p.id,
             'name': p.name,
             'types': p.types,
-            'distance_m': p.distanceMeters.round(),
+            'distance_m': (p.distanceMeters as num).round(),
             if (p.address != null) 'address': p.address,
             if (p.rating != null) 'rating': p.rating,
             if (p.priceLevel != null) 'price_level': p.priceLevel,
@@ -50,10 +81,7 @@ class LlmService {
         )
         .toList();
 
-    AppLogger.i(
-      '[LlmService] ${nearbyPlaces.length} mekan yüklendi '
-      '(places API)',
-    );
+    AppLogger.i('[LlmService] ${nearbyPlaces.length} places loaded, city=$city');
 
     final body = {
       'lat': lat,
@@ -70,40 +98,103 @@ class LlmService {
       'nearby_places': placesPayload,
     };
 
+    // Get user JWT for auth header
+    final token = _supabase.auth.currentSession?.accessToken;
+    if (token == null) throw Exception('[LlmService] Not authenticated');
+
     AppLogger.i(
-      '[LlmService] recommend çağrılıyor — city=$city '
-      'weather=${weatherData?.condition ?? 'unknown'} '
-      'hour=${now.hour}',
+      '[LlmService] SSE stream start — city=$city '
+      'weather=${weatherData?.condition ?? 'unknown'} hour=${now.hour}',
     );
 
-    final response = await _supabase.functions.invoke(
-      'recommend',
-      body: body,
-    );
+    final client = http.Client();
+    try {
+      final request = http.Request('POST', Uri.parse(_functionUrl));
+      request.headers['Authorization'] = 'Bearer $token';
+      request.headers['apikey'] = _supabaseAnonKey;
+      request.headers['Content-Type'] = 'application/json';
+      request.headers['Accept'] = 'text/event-stream';
+      request.body = jsonEncode(body);
 
-    if (response.status != 200) {
-      AppLogger.e(
-        '[LlmService] Edge Function hata: ${response.status}',
-        response.data,
-      );
-      throw Exception('recommend fonksiyonu başarısız: ${response.status}');
+      final streamedResponse = await client.send(request);
+
+      if (streamedResponse.statusCode != 200) {
+        final errorBody = await streamedResponse.stream.bytesToString();
+        throw Exception(
+          '[LlmService] Edge Function error ${streamedResponse.statusCode}: $errorBody',
+        );
+      }
+
+      // SSE parser state
+      String? currentEvent;
+      String? currentData;
+      var lineBuffer = '';
+
+      await for (final chunk
+          in streamedResponse.stream.transform(utf8.decoder)) {
+        lineBuffer += chunk;
+
+        while (true) {
+          final newlineIdx = lineBuffer.indexOf('\n');
+          if (newlineIdx == -1) break;
+
+          final line = lineBuffer.substring(0, newlineIdx);
+          lineBuffer = lineBuffer.substring(newlineIdx + 1);
+          final trimmed = line.trimRight();
+
+          if (trimmed.isEmpty) {
+            // Blank line = event separator
+            if (currentEvent != null && currentData != null) {
+              yield* _handleSseEvent(currentEvent, currentData);
+            }
+            currentEvent = null;
+            currentData = null;
+          } else if (trimmed.startsWith('event: ')) {
+            currentEvent = trimmed.substring(7);
+          } else if (trimmed.startsWith('data: ')) {
+            currentData = trimmed.substring(6);
+          }
+        }
+      }
+    } finally {
+      client.close();
     }
-
-    final data = response.data as Map<String, dynamic>;
-    final rawList = data['suggestions'] as List<dynamic>? ?? [];
-    final provider = data['llm_provider'] as String? ?? 'unknown';
-    final cacheHit = data['cache_hit'] as bool? ?? false;
-    final latencyMs = data['latency_ms'] as int? ?? 0;
-
-    AppLogger.i(
-      '[LlmService] ${rawList.length} öneri alındı — '
-      'provider=$provider cacheHit=$cacheHit latency=${latencyMs}ms',
-    );
-
-    return rawList
-        .map((s) => _parseSuggestion(s as Map<String, dynamic>))
-        .toList();
   }
+
+  Stream<SuggestionModel> _handleSseEvent(
+    String event,
+    String data,
+  ) async* {
+    try {
+      final json = jsonDecode(data) as Map<String, dynamic>;
+
+      if (event == 'suggestion') {
+        final suggestionJson = json['suggestion'] as Map<String, dynamic>;
+        final cacheHit = json['cache_hit'] as bool? ?? false;
+        final provider = json['llm_provider'] as String? ?? 'unknown';
+        final index = json['index'] as int? ?? 0;
+        final suggestion = _parseSuggestion(suggestionJson);
+
+        AppLogger.i(
+          '[LlmService] SSE[$index] ${suggestion.title} '
+          '(provider=$provider cacheHit=$cacheHit)',
+        );
+        yield suggestion;
+      } else if (event == 'done') {
+        AppLogger.i(
+          '[LlmService] SSE done — latency=${json['latency_ms']}ms '
+          'total=${json['total']} cacheHit=${json['cache_hit']}',
+        );
+      } else if (event == 'error') {
+        throw Exception('[LlmService] LLM error: ${json['error']}');
+      }
+    } catch (e) {
+      if (event == 'error') rethrow;
+      AppLogger.e('[LlmService] SSE event parse error (event=$event)', e);
+    }
+  }
+
+  // ── Parsers / helpers ─────────────────────────────────────────────────────
 
   static SuggestionModel _parseSuggestion(Map<String, dynamic> s) {
     final distanceM = (s['distance_m'] as num?)?.toDouble();

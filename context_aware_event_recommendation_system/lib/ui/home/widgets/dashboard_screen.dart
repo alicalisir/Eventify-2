@@ -17,7 +17,7 @@ import 'home_drawer.dart';
 import 'recommendation_card.dart';
 import 'section_label.dart';
 
-/// Dashboard — context hero, today's suggestions, drawer.
+/// Dashboard — context hero, today's suggestions (streamed one by one), drawer.
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
 
@@ -25,14 +25,18 @@ class DashboardScreen extends ConsumerWidget {
     ref.read(suggestionRepositoryProvider).invalidateCache();
     ref.read(contextRepositoryProvider).invalidateContext();
     await ref.read(dismissedSuggestionsProvider.notifier).clear();
-    ref.invalidate(suggestionProvider);
+    ref.invalidate(suggestionStreamProvider);
     ref.invalidate(ambientContextProvider);
-    await ref.read(suggestionProvider.future);
+    // Await at least the first suggestion so the refresh indicator stays visible
+    await ref.read(suggestionStreamProvider.future);
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final visibleAsync = ref.watch(visibleSuggestionsProvider);
+    // suggestionStreamProvider drives loading / error state
+    final suggestionsAsync = ref.watch(suggestionStreamProvider);
+    // visibleSuggestionsProvider is synchronous — no shimmer flicker on each card
+    final visible = ref.watch(visibleSuggestionsProvider);
     final contextAsync = ref.watch(ambientContextProvider);
     final user = ref.watch(authProvider).user;
 
@@ -84,10 +88,20 @@ class DashboardScreen extends ConsumerWidget {
               error: (_, _) => const SizedBox.shrink(),
             ),
             const SizedBox(height: AppSpacing.lg),
-            // Suggestions
-            visibleAsync.when(
-              data: (suggestions) {
-                if (suggestions.isEmpty) {
+            // Suggestions — streamed card by card
+            suggestionsAsync.when(
+              // Loading: show shimmer until the first card arrives
+              loading: () => const _SuggestionListShimmer(),
+              // Error: show retry button
+              error: (_, _) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+                child: ErrorStateWidget.error(
+                  onRetry: () => ref.invalidate(suggestionStreamProvider),
+                ),
+              ),
+              // Data: render visible (filtered) list — grows as stream emits
+              data: (_) {
+                if (visible.isEmpty) {
                   return EmptyDashboard(onRefresh: () => _refresh(ref));
                 }
                 return Column(
@@ -95,16 +109,16 @@ class DashboardScreen extends ConsumerWidget {
                   children: [
                     SectionLabel(
                       label: 'For you, right now',
-                      count: suggestions.length,
+                      count: visible.length,
                     ),
                     const SizedBox(height: AppSpacing.md),
-                    for (var i = 0; i < suggestions.length; i++) ...[
+                    for (var i = 0; i < visible.length; i++) ...[
                       Semantics(
                         customSemanticsActions: {
                           const CustomSemanticsAction(label: 'Dismiss'): () {
                             ref
                                 .read(dismissedSuggestionsProvider.notifier)
-                                .dismiss(suggestions[i].id);
+                                .dismiss(visible[i].id);
                             AppSnackbar.show(
                               context,
                               message: "Got it — we'll suggest fewer like that",
@@ -113,13 +127,13 @@ class DashboardScreen extends ConsumerWidget {
                           },
                         },
                         child: Dismissible(
-                          key: ValueKey(suggestions[i].id),
+                          key: ValueKey(visible[i].id),
                           direction: DismissDirection.endToStart,
                           background: const _DismissBackground(),
                           onDismissed: (_) {
                             ref
                                 .read(dismissedSuggestionsProvider.notifier)
-                                .dismiss(suggestions[i].id);
+                                .dismiss(visible[i].id);
                             AppSnackbar.show(
                               context,
                               message: "Got it — we'll suggest fewer like that",
@@ -127,11 +141,11 @@ class DashboardScreen extends ConsumerWidget {
                             );
                           },
                           child: RecommendationCard(
-                            suggestion: suggestions[i],
+                            suggestion: visible[i],
                             priority: i == 0,
                             onTap: () => context.pushNamed(
                               'suggestion',
-                              pathParameters: {'id': suggestions[i].id},
+                              pathParameters: {'id': visible[i].id},
                             ),
                           ),
                         ),
@@ -142,13 +156,6 @@ class DashboardScreen extends ConsumerWidget {
                   ],
                 );
               },
-              loading: () => const _SuggestionListShimmer(),
-              error: (_, _) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
-                child: ErrorStateWidget.error(
-                  onRetry: () => ref.invalidate(suggestionProvider),
-                ),
-              ),
             ),
           ],
         ),

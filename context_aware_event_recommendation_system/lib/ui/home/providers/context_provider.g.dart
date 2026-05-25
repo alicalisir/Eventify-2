@@ -8,51 +8,6 @@ part of 'context_provider.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Raw suggestions from the repository (TTL-cached, backed by ContextService).
-
-@ProviderFor(suggestion)
-final suggestionProvider = SuggestionProvider._();
-
-/// Raw suggestions from the repository (TTL-cached, backed by ContextService).
-
-final class SuggestionProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<List<SuggestionModel>>,
-          List<SuggestionModel>,
-          FutureOr<List<SuggestionModel>>
-        >
-    with
-        $FutureModifier<List<SuggestionModel>>,
-        $FutureProvider<List<SuggestionModel>> {
-  /// Raw suggestions from the repository (TTL-cached, backed by ContextService).
-  SuggestionProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'suggestionProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$suggestionHash();
-
-  @$internal
-  @override
-  $FutureProviderElement<List<SuggestionModel>> $createElement(
-    $ProviderPointer pointer,
-  ) => $FutureProviderElement(pointer);
-
-  @override
-  FutureOr<List<SuggestionModel>> create(Ref ref) {
-    return suggestion(ref);
-  }
-}
-
-String _$suggestionHash() => r'e6c99773e82dbdbfc0bab0ea22b6d9e685011853';
 
 /// Current ambient context (greeting, location, weather, activity).
 
@@ -196,50 +151,3 @@ abstract class _$DismissedSuggestions extends $AsyncNotifier<Set<String>> {
     element.handleCreate(ref, build);
   }
 }
-
-/// Suggestions visible to the user — raw list minus dismissed.
-
-@ProviderFor(visibleSuggestions)
-final visibleSuggestionsProvider = VisibleSuggestionsProvider._();
-
-/// Suggestions visible to the user — raw list minus dismissed.
-
-final class VisibleSuggestionsProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<List<SuggestionModel>>,
-          List<SuggestionModel>,
-          FutureOr<List<SuggestionModel>>
-        >
-    with
-        $FutureModifier<List<SuggestionModel>>,
-        $FutureProvider<List<SuggestionModel>> {
-  /// Suggestions visible to the user — raw list minus dismissed.
-  VisibleSuggestionsProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'visibleSuggestionsProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$visibleSuggestionsHash();
-
-  @$internal
-  @override
-  $FutureProviderElement<List<SuggestionModel>> $createElement(
-    $ProviderPointer pointer,
-  ) => $FutureProviderElement(pointer);
-
-  @override
-  FutureOr<List<SuggestionModel>> create(Ref ref) {
-    return visibleSuggestions(ref);
-  }
-}
-
-String _$visibleSuggestionsHash() =>
-    r'16eb590195a09e91955b1b44c7fee3fd4680ffca';
