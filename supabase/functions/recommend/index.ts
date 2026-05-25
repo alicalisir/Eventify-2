@@ -5,6 +5,7 @@ import { callSelfHost, callSelfHostStream, isSelfHostHealthy } from "./llm_self_
 import { callClaude, callClaudeStream } from "./llm_claude.ts";
 import { applyHardConstraints, StreamingJsonParser } from "./parser.ts";
 import { buildCacheKeySync } from "./cache.ts";
+import { logLangfuse } from "./langfuse.ts";
 
 const SELF_HOST_URL = Deno.env.get("MISTRAL_URL") ?? "";
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
@@ -121,6 +122,22 @@ async function handleRequest(req: Request): Promise<Response> {
       suggestions: cached.payload.suggestions as Suggestion[],
       llm_provider: cached.llm_provider as string,
     };
+    logLangfuse({
+      traceId: crypto.randomUUID(),
+      userId,
+      llmProvider: cacheData.llm_provider,
+      model: cacheData.llm_provider,
+      systemPrompt: "",
+      userMessage: "",
+      suggestions: cacheData.suggestions,
+      promptTokens: 0,
+      completionTokens: 0,
+      latencyMs: 0,
+      cacheHit: true,
+      city: body.city,
+      weatherCondition: body.weather_condition,
+      hour: body.hour,
+    });
     if (acceptsSse) return sseFromCache(cacheData);
     return jsonResponse({
       suggestions: cacheData.suggestions,
@@ -249,6 +266,23 @@ async function buildJsonResponse(s: Setup): Promise<Response> {
 
   await writeCacheAndFeedback(s, suggestions, result.tokens, result.latency_ms);
 
+  logLangfuse({
+    traceId: crypto.randomUUID(),
+    userId: s.userId,
+    llmProvider: s.llmProvider,
+    model: s.llmProvider,
+    systemPrompt: SYSTEM_PROMPT,
+    userMessage: s.userMessage,
+    suggestions,
+    promptTokens: result.tokens.prompt,
+    completionTokens: result.tokens.completion,
+    latencyMs: result.latency_ms,
+    cacheHit: false,
+    city: s.body.city,
+    weatherCondition: s.body.weather_condition,
+    hour: s.body.hour,
+  });
+
   console.log(
     `[recommend] JSON done provider=${s.llmProvider} suggestions=${suggestions.length} latency=${result.latency_ms}ms`,
   );
@@ -333,6 +367,10 @@ function buildSseStream(s: Setup): Response {
       const latency_ms = Date.now() - llmStart;
       const allSuggestions = parser.suggestions;
 
+      if (sentCount === 0) {
+        console.warn(`[recommend] SSE sentCount=0 — parser buf preview: ${parser.bufPreview}`);
+      }
+
       // Estimate tokens from accumulated buffer length (stream mode doesn't return usage)
       const approxTokens = Math.round(allSuggestions.reduce(
         (acc, sg) => acc + sg.title.length + sg.rationale.length,
@@ -345,6 +383,23 @@ function buildSseStream(s: Setup): Response {
         { prompt: 0, completion: approxTokens },
         latency_ms,
       );
+
+      logLangfuse({
+        traceId: crypto.randomUUID(),
+        userId: s.userId,
+        llmProvider: s.llmProvider,
+        model: s.llmProvider,
+        systemPrompt: SYSTEM_PROMPT,
+        userMessage: s.userMessage,
+        suggestions: allSuggestions.slice(0, 3),
+        promptTokens: 0,
+        completionTokens: approxTokens,
+        latencyMs: latency_ms,
+        cacheHit: false,
+        city: s.body.city,
+        weatherCondition: s.body.weather_condition,
+        hour: s.body.hour,
+      });
 
       await writer.write(enc.encode(sseEvent("done", {
         latency_ms,

@@ -100,16 +100,23 @@ export class StreamingJsonParser {
     return this._results;
   }
 
+  /** First 400 chars of the accumulated buffer — for debugging empty parse results. */
+  get bufPreview(): string {
+    return this._buf.slice(0, 400);
+  }
+
   /** Feed a new token chunk. Returns newly completed suggestions (0-N per call). */
   feed(token: string): Suggestion[] {
     this._buf += token;
 
-    // Locate the start of the suggestions array on first match
+    // Locate the start of the suggestions array on first match.
+    // Handle both `"suggestions":[` and `"suggestions": [` (LLM may add whitespace).
     if (this._arrayStart === -1) {
-      const marker = '"suggestions":[';
-      const idx = this._buf.indexOf(marker);
-      if (idx === -1) return [];
-      this._arrayStart = idx + marker.length;
+      const keyIdx = this._buf.indexOf('"suggestions"');
+      if (keyIdx === -1) return [];
+      const bracketIdx = this._buf.indexOf('[', keyIdx + '"suggestions"'.length);
+      if (bracketIdx === -1) return [];
+      this._arrayStart = bracketIdx + 1;
       this._cursor = this._arrayStart;
     }
 
