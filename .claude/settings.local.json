@@ -13,7 +13,19 @@
       "Bash(Select-Object Name)",
       "Bash(dart format *)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Huawei\\\\Desktop\\\\Klasorlerim\\\\Projelerim\\\\context_aware_event_recommendation_system\" -Recurse -Directory)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(xargs cat *)",
+      "PowerShell(flutter doctor *)",
+      "Bash(uvicorn main:app --host 0.0.0.0 --port 8000)",
+      "Bash(curl -s http://localhost:8000/health)",
+      "Bash(curl -s \"http://localhost:8000/api/recommendations/test-user-id?lat=41.0082&lon=28.9784\")",
+      "Bash(python -m json.tool)",
+      "Bash(python -m py_compile main.py)",
+      "PowerShell(cd \"C:\\\\Users\\\\alief\\\\Desktop\\\\Context-Aware-Event-Recommendation-System\"; Get-ChildItem -Force | Select-Object Name, @{Name=\"Type\"; Expression={if \\($_.PSIsContainer\\) {\"DIR\"} else {\"FILE\"}}} | Format-Table -AutoSize)",
+      "Bash(flutter build *)",
+      "Bash(flutter devices *)",
+      "Bash(flutter run *)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\alief\\\\Desktop\\\\Context-Aware-Event-Recommendation-System\\\\backend\\\\MLPipeline\\\\outputs\\\\model\\\\\" | ForEach-Object { \"$\\($_.Name\\) - $\\([math]::Round\\($_.Length/1MB,2\\)\\) MB\" })"
     ]
   }
 }

@@ -13,14 +13,26 @@ class ContextAwareApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
+    final authState = ref.watch(authProvider);
+    final prefs = ref.read(sharedPreferencesProvider);
+    final screenEvents = ref.read(screenEventServiceProvider);
 
-    // Start GPS collection when authenticated, stop on sign-out.
+    // Sync current auth state on build (handles hot-restart / session restore)
+    if (authState.status == AuthStatus.authenticated && authState.user != null) {
+      prefs.setString('current_user_id', authState.user!.id);
+      screenEvents.start(); // starts native ScreenEventService.kt (screen on/off capture)
+    }
+
+    // Handle auth state transitions (login / logout)
     ref.listen<AuthState>(authProvider, (previous, next) {
-      final gps = ref.read(gpsCollectionServiceProvider);
+      final screenEvents = ref.read(screenEventServiceProvider);
+      final prefs = ref.read(sharedPreferencesProvider);
       if (next.status == AuthStatus.authenticated && next.user != null) {
-        gps.start(next.user!.id);
+        prefs.setString('current_user_id', next.user!.id);
+        screenEvents.start();
       } else if (next.status == AuthStatus.unauthenticated) {
-        gps.stop();
+        prefs.remove('current_user_id');
+        screenEvents.stop();
       }
     });
 

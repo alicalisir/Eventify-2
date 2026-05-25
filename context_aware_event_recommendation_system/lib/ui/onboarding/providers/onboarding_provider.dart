@@ -35,7 +35,11 @@ class Onboarding extends _$Onboarding {
       '[Onboarding] Location permission → ${granted ? 'granted' : 'denied'}',
     );
     state = state.copyWith(locationGranted: granted);
-    if (granted) ref.read(contextRepositoryProvider).invalidateContext();
+    if (granted) {
+      ref.read(contextRepositoryProvider).invalidateContext();
+      // Also request Activity Recognition permission (Android 10+, silent fail ok)
+      await Permission.activityRecognition.request();
+    }
   }
 
   Future<void> grantNotifications() async {

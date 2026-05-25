@@ -4,21 +4,32 @@ import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../utils/app_logger.dart';
+import 'app_usage_service.dart';
+import 'screen_event_service.dart';
 
 /// Periodically collects GPS pings and uploads them to Supabase.
+/// Every 12th tick (≈ once per hour) also triggers app usage collection
+/// and screen event flush.
 ///
-/// Speed → movement_state thresholds match the synthetic training data:
-///   < 0.5 m/s  → stationary
-///   < 2.0 m/s  → walking
-///   < 5.0 m/s  → cycling
-///   < 20.0 m/s → transit
-///   ≥ 20.0 m/s → vehicle
+/// movement_state priority:
+///   1. Android Activity Recognition (native, most accurate)
+///   2. GPS speed thresholds (fallback)
+///      < 0.5 m/s  → stationary
+///      < 2.0 m/s  → walking
+///      < 5.0 m/s  → cycling
+///      < 20.0 m/s → transit
+///      ≥ 20.0 m/s → vehicle
 class GpsCollectionService {
-  GpsCollectionService(this._client);
+  GpsCollectionService(this._client, this._appUsage, this._screenEvents);
 
   final SupabaseClient _client;
+  final AppUsageService _appUsage;
+  final ScreenEventService _screenEvents;
 
   static const _interval = Duration(minutes: 5);
+  static const _appUsageEveryNTicks = 12; // every 60 minutes
+
+  int _tickCount = 0;
 
   Timer? _timer;
   String? _currentUserId;
@@ -42,11 +53,19 @@ class GpsCollectionService {
     _timer = null;
     _currentUserId = null;
     _stationaryStartTime = null;
+    _tickCount = 0;
     AppLogger.i('[GpsCollection] Stopped');
   }
 
   Future<void> _collectAndUpload() async {
     final userId = _currentUserId;
+    _tickCount++;
+
+    // Collect app usage + flush screen events once per hour
+    if (userId != null && _tickCount % _appUsageEveryNTicks == 0) {
+      await _appUsage.collectAndUpload(userId);
+      await _screenEvents.flush(userId);
+    }
     if (userId == null) return;
 
     try {
@@ -71,7 +90,9 @@ class GpsCollectionService {
 
       final now = DateTime.now();
       final speedMps = position.speed < 0 ? 0.0 : position.speed;
-      final movementState = _movementStateFromSpeed(speedMps);
+      // Prefer Activity Recognition over GPS speed (more accurate indoors/low speed)
+      final nativeActivity = await _screenEvents.getCurrentActivityState();
+      final movementState = nativeActivity ?? _movementStateFromSpeed(speedMps);
 
       if (movementState == 'stationary') {
         _stationaryStartTime ??= now;

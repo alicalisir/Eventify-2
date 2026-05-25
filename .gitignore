@@ -1,0 +1,13 @@
+# backend ML data — raw data ignored, trained model tracked
+backend/MLPipeline/outputs/train_raw/
+backend/MLPipeline/outputs/test_raw/
+backend/MLPipeline/outputs/features/
+backend/MLPipeline/outputs/reports/
+backend/MLPipeline/catboost_info/
+
+
+# general
+*.csv
+*.tsv
+__pycache__/
+.env
