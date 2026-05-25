@@ -77,6 +77,7 @@ def _supa_get(table: str, params: dict) -> list[dict]:
         )
         if resp.status_code == 200:
             return resp.json() or []
+        logger.warning("[supa_get] %s status=%s body=%s", table, resp.status_code, resp.text[:300])
         return []
 
 # ─────────────────────────────────────────── Google Places ───────────────────
