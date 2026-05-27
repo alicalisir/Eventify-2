@@ -41,9 +41,15 @@ class SuggestionRepository {
       _cacheExpiresAt = now.add(_cacheTtl);
       return fresh;
     } catch (e, s) {
-      AppLogger.e('[SuggestionRepository] LLM failed, falling back to mock', e);
+      AppLogger.e('[SuggestionRepository] LLM failed, falling back to backend', e);
       AppLogger.d('[SuggestionRepository] Stack', s);
-      return _contextService.getSuggestions();
+      try {
+        return await _contextService.getSuggestions();
+      } catch (e2, s2) {
+        AppLogger.e('[SuggestionRepository] Backend also failed, returning empty', e2);
+        AppLogger.d('[SuggestionRepository] Stack', s2);
+        return [];
+      }
     }
   }
 

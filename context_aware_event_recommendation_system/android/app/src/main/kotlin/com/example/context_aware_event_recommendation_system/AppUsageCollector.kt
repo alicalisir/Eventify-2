@@ -22,6 +22,26 @@ object AppUsageCollector {
 
     private const val MIN_DURATION_MS = 30_000L // 30 seconds
 
+    // Android ApplicationInfo.category → ML model category
+    private fun systemCategory(context: Context, pkg: String): String? {
+        return try {
+            val info = context.packageManager.getApplicationInfo(pkg, 0)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                when (info.category) {
+                    android.content.pm.ApplicationInfo.CATEGORY_GAME         -> "gaming"
+                    android.content.pm.ApplicationInfo.CATEGORY_AUDIO        -> "music"
+                    android.content.pm.ApplicationInfo.CATEGORY_VIDEO        -> "video"
+                    android.content.pm.ApplicationInfo.CATEGORY_IMAGE        -> "photo"
+                    android.content.pm.ApplicationInfo.CATEGORY_SOCIAL       -> "social"
+                    android.content.pm.ApplicationInfo.CATEGORY_NEWS         -> "news"
+                    android.content.pm.ApplicationInfo.CATEGORY_MAPS         -> "navigation"
+                    android.content.pm.ApplicationInfo.CATEGORY_PRODUCTIVITY -> "productivity"
+                    else -> null
+                }
+            } else null
+        } catch (e: Exception) { null }
+    }
+
     private val PKG_CATEGORY = mapOf(
         // Social
         "com.instagram.android" to "social",
@@ -180,13 +200,16 @@ object AppUsageCollector {
         val arr = JSONArray()
         for (stat in stats) {
             if (stat.totalTimeInForeground < MIN_DURATION_MS) continue
-            val category = resolveCategory(stat.packageName) ?: continue
+            val category = resolveCategory(context, stat.packageName)
 
             arr.put(JSONObject().apply {
                 put("app_name", stat.packageName)
                 put("category", category)
                 put("duration_min", stat.totalTimeInForeground / 60_000.0)
-                put("timestamp", Instant.ofEpochMilli(stat.lastTimeUsed).toString())
+                put("timestamp", java.time.LocalDateTime.ofInstant(
+                    java.time.Instant.ofEpochMilli(stat.lastTimeUsed),
+                    java.time.ZoneId.systemDefault()
+                ).format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME))
                 put("state", "foreground")
             })
         }
@@ -197,19 +220,19 @@ object AppUsageCollector {
             .edit().putString(FLUTTER_KEY, arr.toString()).apply()
     }
 
-    private fun resolveCategory(pkg: String): String? {
+    private fun resolveCategory(context: Context, pkg: String): String {
         PKG_CATEGORY[pkg]?.let { return it }
         val lower = pkg.lowercase()
-        return when {
-            "game" in lower || "puzzle" in lower -> "gaming"
-            "news" in lower || "haber" in lower  -> "news"
-            "music" in lower || "muzik" in lower -> "music"
-            "shop" in lower || "market" in lower -> "shopping"
-            "fitness" in lower || "sport" in lower -> "fitness"
-            "bank" in lower || "pay" in lower    -> "finance"
-            "edu" in lower || "learn" in lower   -> "education"
-            "photo" in lower || "camera" in lower -> "photo"
-            else -> null
+        when {
+            "game" in lower || "puzzle" in lower  -> return "gaming"
+            "news" in lower || "haber" in lower   -> return "news"
+            "music" in lower || "muzik" in lower  -> return "music"
+            "shop" in lower || "market" in lower  -> return "shopping"
+            "fitness" in lower || "sport" in lower -> return "fitness"
+            "bank" in lower || "pay" in lower     -> return "finance"
+            "edu" in lower || "learn" in lower    -> return "education"
+            "photo" in lower || "camera" in lower -> return "photo"
         }
+        return systemCategory(context, pkg) ?: "other"
     }
 }
