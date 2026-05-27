@@ -28,7 +28,7 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
 
     <application
-        android:label="context_aware_event_recommendation_system"
+        android:label="Eventify"
         android:name=".MainApplication"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">
