@@ -638,13 +638,16 @@ def _save_persona_cache(user_id: str, persona_class: str, signals_today: int, ct
     }
     try:
         with httpx.Client(timeout=10) as client:
-            client.patch(
+            resp = client.patch(
                 f"{SUPABASE_URL}/rest/v1/users",
                 headers=_SUPA_HEADERS,
                 params={"id": f"eq.{user_id}"},
                 json={"persona_json": payload, "persona_updated_at": now_str},
             )
-        logger.info("[persona_cache] WRITE %s → %s", user_id, persona_class)
+        if resp.status_code in (200, 204):
+            logger.info("[persona_cache] WRITE %s → %s", user_id, persona_class)
+        else:
+            logger.warning("[persona_cache] PATCH failed status=%s body=%s", resp.status_code, resp.text[:300])
     except Exception as e:
         logger.warning("[persona_cache] write failed: %s", e)
 
