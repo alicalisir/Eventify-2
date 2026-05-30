@@ -557,6 +557,43 @@ class SuggestionResponse(BaseModel):
     weather: Optional[str] = None
     created_at: str
 
+# ─────────────────────────────────────────── timezone helpers ────────────────
+
+def _compute_tz_offset(gps_df: pd.DataFrame) -> int:
+    """Return the user's UTC offset in whole hours using GPS coordinates.
+    Uses timezonefinder for exact lookup; falls back to longitude estimate."""
+    if gps_df.empty or "latitude" not in gps_df.columns or "longitude" not in gps_df.columns:
+        return 0
+    try:
+        from timezonefinder import TimezoneFinder
+        import pytz
+        tf = TimezoneFinder()
+        lat = float(gps_df["latitude"].median())
+        lon = float(gps_df["longitude"].median())
+        tz_name = tf.timezone_at(lat=lat, lng=lon)
+        if tz_name:
+            tz = pytz.timezone(tz_name)
+            now_utc = datetime.now(timezone.utc)
+            offset_td = tz.utcoffset(now_utc.replace(tzinfo=None))
+            return int(offset_td.total_seconds() // 3600)
+    except Exception:
+        pass
+    # Longitude-based fallback (±1h accuracy)
+    median_lon = float(gps_df["longitude"].median())
+    return max(-12, min(14, round(median_lon / 15.0)))
+
+
+def _apply_tz_to_apps(apps: pd.DataFrame, tz_offset: int) -> pd.DataFrame:
+    """Shift hour and weekday columns to local time for circadian features."""
+    if apps.empty or tz_offset == 0:
+        return apps
+    apps = apps.copy()
+    local_ts = apps["timestamp"] + pd.Timedelta(hours=tz_offset)
+    apps["hour"]    = local_ts.dt.hour
+    apps["weekday"] = local_ts.dt.weekday
+    return apps
+
+
 # ─────────────────────────────────────────── data fetching ───────────────────
 
 def _fetch_gps(user_id: str) -> pd.DataFrame:
@@ -770,6 +807,12 @@ def _classify(user_id: str) -> tuple[str, dict, int, dict]:
     apps   = _fetch_app_sessions(user_id)
     screen = _fetch_screen_events(user_id)
 
+    # Estimate user's local timezone from GPS coordinates and adjust hour features
+    tz_offset = _compute_tz_offset(gps)
+    if tz_offset != 0:
+        logger.info("[classify] GPS-derived tz_offset=%+dh for user %s", tz_offset, user_id)
+    apps = _apply_tz_to_apps(apps, tz_offset)
+
     # signals_today = GPS pings from today
     signals_today = 0
     if not gps.empty:
@@ -783,7 +826,7 @@ def _classify(user_id: str) -> tuple[str, dict, int, dict]:
     # episode detector ile 15 ep_share_* + episodes_per_day değerlerini doldur.
     # Hata olursa sıfır bırak — request'i bozma.
     try:
-        ep_feats = compute_episode_shares(gps, apps, screen)
+        ep_feats = compute_episode_shares(gps, apps, screen, tz_offset=tz_offset)
         feat.update(ep_feats)
     except Exception as e:
         logger.warning("[episodes] inference failed for %s: %s", user_id, e)

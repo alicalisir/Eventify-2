@@ -12,6 +12,7 @@ import '../../utils/app_logger.dart';
 const _kUserIdKey = 'current_user_id';
 const _kSupabaseUrl = 'supabase_url';
 const _kSupabaseKey = 'supabase_anon_key';
+const _kStationaryStartKey = 'stationary_start_ts';
 
 // Tick-level state — safe in background isolate (each isolate has own globals)
 int _tickCount = 0;
@@ -92,6 +93,12 @@ void onStart(ServiceInstance service) async {
     AppLogger.w('[BgService] Token refresh failed: $e');
   }
 
+  // Restore persisted stationaryStart across service restarts
+  final savedStart = prefs.getString(_kStationaryStartKey);
+  if (savedStart != null) {
+    _stationaryStart = DateTime.tryParse(savedStart);
+  }
+
   Future<void> tick() async {
     await prefs.reload(); // read latest userId / activity state from main isolate writes
     final userId = prefs.getString(_kUserIdKey);
@@ -147,9 +154,13 @@ Future<void> _collectGps(
     final movementState = nativeActivity ?? _movementStateFromSpeed(speedMps);
 
     if (movementState == 'stationary') {
-      _stationaryStart ??= now;
+      if (_stationaryStart == null) {
+        _stationaryStart = now;
+        await prefs.setString(_kStationaryStartKey, now.toIso8601String());
+      }
     } else {
       _stationaryStart = null;
+      await prefs.remove(_kStationaryStartKey);
     }
 
     final dwellTimeS = _stationaryStart != null

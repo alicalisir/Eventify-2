@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../domain/models/place_model.dart';
 import '../../domain/models/suggestion_model.dart';
 import '../../utils/app_logger.dart';
 import '../repositories/location_repository.dart';
@@ -76,33 +77,80 @@ class LlmService {
       'hour=${now.hour}',
     );
 
-    final response = await _supabase.functions.invoke(
-      'recommend',
-      body: body,
-    );
-
-    if (response.status != 200) {
-      AppLogger.e(
-        '[LlmService] Edge Function hata: ${response.status}',
-        response.data,
+    try {
+      final response = await _supabase.functions.invoke(
+        'recommend',
+        body: body,
       );
-      throw Exception('recommend fonksiyonu başarısız: ${response.status}');
+
+      if (response.status != 200) {
+        AppLogger.w(
+          '[LlmService] Edge Function hata: ${response.status} — mekanlar gösteriliyor',
+        );
+        return _placesToSuggestions(nearbyPlaces);
+      }
+
+      final data = response.data as Map<String, dynamic>;
+      final rawList = data['suggestions'] as List<dynamic>? ?? [];
+      final provider = data['llm_provider'] as String? ?? 'unknown';
+      final cacheHit = data['cache_hit'] as bool? ?? false;
+      final latencyMs = data['latency_ms'] as int? ?? 0;
+
+      AppLogger.i(
+        '[LlmService] ${rawList.length} öneri alındı — '
+        'provider=$provider cacheHit=$cacheHit latency=${latencyMs}ms',
+      );
+
+      if (rawList.isEmpty) {
+        AppLogger.w('[LlmService] LLM boş liste döndü — mekanlar gösteriliyor');
+        return _placesToSuggestions(nearbyPlaces);
+      }
+
+      return rawList
+          .map((s) => _parseSuggestion(s as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      AppLogger.w('[LlmService] LLM erişilemiyor — mekanlar gösteriliyor: $e');
+      return _placesToSuggestions(nearbyPlaces);
     }
+  }
 
-    final data = response.data as Map<String, dynamic>;
-    final rawList = data['suggestions'] as List<dynamic>? ?? [];
-    final provider = data['llm_provider'] as String? ?? 'unknown';
-    final cacheHit = data['cache_hit'] as bool? ?? false;
-    final latencyMs = data['latency_ms'] as int? ?? 0;
+  static List<SuggestionModel> _placesToSuggestions(List<PlaceModel> places) {
+    return places.map((p) {
+      final category = _categoryFromTypes(p.types);
+      return SuggestionModel(
+        id: p.id,
+        title: p.name,
+        description: p.address ?? '',
+        rationale: '',
+        category: category,
+        distance: p.distanceMeters > 0 ? p.distanceMeters / 1000 : null,
+        address: p.address,
+        tags: p.types.take(3).toList(),
+        createdAt: DateTime.now(),
+      );
+    }).toList();
+  }
 
-    AppLogger.i(
-      '[LlmService] ${rawList.length} öneri alındı — '
-      'provider=$provider cacheHit=$cacheHit latency=${latencyMs}ms',
-    );
-
-    return rawList
-        .map((s) => _parseSuggestion(s as Map<String, dynamic>))
-        .toList();
+  static String _categoryFromTypes(List<String> types) {
+    for (final t in types) {
+      if (t.contains('restaurant') || t.contains('food') || t.contains('cafe')) {
+        return 'food';
+      }
+      if (t.contains('park') || t.contains('gym') || t.contains('sport')) {
+        return 'outdoor';
+      }
+      if (t.contains('museum') || t.contains('art') || t.contains('theater')) {
+        return 'culture';
+      }
+      if (t.contains('bar') || t.contains('night') || t.contains('club')) {
+        return 'nightlife';
+      }
+      if (t.contains('shop') || t.contains('store') || t.contains('mall')) {
+        return 'shopping';
+      }
+    }
+    return 'culture';
   }
 
   static SuggestionModel _parseSuggestion(Map<String, dynamic> s) {
