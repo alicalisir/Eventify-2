@@ -594,6 +594,61 @@ def _apply_tz_to_apps(apps: pd.DataFrame, tz_offset: int) -> pd.DataFrame:
     return apps
 
 
+# ─────────────────────────────────────────── persona cache (users table) ─────
+
+_PERSONA_CACHE_TTL_H = 24  # re-classify after this many hours
+
+
+def _load_persona_cache(user_id: str) -> Optional[tuple[str, dict, dict]]:
+    """Return (persona_class, meta, context) from users.persona_json if fresh, else None."""
+    rows = _supa_get("users", {
+        "id": f"eq.{user_id}",
+        "select": "persona_json,persona_updated_at",
+    })
+    if not rows or not rows[0].get("persona_json") or not rows[0].get("persona_updated_at"):
+        return None
+    try:
+        updated_at = datetime.fromisoformat(rows[0]["persona_updated_at"].replace("Z", "+00:00"))
+        age_h = (datetime.now(timezone.utc) - updated_at).total_seconds() / 3600
+        if age_h > _PERSONA_CACHE_TTL_H:
+            return None
+        pj = rows[0]["persona_json"]
+        persona_class = pj["persona_id"]
+        meta = _PERSONA_META.get(persona_class, _PERSONA_META["HYBRID"])
+        ctx = pj.get("context", {})
+        logger.info("[persona_cache] HIT for %s — persona=%s age=%.1fh", user_id, persona_class, age_h)
+        return persona_class, meta, ctx
+    except Exception as e:
+        logger.warning("[persona_cache] parse error: %s", e)
+        return None
+
+
+def _save_persona_cache(user_id: str, persona_class: str, signals_today: int, ctx: dict) -> None:
+    """Write persona result to users.persona_json and persona_updated_at."""
+    meta = _PERSONA_META.get(persona_class, _PERSONA_META["HYBRID"])
+    now_str = datetime.now(timezone.utc).isoformat()
+    payload = {
+        "persona_id": persona_class,
+        "persona_name": meta["display"],
+        "traits": meta["traits"],
+        "preferences": meta["preferences"],
+        "signals_today": signals_today,
+        "context": ctx,
+        "classified_at": now_str,
+    }
+    try:
+        with httpx.Client(timeout=10) as client:
+            client.patch(
+                f"{SUPABASE_URL}/rest/v1/users",
+                headers=_SUPA_HEADERS,
+                params={"id": f"eq.{user_id}"},
+                json={"persona_json": payload, "persona_updated_at": now_str},
+            )
+        logger.info("[persona_cache] WRITE %s → %s", user_id, persona_class)
+    except Exception as e:
+        logger.warning("[persona_cache] write failed: %s", e)
+
+
 # ─────────────────────────────────────────── data fetching ───────────────────
 
 def _fetch_gps(user_id: str) -> pd.DataFrame:
@@ -801,8 +856,18 @@ def _llm_to_suggestions(
 
 # ─────────────────────────────────────────── classification ──────────────────
 
-def _classify(user_id: str) -> tuple[str, dict, int, dict]:
-    """Returns (persona_class, meta_dict, signals_today, context_summary)."""
+def _classify(user_id: str, force: bool = False) -> tuple[str, dict, int, dict]:
+    """Returns (persona_class, meta_dict, signals_today, context_summary).
+
+    Reads from users.persona_json cache when fresh (< PERSONA_CACHE_TTL_H hours).
+    Set force=True to bypass cache and re-run the model.
+    """
+    if not force:
+        cached = _load_persona_cache(user_id)
+        if cached is not None:
+            persona_class, meta, ctx = cached
+            return persona_class, meta, 0, ctx
+
     gps    = _fetch_gps(user_id)
     apps   = _fetch_app_sessions(user_id)
     screen = _fetch_screen_events(user_id)
@@ -864,6 +929,8 @@ def _classify(user_id: str) -> tuple[str, dict, int, dict]:
     else:
         context_summary["top_app_category"] = "unknown"
 
+    _save_persona_cache(user_id, persona_class, signals_today, context_summary)
+
     return persona_class, meta, signals_today, context_summary
 
 # ─────────────────────────────────────────── routes ──────────────────────────
@@ -914,8 +981,8 @@ def debug_episodes(user_id: str):
 
 
 @app.get("/api/persona/{user_id}", response_model=PersonaResponse)
-def get_persona(user_id: str):
-    persona_class, meta, signals_today, _ = _classify(user_id)
+def get_persona(user_id: str, force: bool = Query(False)):
+    persona_class, meta, signals_today, _ = _classify(user_id, force=force)
     return PersonaResponse(
         persona_id=persona_class,
         persona_name=meta["display"],
@@ -931,8 +998,9 @@ def get_recommendations(
     user_id: str,
     lat: Optional[float] = Query(None),
     lon: Optional[float] = Query(None),
+    force: bool = Query(False),
 ):
-    persona_class, meta, _, ctx = _classify(user_id)
+    persona_class, meta, _, ctx = _classify(user_id, force=force)
     now = datetime.now(timezone.utc)
     now_str = now.isoformat()
 
