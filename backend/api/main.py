@@ -938,7 +938,7 @@ def get_recommendations(
 
     # When GPS provided, fetch real nearby venues and generate LLM recommendations.
     if lat is not None and lon is not None and GOOGLE_PLACES_KEY:
-        place_types = _PERSONA_PLACE_TYPES.get(persona_class, _PERSONA_PLACE_TYPES["HIBRIT"])
+        place_types = _PERSONA_PLACE_TYPES.get(persona_class, _PERSONA_PLACE_TYPES["HYBRID"])
         raw_places = _fetch_google_places(lat, lon, place_types)
 
         # Tier 1: LLM-enriched recommendations (persona + places + app context → Mistral)
