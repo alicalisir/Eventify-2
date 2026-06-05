@@ -198,6 +198,36 @@ async function handleRequest(req: Request): Promise<Response> {
     recent_liked_categories: likedCategories,
   };
 
+  // ── Rate limit check ─────────────────────────────────────────────────────
+  // Each LLM call inserts 3 "view" rows into user_feedback (one per suggestion).
+  // 10 calls/hr × 3 = 30 rows threshold.
+  const oneHourAgo = new Date(Date.now() - 3_600_000).toISOString();
+  const { count: viewCount } = await supabase
+    .from("user_feedback")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("action", "view")
+    .gt("created_at", oneHourAgo);
+
+  if ((viewCount ?? 0) >= 30) {
+    console.warn(`[recommend] rate limited userId=${userId} views=${viewCount}/hr`);
+    const { data: staleCache } = await supabase
+      .from("cached_suggestions")
+      .select("payload, llm_provider")
+      .eq("user_id", userId)
+      .order("expires_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (staleCache) {
+      const staleSuggestions = staleCache.payload.suggestions as Suggestion[];
+      const staleData = { suggestions: staleSuggestions, llm_provider: staleCache.llm_provider as string };
+      if (acceptsSse) return sseFromCache(staleData);
+      return jsonResponse({ ...staleData, cache_hit: true, rate_limited: true, latency_ms: 0 });
+    }
+    return errorResponse("Rate limit exceeded: max 10 LLM calls per hour", 429);
+  }
+
   // ── Build prompt ──────────────────────────────────────────────────────────
   const nearbyPlaces = body.nearby_places ?? [];
   const userMessage = buildUserMessage(enrichedBody, persona, nearbyEvents, nearbyPlaces);
