@@ -6,6 +6,9 @@ import 'package:go_router/go_router.dart';
 import '../../../config/constants/app_colors.dart';
 import '../../../config/constants/app_spacing.dart';
 import '../../../config/constants/app_strings.dart';
+import '../../../di/providers.dart'
+    show locationRepositoryProvider, llmServiceProvider, weatherServiceProvider;
+import '../../../utils/app_logger.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../core/ui/app_snackbar.dart';
 import '../../core/ui/error_state_widget.dart';
@@ -18,24 +21,64 @@ import 'recommendation_card.dart';
 import 'section_label.dart';
 
 /// Dashboard — context hero, today's suggestions (streamed one by one), drawer.
-class DashboardScreen extends ConsumerWidget {
+class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
 
-  Future<void> _refresh(WidgetRef ref) async {
+  @override
+  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends ConsumerState<DashboardScreen>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkAndRefreshIfMoved();
+    }
+  }
+
+  Future<void> _checkAndRefreshIfMoved() async {
+    final llmService = ref.read(llmServiceProvider);
+    final locationRepo = ref.read(locationRepositoryProvider);
+    final weatherService = ref.read(weatherServiceProvider);
+
+    final position = await locationRepo.getCurrentPosition();
+    if (position == null) return;
+
+    final weather =
+        await weatherService.getCurrentWeather(position.latitude, position.longitude);
+    final weatherCondition = weather?.condition ?? 'clear';
+
+    if (llmService.hasMoved(position.latitude, position.longitude, weatherCondition)) {
+      AppLogger.i('[Dashboard] Context changed >500m or weather shifted — refreshing');
+      await _refresh();
+    }
+  }
+
+  Future<void> _refresh() async {
     ref.read(suggestionRepositoryProvider).invalidateCache();
     ref.read(contextRepositoryProvider).invalidateContext();
     await ref.read(dismissedSuggestionsProvider.notifier).clear();
     ref.invalidate(suggestionStreamProvider);
     ref.invalidate(ambientContextProvider);
-    // Await at least the first suggestion so the refresh indicator stays visible
     await ref.read(suggestionStreamProvider.future);
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // suggestionStreamProvider drives loading / error state
+  Widget build(BuildContext context) {
     final suggestionsAsync = ref.watch(suggestionStreamProvider);
-    // visibleSuggestionsProvider is synchronous — no shimmer flicker on each card
     final visible = ref.watch(visibleSuggestionsProvider);
     final contextAsync = ref.watch(ambientContextProvider);
     final user = ref.watch(authProvider).user;
@@ -55,7 +98,7 @@ class DashboardScreen extends ConsumerWidget {
             icon: const Icon(Icons.refresh),
             tooltip: AppStrings.refreshContext,
             onPressed: () async {
-              await _refresh(ref);
+              await _refresh();
               if (context.mounted) {
                 AppSnackbar.show(
                   context,
@@ -69,7 +112,7 @@ class DashboardScreen extends ConsumerWidget {
       ),
       drawer: const HomeDrawer(),
       body: RefreshIndicator(
-        onRefresh: () => _refresh(ref),
+        onRefresh: _refresh,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.lg,
@@ -98,11 +141,12 @@ class DashboardScreen extends ConsumerWidget {
                 child: ErrorStateWidget.error(
                   onRetry: () => ref.invalidate(suggestionStreamProvider),
                 ),
+
               ),
               // Data: render visible (filtered) list — grows as stream emits
               data: (_) {
                 if (visible.isEmpty) {
-                  return EmptyDashboard(onRefresh: () => _refresh(ref));
+                  return EmptyDashboard(onRefresh: _refresh);
                 }
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,

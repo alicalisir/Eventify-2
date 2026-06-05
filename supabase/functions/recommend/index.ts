@@ -8,6 +8,7 @@ import { buildCacheKeySync } from "./cache.ts";
 import { logLangfuse } from "./langfuse.ts";
 
 const SELF_HOST_URL = Deno.env.get("MISTRAL_URL") ?? "";
+const SELF_HOST_MODEL = Deno.env.get("SELF_HOST_MODEL") ?? "mistral-nemo:12b-instruct-q4_k_m";
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
 const ALLOW_CLOUD_FALLBACK = Deno.env.get("ALLOW_CLOUD_FALLBACK") === "true";
 const CACHE_TTL_MINUTES = 30;
@@ -122,7 +123,7 @@ async function handleRequest(req: Request): Promise<Response> {
       suggestions: cached.payload.suggestions as Suggestion[],
       llm_provider: cached.llm_provider as string,
     };
-    logLangfuse({
+    await logLangfuse({
       traceId: crypto.randomUUID(),
       userId,
       llmProvider: cacheData.llm_provider,
@@ -208,7 +209,7 @@ async function handleRequest(req: Request): Promise<Response> {
 
   let llmProvider: string;
   if (selfHostAvailable) {
-    llmProvider = "mistral-nemo-12b";
+    llmProvider = SELF_HOST_MODEL;
   } else if (ALLOW_CLOUD_FALLBACK && ANTHROPIC_API_KEY) {
     llmProvider = "claude-sonnet-4-6";
   } else {
@@ -266,7 +267,7 @@ async function buildJsonResponse(s: Setup): Promise<Response> {
 
   await writeCacheAndFeedback(s, suggestions, result.tokens, result.latency_ms);
 
-  logLangfuse({
+  await logLangfuse({
     traceId: crypto.randomUUID(),
     userId: s.userId,
     llmProvider: s.llmProvider,
@@ -331,11 +332,12 @@ function buildSseStream(s: Setup): Response {
   const writer = writable.getWriter();
 
   (async () => {
-    try {
-      const parser = new StreamingJsonParser();
-      let sentCount = 0;
-      const llmStart = Date.now();
+    const parser = new StreamingJsonParser();
+    let sentCount = 0;
+    const llmStart = Date.now();
+    let latency_ms = 0;
 
+    try {
       const tokenStream: AsyncGenerator<string> = s.selfHostAvailable
         ? callSelfHostStream(SELF_HOST_URL, SYSTEM_PROMPT, s.userMessage)
         : callClaudeStream(ANTHROPIC_API_KEY, SYSTEM_PROMPT, s.userMessage);
@@ -346,7 +348,6 @@ function buildSseStream(s: Setup): Response {
         const newSuggestions = parser.feed(token);
 
         for (const suggestion of newSuggestions) {
-          // Apply per-suggestion weather + dismissed constraints immediately
           const rainy = ["rain", "snow", "drizzle", "thunderstorm"].some((w) =>
             s.body.weather_condition.toLowerCase().includes(w)
           );
@@ -364,34 +365,56 @@ function buildSseStream(s: Setup): Response {
         }
       }
 
-      const latency_ms = Date.now() - llmStart;
-      const allSuggestions = parser.suggestions;
+      latency_ms = Date.now() - llmStart;
 
       if (sentCount === 0) {
         console.warn(`[recommend] SSE sentCount=0 — parser buf preview: ${parser.bufPreview}`);
       }
 
-      // Estimate tokens from accumulated buffer length (stream mode doesn't return usage)
-      const approxTokens = Math.round(allSuggestions.reduce(
+      const approxTokens = Math.round(parser.suggestions.reduce(
         (acc, sg) => acc + sg.title.length + sg.rationale.length,
         0,
       ) / 4);
 
       await writeCacheAndFeedback(
         s,
-        allSuggestions.slice(0, 3),
+        parser.suggestions.slice(0, 3),
         { prompt: 0, completion: approxTokens },
         latency_ms,
       );
 
-      logLangfuse({
+      // done event — may fail if client already disconnected after receiving suggestions
+      try {
+        await writer.write(enc.encode(sseEvent("done", {
+          latency_ms,
+          llm_provider: s.llmProvider,
+          total: sentCount,
+        })));
+      } catch { /* client disconnected before done — that's fine */ }
+
+      console.log(
+        `[recommend] SSE done provider=${s.llmProvider} sent=${sentCount} latency=${latency_ms}ms`,
+      );
+    } catch (e) {
+      console.error("[recommend] SSE error:", e);
+      latency_ms = latency_ms || Date.now() - llmStart;
+      try {
+        await writer.write(enc.encode(sseEvent("error", { error: String(e) })));
+      } catch { /* writer may already be closed */ }
+    } finally {
+      // Always log to Langfuse regardless of whether client disconnected mid-stream
+      const approxTokens = Math.round(parser.suggestions.reduce(
+        (acc, sg) => acc + sg.title.length + sg.rationale.length,
+        0,
+      ) / 4);
+      await logLangfuse({
         traceId: crypto.randomUUID(),
         userId: s.userId,
         llmProvider: s.llmProvider,
         model: s.llmProvider,
         systemPrompt: SYSTEM_PROMPT,
         userMessage: s.userMessage,
-        suggestions: allSuggestions.slice(0, 3),
+        suggestions: parser.suggestions.slice(0, 3),
         promptTokens: 0,
         completionTokens: approxTokens,
         latencyMs: latency_ms,
@@ -400,23 +423,7 @@ function buildSseStream(s: Setup): Response {
         weatherCondition: s.body.weather_condition,
         hour: s.body.hour,
       });
-
-      await writer.write(enc.encode(sseEvent("done", {
-        latency_ms,
-        llm_provider: s.llmProvider,
-        total: sentCount,
-      })));
-
-      console.log(
-        `[recommend] SSE done provider=${s.llmProvider} sent=${sentCount} latency=${latency_ms}ms`,
-      );
-    } catch (e) {
-      console.error("[recommend] SSE error:", e);
-      try {
-        await writer.write(enc.encode(sseEvent("error", { error: String(e) })));
-      } catch { /* writer may already be closed */ }
-    } finally {
-      writer.close();
+      writer.close().catch(() => {});
     }
   })();
 

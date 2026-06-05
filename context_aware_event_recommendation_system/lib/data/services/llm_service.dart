@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -27,6 +28,32 @@ class LlmService {
   final PlacesRepository _places;
   final String _functionUrl;
   final String _supabaseAnonKey;
+
+  // Tracks the context of the last successful fetch for cache invalidation.
+  double? _lastLat;
+  double? _lastLng;
+  String? _lastWeather;
+
+  /// Returns true if location moved >500m or weather condition changed since
+  /// the last fetch. Returns false if no fetch has happened yet.
+  bool hasMoved(double lat, double lng, String weather) {
+    if (_lastLat == null) return false;
+    final dist = _haversineMeters(_lastLat!, _lastLng!, lat, lng);
+    return dist > 500 || _lastWeather != weather;
+  }
+
+  static double _haversineMeters(
+      double lat1, double lng1, double lat2, double lng2) {
+    const r = 6371000.0;
+    final dLat = (lat2 - lat1) * pi / 180;
+    final dLng = (lng2 - lng1) * pi / 180;
+    final a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(lat1 * pi / 180) *
+            cos(lat2 * pi / 180) *
+            sin(dLng / 2) *
+            sin(dLng / 2);
+    return r * 2 * atan2(sqrt(a), sqrt(1 - a));
+  }
 
   // ── Public API ────────────────────────────────────────────────────────────
 
@@ -82,6 +109,11 @@ class LlmService {
         .toList();
 
     AppLogger.i('[LlmService] ${nearbyPlaces.length} places loaded, city=$city');
+
+    // Record fetch context for cache invalidation checks.
+    _lastLat = lat;
+    _lastLng = lng;
+    _lastWeather = weatherData?.condition ?? 'clear';
 
     final body = {
       'lat': lat,
