@@ -47,7 +47,7 @@ Android Native (Kotlin ForegroundService)
 FastAPI /api/recommendations/{user_id}?lat=X&lon=Y
   → Supabase fetch → feature_engineering.py → CatBoost → persona
   → Google Places API (persona-filtered venues)
-  → Ollama/Mistral (MISTRAL_URL) → Türkçe LLM önerileri
+  → Ollama/LLM (MISTRAL_URL) → English LLM recommendations
   → Tier 1: LLM-enriched | Tier 2: Places-only | Tier 3: static persona fallback
 ```
 
@@ -93,7 +93,7 @@ Two MethodChannels in `MainActivity.kt`:
 3. Yeni makinenin firewall'unda 8000 portunu aç
 
 ### Key Conventions
-- All UI text, persona descriptions, and LLM prompts are in **Turkish**.
+- All UI text, persona descriptions, and LLM prompts are in **English**.
 - State management: Riverpod 3.x with code-generated providers (Freezed + `build_runner`).
 - After changing any `@freezed` or `@JsonSerializable` class: `flutter pub run build_runner build --delete-conflicting-outputs`
 - Backend model path is relative: `../MLPipeline/outputs/model/` — backend must be run from `backend/api/`.

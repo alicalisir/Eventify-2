@@ -727,7 +727,7 @@ def _build_llm_prompt(
     now: datetime,
 ) -> str:
     hour = now.hour
-    time_label = next((l for a, b, l in _TIME_LABELS if a <= hour < b), "Gece")
+    time_label = next((l for a, b, l in _TIME_LABELS if a <= hour < b), "Night")
 
     traits_str = ", ".join(
         f"{t['label']} (%{int(t['confidence'] * 100)})" for t in meta["traits"]
@@ -753,7 +753,7 @@ def _build_llm_prompt(
         r_str = f" ★{rating:.1f}" if rating else ""
         places_lines.append(f"{i + 1}. {name} — {cat}{r_str} — {addr}")
 
-    places_str = "\n".join(places_lines) or "Yakın mekan bulunamadı."
+    places_str = "\n".join(places_lines) or "No nearby venues found."
 
     return f"""## User Profile
 Persona: {meta['display']} ({persona_class})
