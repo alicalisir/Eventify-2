@@ -105,6 +105,11 @@ _PERSONA_PLACE_TYPES: dict[str, list[str]] = {
     "ATHLETE":           ["gym", "park", "sports_complex", "restaurant", "cafe"],
 }
 
+# Broad type list used for all nearby searches — persona filtering happens in the LLM
+_ALL_PLACE_TYPES: list[str] = list({
+    t for types in _PERSONA_PLACE_TYPES.values() for t in types
+})
+
 _TYPE_TO_CATEGORY: dict[str, str] = {
     "cafe": "Recharge", "coffee_shop": "Recharge", "restaurant": "Recharge",
     "bakery": "Recharge", "shopping_mall": "Recharge",
@@ -146,7 +151,7 @@ def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 2 * 6371.0 * _math.asin(_math.sqrt(a))
 
 
-def _fetch_google_places(lat: float, lon: float, types: list[str]) -> list[dict]:
+def _fetch_google_places(lat: float, lon: float) -> list[dict]:
     if not GOOGLE_PLACES_KEY:
         return []
     try:
@@ -160,7 +165,7 @@ def _fetch_google_places(lat: float, lon: float, types: list[str]) -> list[dict]
                             "radius": 1500.0,
                         }
                     },
-                    "includedTypes": types[:5],
+                    "includedTypes": _ALL_PLACE_TYPES,
                     "maxResultCount": 10,
                     "rankPreference": "DISTANCE",
                 },
@@ -1010,8 +1015,7 @@ def get_recommendations(
 
     # When GPS provided, fetch real nearby venues and generate LLM recommendations.
     if lat is not None and lon is not None and GOOGLE_PLACES_KEY:
-        place_types = _PERSONA_PLACE_TYPES.get(persona_class, _PERSONA_PLACE_TYPES["HYBRID"])
-        raw_places = _fetch_google_places(lat, lon, place_types)
+        raw_places = _fetch_google_places(lat, lon)
 
         # Tier 1: LLM-enriched recommendations (persona + places + app context → Mistral)
         if raw_places:
