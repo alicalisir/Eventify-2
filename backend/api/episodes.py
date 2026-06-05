@@ -86,6 +86,7 @@ def _build_windows(
     gps: pd.DataFrame,
     apps: pd.DataFrame,
     screen: pd.DataFrame,
+    tz_offset: int = 0,
 ) -> pd.DataFrame:
     """Tüm zaman aralığını 30dk pencerelere böl ve her pencere için özet üret."""
 
@@ -132,11 +133,15 @@ def _build_windows(
 
     rows = []
     for w_start in window_starts[:-1]:
+        local_hour = (w_start.hour + tz_offset) % 24
+        local_weekday = w_start.weekday() if tz_offset == 0 else (
+            (w_start + pd.Timedelta(hours=tz_offset)).weekday()
+        )
         rec = {
             "bin": w_start,
-            "hour": w_start.hour + w_start.minute / 60.0,
-            "weekday": w_start.weekday(),
-            "is_weekend": w_start.weekday() >= 5,
+            "hour": local_hour + w_start.minute / 60.0,
+            "weekday": local_weekday,
+            "is_weekend": local_weekday >= 5,
         }
 
         # ----- app aktivitesi
@@ -497,6 +502,7 @@ def compute_episode_shares(
     gps: pd.DataFrame,
     apps: pd.DataFrame,
     screen: pd.DataFrame,
+    tz_offset: int = 0,
 ) -> Dict[str, float]:
     """Ham veriden 15 ep_share_* + episodes_per_day döner.
 
@@ -512,7 +518,7 @@ def compute_episode_shares(
     blank = {f"ep_share_{ep}": 0.0 for ep in EPISODE_TYPES}
     blank["episodes_per_day"] = 0.0
 
-    windows = _build_windows(gps, apps, screen)
+    windows = _build_windows(gps, apps, screen, tz_offset=tz_offset)
     if windows.empty:
         return blank
 

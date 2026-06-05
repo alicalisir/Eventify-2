@@ -9,6 +9,7 @@ and classifies the user with the pre-trained CatBoost model.
 from __future__ import annotations
 
 import json
+import logging
 import math as _math
 import os
 import sys
@@ -27,6 +28,9 @@ from pydantic import BaseModel
 
 load_dotenv()
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s | %(message)s")
+logger = logging.getLogger("caers.api")
+
 # ─────────────────────────────────────────── paths ───────────────────────────
 
 _API_DIR     = Path(__file__).resolve().parent
@@ -36,6 +40,7 @@ _ENCODER_FILE= _MODEL_DIR / "label_encoder.json"
 _FEATURES_FILE = _MODEL_DIR / "feature_columns.json"
 
 from feature_engineering import extract_user_features  # noqa: E402
+from episodes import compute_episode_shares  # noqa: E402
 
 # ─────────────────────────────────────────── load model ──────────────────────
 
@@ -54,8 +59,9 @@ SUPABASE_URL = os.environ["SUPABASE_URL"].strip()
 SUPABASE_KEY = (os.environ.get("SUPABASE_SERVICE_KEY") or os.environ["SUPABASE_ANON_KEY"]).strip()
 print(f"[startup] SUPABASE_URL={SUPABASE_URL!r}", flush=True)
 GOOGLE_PLACES_KEY = os.environ.get("GOOGLE_PLACES_API_KEY", "")
-# Local Mistral via Ollama — run: ollama pull mistral && ollama serve
+# Local LLM via Ollama — run: ollama pull qwen2.5:14b && ollama serve
 MISTRAL_URL = os.environ.get("MISTRAL_URL", "http://localhost:11434")
+LLM_MODEL   = os.environ.get("LLM_MODEL", "qwen2.5:14b")
 _SUPA_HEADERS = {
     "apikey": SUPABASE_KEY,
     "Authorization": f"Bearer {SUPABASE_KEY}",
@@ -72,6 +78,7 @@ def _supa_get(table: str, params: dict) -> list[dict]:
         )
         if resp.status_code == 200:
             return resp.json() or []
+        logger.warning("[supa_get] %s status=%s body=%s", table, resp.status_code, resp.text[:300])
         return []
 
 # ─────────────────────────────────────────── Google Places ───────────────────
@@ -84,19 +91,24 @@ _PLACES_FIELD_MASK = (
 
 # Venue types each persona prefers (Google Places New API type strings)
 _PERSONA_PLACE_TYPES: dict[str, list[str]] = {
-    "ERKENCI":         ["cafe", "park", "gym", "bakery", "restaurant"],
-    "EVCIMEN":         ["cafe", "restaurant", "book_store", "library", "park"],
-    "GECE_KUSU":       ["bar", "night_club", "restaurant", "movie_theater", "cafe"],
-    "HIBRIT":          ["cafe", "restaurant", "park", "museum", "bar"],
-    "ICERIK_TUKETICI": ["movie_theater", "museum", "library", "cafe", "art_gallery"],
-    "KRIZ_DUZENSIZ":   ["cafe", "park", "restaurant", "book_store", "spa"],
-    "OGRENCI":         ["library", "cafe", "book_store", "museum", "park"],
-    "OYUNCU":          ["cafe", "restaurant", "park", "shopping_mall", "movie_theater"],
-    "PROFESYONEL":     ["restaurant", "cafe", "bar", "museum", "performing_arts_theater"],
-    "SEYYAH":          ["park", "museum", "tourist_attraction", "art_gallery", "performing_arts_theater"],
-    "SOSYAL":          ["restaurant", "bar", "cafe", "performing_arts_theater", "park"],
-    "SPORCU":          ["gym", "park", "sports_complex", "restaurant", "cafe"],
+    "EARLY_BIRD":        ["cafe", "park", "gym", "bakery", "restaurant"],
+    "HOMEBODY":          ["cafe", "restaurant", "book_store", "library", "park"],
+    "NIGHT_OWL":         ["bar", "night_club", "restaurant", "movie_theater", "cafe"],
+    "HYBRID":            ["cafe", "restaurant", "park", "museum", "bar"],
+    "CONTENT_CONSUMER":  ["movie_theater", "museum", "library", "cafe", "art_gallery"],
+    "IRREGULAR":         ["cafe", "park", "restaurant", "book_store", "spa"],
+    "STUDENT":           ["library", "cafe", "book_store", "museum", "park"],
+    "GAMER":             ["cafe", "restaurant", "park", "shopping_mall", "movie_theater"],
+    "PROFESSIONAL":      ["restaurant", "cafe", "bar", "museum", "performing_arts_theater"],
+    "TRAVELER":          ["park", "museum", "tourist_attraction", "art_gallery", "performing_arts_theater"],
+    "SOCIAL":            ["restaurant", "bar", "cafe", "performing_arts_theater", "park"],
+    "ATHLETE":           ["gym", "park", "sports_complex", "restaurant", "cafe"],
 }
+
+# Broad type list used for all nearby searches — persona filtering happens in the LLM
+_ALL_PLACE_TYPES: list[str] = list({
+    t for types in _PERSONA_PLACE_TYPES.values() for t in types
+})
 
 _TYPE_TO_CATEGORY: dict[str, str] = {
     "cafe": "Recharge", "coffee_shop": "Recharge", "restaurant": "Recharge",
@@ -109,16 +121,16 @@ _TYPE_TO_CATEGORY: dict[str, str] = {
 }
 
 _TYPE_TO_TAGS: dict[str, list[str]] = {
-    "cafe": ["Kafe", "İçecek"], "coffee_shop": ["Kafe", "Kahve"],
-    "restaurant": ["Yemek", "Restoran"], "bakery": ["Fırın", "Tatlı"],
-    "bar": ["Bar", "Sosyal"], "night_club": ["Gece", "Müzik"],
-    "performing_arts_theater": ["Tiyatro", "Kültür"],
-    "park": ["Park", "Açık Hava"],
-    "gym": ["Spor", "Fitness"], "sports_complex": ["Spor", "Aktif"],
-    "museum": ["Müze", "Kültür"], "art_gallery": ["Sanat", "Galeri"],
-    "library": ["Kütüphane", "Sessiz"], "movie_theater": ["Sinema", "Film"],
-    "book_store": ["Kitapçı", "Okuma"], "shopping_mall": ["AVM", "Alışveriş"],
-    "tourist_attraction": ["Keşif", "Gezi"],
+    "cafe": ["Cafe", "Drinks"], "coffee_shop": ["Cafe", "Coffee"],
+    "restaurant": ["Food", "Restaurant"], "bakery": ["Bakery", "Sweets"],
+    "bar": ["Bar", "Social"], "night_club": ["Night", "Music"],
+    "performing_arts_theater": ["Theater", "Culture"],
+    "park": ["Park", "Outdoors"],
+    "gym": ["Sports", "Fitness"], "sports_complex": ["Sports", "Active"],
+    "museum": ["Museum", "Culture"], "art_gallery": ["Art", "Gallery"],
+    "library": ["Library", "Quiet"], "movie_theater": ["Cinema", "Film"],
+    "book_store": ["Bookstore", "Reading"], "shopping_mall": ["Mall", "Shopping"],
+    "tourist_attraction": ["Explore", "Sightseeing"],
 }
 
 _CATEGORY_TO_PREF_KEY: dict[str, str] = {
@@ -139,7 +151,7 @@ def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 2 * 6371.0 * _math.asin(_math.sqrt(a))
 
 
-def _fetch_google_places(lat: float, lon: float, types: list[str]) -> list[dict]:
+def _fetch_google_places(lat: float, lon: float) -> list[dict]:
     if not GOOGLE_PLACES_KEY:
         return []
     try:
@@ -153,7 +165,7 @@ def _fetch_google_places(lat: float, lon: float, types: list[str]) -> list[dict]
                             "radius": 1500.0,
                         }
                     },
-                    "includedTypes": types[:5],
+                    "includedTypes": _ALL_PLACE_TYPES,
                     "maxResultCount": 10,
                     "rankPreference": "DISTANCE",
                 },
@@ -207,8 +219,8 @@ def _place_to_suggestion(
         pref_score = meta["preferences"].get(pref_key, 0.5)
 
         rationale = (
-            f"Sana {distance_km:.1f} km yakında{rating_str}. "
-            f"Bu tür mekanlar senin profil tipine {int(pref_score * 100)}% uyuyor."
+            f"{distance_km:.1f} km away{rating_str}. "
+            f"This type of venue matches your profile {int(pref_score * 100)}%."
         )
 
         return SuggestionResponse(
@@ -234,280 +246,280 @@ def _place_to_suggestion(
 # preferences, and event recommendations.
 
 _PERSONA_META: dict[str, dict[str, Any]] = {
-    "ERKENCI": {
-        "display": "Erkenci Kuş",
+    "EARLY_BIRD": {
+        "display": "Early Bird",
         "traits": [
-            {"label": "Sabah Aktif", "confidence": 0.90},
-            {"label": "Disiplinli", "confidence": 0.85},
-            {"label": "Verimlilik Odaklı", "confidence": 0.80},
+            {"label": "Morning Active", "confidence": 0.90},
+            {"label": "Disciplined", "confidence": 0.85},
+            {"label": "Productivity-Focused", "confidence": 0.80},
         ],
         "preferences": {"outdoor": 0.7, "culture": 0.6, "social": 0.5, "food": 0.5},
         "recommendations": [
-            {"category": "Movement", "title": "Sabah Koşusu",
-             "description": "Güne enerjik başla — sabah erken 20-30 dakika koşu.",
-             "rationale": "Sabah aktivite örüntün gün erken saatlerde yüksek enerji gösteriyor.",
-             "tags": ["Sabah", "Koşu", "Enerji"], "estimated_minutes": 30},
-            {"category": "Learning", "title": "Sabah Eğitim Seansı",
-             "description": "Bir podcast, dil uygulaması veya online kurs ile güne başla.",
-             "rationale": "Sabah saatlerindeki üretken profil öğrenmeye çok uygun.",
-             "tags": ["Sabah", "Öğrenme", "Gelişim"], "estimated_minutes": 20},
-            {"category": "Recharge", "title": "Kahve Ritüeli",
-             "description": "Sevdiğin kafede sessizce kahveni iç, güne hazırlan.",
-             "rationale": "Sabah rutinin yapılandırılmış başlangıç için mükemmel.",
-             "tags": ["Kahve", "Sabah", "Rutin"], "estimated_minutes": 25},
+            {"category": "Movement", "title": "Morning Run",
+             "description": "Start your day energetically — 20-30 minutes of early morning jogging.",
+             "rationale": "Your morning activity pattern shows high energy in the early hours.",
+             "tags": ["Morning", "Running", "Energy"], "estimated_minutes": 30},
+            {"category": "Learning", "title": "Morning Learning Session",
+             "description": "Start the day with a podcast, language app, or online course.",
+             "rationale": "Your productive morning profile is ideal for learning.",
+             "tags": ["Morning", "Learning", "Growth"], "estimated_minutes": 20},
+            {"category": "Recharge", "title": "Coffee Ritual",
+             "description": "Quietly enjoy your coffee at your favorite cafe and prepare for the day.",
+             "rationale": "Your morning routine is perfect for a structured start.",
+             "tags": ["Coffee", "Morning", "Routine"], "estimated_minutes": 25},
         ],
     },
-    "EVCIMEN": {
-        "display": "Evcimen",
+    "HOMEBODY": {
+        "display": "Homebody",
         "traits": [
-            {"label": "Ev Odaklı", "confidence": 0.90},
-            {"label": "İçe Dönük", "confidence": 0.82},
-            {"label": "Sakin Yaşam", "confidence": 0.78},
+            {"label": "Home-Centered", "confidence": 0.90},
+            {"label": "Introverted", "confidence": 0.82},
+            {"label": "Calm Lifestyle", "confidence": 0.78},
         ],
         "preferences": {"food": 0.7, "culture": 0.6, "outdoor": 0.3, "social": 0.4},
         "recommendations": [
-            {"category": "Recharge", "title": "Ev Yakını Kafe",
-             "description": "Evine yakın sakin bir kafede mola ver.",
-             "rationale": "Ev çevresinde kalma eğilimin yerel mekanlara çok uygun.",
-             "tags": ["Kafe", "Yakın", "Sakin"], "estimated_minutes": 40},
-            {"category": "Learning", "title": "Çevrimiçi Workshop",
-             "description": "Evden katılabileceğin bir online atölyeye kayıt ol.",
-             "rationale": "Eve bağlı yaşam tarzın online etkinliklere en uygun.",
-             "tags": ["Online", "Öğrenme", "Ev"], "estimated_minutes": 60},
-            {"category": "Movement", "title": "Mahalle Yürüyüşü",
-             "description": "Kısa bir hava alma yürüyüşü — 20 dakika yeterli.",
-             "rationale": "Küçük ama düzenli hareket dengeni korur.",
-             "tags": ["Yürüyüş", "Yakın", "Günlük"], "estimated_minutes": 20},
+            {"category": "Recharge", "title": "Nearby Cafe",
+             "description": "Take a break at a quiet cafe close to home.",
+             "rationale": "Your tendency to stay close to home fits local venues perfectly.",
+             "tags": ["Cafe", "Nearby", "Quiet"], "estimated_minutes": 40},
+            {"category": "Learning", "title": "Online Workshop",
+             "description": "Register for an online workshop you can join from home.",
+             "rationale": "Your home-centered lifestyle is best suited for online events.",
+             "tags": ["Online", "Learning", "Home"], "estimated_minutes": 60},
+            {"category": "Movement", "title": "Neighborhood Walk",
+             "description": "A short walk for some fresh air — 20 minutes is enough.",
+             "rationale": "Small but regular movement keeps your balance.",
+             "tags": ["Walk", "Nearby", "Daily"], "estimated_minutes": 20},
         ],
     },
-    "GECE_KUSU": {
-        "display": "Gece Kuşu",
+    "NIGHT_OWL": {
+        "display": "Night Owl",
         "traits": [
-            {"label": "Gece Aktif", "confidence": 0.90},
-            {"label": "Spontane", "confidence": 0.80},
-            {"label": "Sosyal Gece", "confidence": 0.72},
+            {"label": "Night Active", "confidence": 0.90},
+            {"label": "Spontaneous", "confidence": 0.80},
+            {"label": "Social at Night", "confidence": 0.72},
         ],
         "preferences": {"social": 0.8, "culture": 0.7, "food": 0.8, "outdoor": 0.3},
         "recommendations": [
-            {"category": "Social", "title": "Gece Müzik Etkinliği",
-             "description": "Canlı müzik veya konser salonuna git.",
-             "rationale": "Gece saatlerindeki yüksek aktivite müzik etkinliklerine çok uygun.",
-             "tags": ["Müzik", "Gece", "Canlı"], "estimated_minutes": 150},
-            {"category": "Recharge", "title": "Geç Saatte Kafe",
-             "description": "Gece geç saatlerde açık, sakin bir kafede otur.",
-             "rationale": "Gece profili geç saatlerde aktif olmayı tercih ettiğini gösteriyor.",
-             "tags": ["Gece", "Kafe", "Sakin"], "estimated_minutes": 60},
-            {"category": "Social", "title": "Gece Pazarı",
-             "description": "Gece pazarı veya sokak yemekleri etkinliğine git.",
-             "rationale": "Hafta sonu gece aktivite örüntüne çok uygun.",
-             "tags": ["Pazar", "Yemek", "Keşif"], "estimated_minutes": 90},
+            {"category": "Social", "title": "Live Music Event",
+             "description": "Head to a live music venue or concert hall.",
+             "rationale": "Your high nighttime activity is a great match for music events.",
+             "tags": ["Music", "Night", "Live"], "estimated_minutes": 150},
+            {"category": "Recharge", "title": "Late-Night Cafe",
+             "description": "Sit at a quiet cafe that stays open late.",
+             "rationale": "Your night profile shows a preference for being active in late hours.",
+             "tags": ["Night", "Cafe", "Quiet"], "estimated_minutes": 60},
+            {"category": "Social", "title": "Night Market",
+             "description": "Visit a night market or street food event.",
+             "rationale": "A great fit for your weekend nighttime activity pattern.",
+             "tags": ["Market", "Food", "Explore"], "estimated_minutes": 90},
         ],
     },
-    "HIBRIT": {
-        "display": "Hibrit Kullanıcı",
+    "HYBRID": {
+        "display": "Hybrid User",
         "traits": [
-            {"label": "Dengeli", "confidence": 0.80},
-            {"label": "Adaptif", "confidence": 0.75},
-            {"label": "Çok Yönlü", "confidence": 0.70},
+            {"label": "Balanced", "confidence": 0.80},
+            {"label": "Adaptive", "confidence": 0.75},
+            {"label": "Versatile", "confidence": 0.70},
         ],
         "preferences": {"outdoor": 0.6, "culture": 0.6, "social": 0.6, "food": 0.6},
         "recommendations": [
-            {"category": "Social", "title": "Topluluk Etkinliği",
-             "description": "Yakınındaki bir topluluk buluşmasına katıl.",
-             "rationale": "Dengeli ve çok yönlü profilin topluluk etkinliklerine uygun.",
-             "tags": ["Topluluk", "Sosyal", "Yerel"], "estimated_minutes": 90},
-            {"category": "Movement", "title": "Şehir Keşfi",
-             "description": "Hiç gitmediğin bir mahallede kısa bir yürüyüş.",
-             "rationale": "Esnek hareket profilin keşif aktivitelerine uygun.",
-             "tags": ["Yürüyüş", "Keşif", "Şehir"], "estimated_minutes": 45},
-            {"category": "Recharge", "title": "Yeni Kafe Dene",
-             "description": "Yakındaki yeni bir kafe veya restoranı ziyaret et.",
-             "rationale": "Dengeli profil için yeni deneyimler ideal.",
-             "tags": ["Kafe", "Yeni", "Dinlenme"], "estimated_minutes": 40},
+            {"category": "Social", "title": "Community Event",
+             "description": "Join a community meetup nearby.",
+             "rationale": "Your balanced and versatile profile fits community events well.",
+             "tags": ["Community", "Social", "Local"], "estimated_minutes": 90},
+            {"category": "Movement", "title": "City Exploration",
+             "description": "Take a short walk through a neighborhood you've never visited.",
+             "rationale": "Your flexible movement profile suits exploration activities.",
+             "tags": ["Walk", "Explore", "City"], "estimated_minutes": 45},
+            {"category": "Recharge", "title": "Try a New Cafe",
+             "description": "Visit a new cafe or restaurant nearby.",
+             "rationale": "New experiences are ideal for a balanced profile.",
+             "tags": ["Cafe", "New", "Relax"], "estimated_minutes": 40},
         ],
     },
-    "ICERIK_TUKETICI": {
-        "display": "İçerik Tüketicisi",
+    "CONTENT_CONSUMER": {
+        "display": "Content Consumer",
         "traits": [
-            {"label": "Dijital Odaklı", "confidence": 0.90},
-            {"label": "Medya Sever", "confidence": 0.85},
-            {"label": "Evde Konforlu", "confidence": 0.78},
+            {"label": "Digitally-Focused", "confidence": 0.90},
+            {"label": "Media Lover", "confidence": 0.85},
+            {"label": "Comfortable at Home", "confidence": 0.78},
         ],
         "preferences": {"culture": 0.9, "food": 0.6, "outdoor": 0.3, "social": 0.5},
         "recommendations": [
-            {"category": "Learning", "title": "Film / Belgesel Festivali",
-             "description": "Yakındaki bir sinema veya belgesel gösterimine git.",
-             "rationale": "Yüksek medya tüketim oranın film etkinliklerine çok uygun.",
-             "tags": ["Film", "Sinema", "Kültür"], "estimated_minutes": 120},
-            {"category": "Recharge", "title": "Kitap Kulübü",
-             "description": "Bir kitap kulübü toplantısına katıl.",
-             "rationale": "İçerik tüketim profilin kitap kulübüne uyuyor.",
-             "tags": ["Kitap", "Kültür", "Sosyal"], "estimated_minutes": 90},
-            {"category": "Movement", "title": "Kısa Hava Alma Yürüyüşü",
-             "description": "Ekran başından kalkıp 20 dakika dışarı çık.",
-             "rationale": "Uzun ekran periyotlarının ardından kısa yürüyüş enerji verir.",
-             "tags": ["Yürüyüş", "Hava", "Mola"], "estimated_minutes": 20},
+            {"category": "Learning", "title": "Film / Documentary Festival",
+             "description": "Go to a nearby cinema or documentary screening.",
+             "rationale": "Your high media consumption rate is a great match for film events.",
+             "tags": ["Film", "Cinema", "Culture"], "estimated_minutes": 120},
+            {"category": "Recharge", "title": "Book Club",
+             "description": "Join a book club meeting.",
+             "rationale": "Your content consumption profile aligns well with book clubs.",
+             "tags": ["Books", "Culture", "Social"], "estimated_minutes": 90},
+            {"category": "Movement", "title": "Short Fresh-Air Walk",
+             "description": "Step away from the screen and get outside for 20 minutes.",
+             "rationale": "A short walk after long screen sessions restores energy.",
+             "tags": ["Walk", "Fresh Air", "Break"], "estimated_minutes": 20},
         ],
     },
-    "KRIZ_DUZENSIZ": {
-        "display": "Kriz & Düzensiz",
+    "IRREGULAR": {
+        "display": "Irregular",
         "traits": [
-            {"label": "Değişken Ritim", "confidence": 0.82},
-            {"label": "Yüksek Stres", "confidence": 0.75},
-            {"label": "Ani Kararlar", "confidence": 0.70},
+            {"label": "Variable Rhythm", "confidence": 0.82},
+            {"label": "High Stress", "confidence": 0.75},
+            {"label": "Impulsive Decisions", "confidence": 0.70},
         ],
         "preferences": {"outdoor": 0.5, "food": 0.7, "social": 0.5, "culture": 0.4},
         "recommendations": [
-            {"category": "Recharge", "title": "Meditasyon / Nefes Egzersizi",
-             "description": "5-10 dakikalık rehberli meditasyon dene.",
-             "rationale": "Düzensiz aktivite örüntün stres azaltıcı aktivitelere ihtiyaç duyuyor.",
-             "tags": ["Meditasyon", "Nefes", "Huzur"], "estimated_minutes": 10},
-            {"category": "Movement", "title": "Kısa Yürüyüş Molası",
-             "description": "Her iki saatte bir 10 dakika yürü.",
-             "rationale": "Küçük düzenli molalar enerji ve odak artırır.",
-             "tags": ["Yürüyüş", "Mola", "Düzen"], "estimated_minutes": 10},
-            {"category": "Recharge", "title": "Sakin Bir Kafede Mola",
-             "description": "Sakin bir ortamda oturup düşüncelerini topla.",
-             "rationale": "Düzensiz aktivite örüntün sakin ortamlardan fayda görür.",
-             "tags": ["Kafe", "Sessiz", "Toparlanma"], "estimated_minutes": 30},
+            {"category": "Recharge", "title": "Meditation / Breathing Exercise",
+             "description": "Try a 5-10 minute guided meditation.",
+             "rationale": "Your irregular activity pattern indicates a need for stress-reducing activities.",
+             "tags": ["Meditation", "Breathing", "Calm"], "estimated_minutes": 10},
+            {"category": "Movement", "title": "Short Walk Break",
+             "description": "Walk for 10 minutes every two hours.",
+             "rationale": "Small regular breaks boost energy and focus.",
+             "tags": ["Walk", "Break", "Routine"], "estimated_minutes": 10},
+            {"category": "Recharge", "title": "Quiet Cafe Break",
+             "description": "Sit in a calm environment and gather your thoughts.",
+             "rationale": "Your irregular pattern benefits from quiet, structured environments.",
+             "tags": ["Cafe", "Quiet", "Reset"], "estimated_minutes": 30},
         ],
     },
-    "OGRENCI": {
-        "display": "Öğrenci",
+    "STUDENT": {
+        "display": "Student",
         "traits": [
-            {"label": "Öğrenme Odaklı", "confidence": 0.90},
-            {"label": "Meraklı", "confidence": 0.85},
-            {"label": "Bütçe Bilinçli", "confidence": 0.75},
+            {"label": "Learning-Focused", "confidence": 0.90},
+            {"label": "Curious", "confidence": 0.85},
+            {"label": "Budget-Conscious", "confidence": 0.75},
         ],
         "preferences": {"culture": 0.9, "outdoor": 0.6, "social": 0.7, "food": 0.5},
         "recommendations": [
-            {"category": "Learning", "title": "Kütüphane veya Study Space",
-             "description": "Yakındaki sessiz bir kütüphane veya çalışma alanına git.",
-             "rationale": "Öğrenci profiline uygun ücretsiz çalışma ortamı.",
-             "tags": ["Kütüphane", "Çalışma", "Ücretsiz"], "estimated_minutes": 120},
-            {"category": "Social", "title": "Kampüs / Öğrenci Etkinliği",
-             "description": "Yakında düzenlenen öğrenci kulübü veya workshop etkinliğine katıl.",
-             "rationale": "Sosyal ve öğrenme odaklı profilin bu tür etkinliklere çok uygun.",
-             "tags": ["Öğrenci", "Sosyal", "Network"], "estimated_minutes": 90},
-            {"category": "Recharge", "title": "Uygun Fiyatlı Kafe Molası",
-             "description": "Bütçene uygun bir kafede mola ver.",
-             "rationale": "Yoğun çalışma periyotlarının ardından kısa mola verimlilik artırır.",
-             "tags": ["Kafe", "Uygun", "Mola"], "estimated_minutes": 30},
+            {"category": "Learning", "title": "Library or Study Space",
+             "description": "Go to a quiet library or study area nearby.",
+             "rationale": "A free study environment perfect for your student profile.",
+             "tags": ["Library", "Study", "Free"], "estimated_minutes": 120},
+            {"category": "Social", "title": "Campus / Student Event",
+             "description": "Join a nearby student club or workshop event.",
+             "rationale": "Your social and learning-focused profile fits these events perfectly.",
+             "tags": ["Student", "Social", "Network"], "estimated_minutes": 90},
+            {"category": "Recharge", "title": "Budget-Friendly Cafe Break",
+             "description": "Take a break at an affordable cafe.",
+             "rationale": "Short breaks after intense study sessions increase productivity.",
+             "tags": ["Cafe", "Affordable", "Break"], "estimated_minutes": 30},
         ],
     },
-    "OYUNCU": {
-        "display": "Oyuncu",
+    "GAMER": {
+        "display": "Gamer",
         "traits": [
-            {"label": "Gaming Tutkunu", "confidence": 0.92},
-            {"label": "Rekabetçi", "confidence": 0.85},
-            {"label": "Dijital Sosyal", "confidence": 0.78},
+            {"label": "Gaming Enthusiast", "confidence": 0.92},
+            {"label": "Competitive", "confidence": 0.85},
+            {"label": "Digitally Social", "confidence": 0.78},
         ],
         "preferences": {"social": 0.7, "culture": 0.5, "outdoor": 0.3, "food": 0.6},
         "recommendations": [
-            {"category": "Social", "title": "Gaming Cafe / Turnuva",
-             "description": "Yakındaki bir gaming kafede turnuvaya katıl veya arkadaşlarla oyna.",
-             "rationale": "Yüksek gaming profili bu tür sosyal gaming ortamlarına çok uygun.",
-             "tags": ["Gaming", "Turnuva", "Sosyal"], "estimated_minutes": 120},
-            {"category": "Movement", "title": "Dijital Detoks Yürüyüşü",
-             "description": "Ekrandan uzaklaşmak için 30 dakika açık hava yürüyüşü.",
-             "rationale": "Uzun gaming seanslarının ardından fiziksel aktivite faydalı.",
-             "tags": ["Yürüyüş", "Detoks", "Açık Hava"], "estimated_minutes": 30},
-            {"category": "Social", "title": "Board Game Etkinliği",
-             "description": "Bir board game kafesinde yüz yüze oyun oyna.",
-             "rationale": "Gaming sosyal yönünü yüz yüze aktiviteye taşıma fırsatı.",
-             "tags": ["Board Game", "Sosyal", "Eğlence"], "estimated_minutes": 90},
+            {"category": "Social", "title": "Gaming Cafe / Tournament",
+             "description": "Join a tournament at a nearby gaming cafe or play with friends.",
+             "rationale": "Your high gaming profile is a great fit for social gaming environments.",
+             "tags": ["Gaming", "Tournament", "Social"], "estimated_minutes": 120},
+            {"category": "Movement", "title": "Digital Detox Walk",
+             "description": "30 minutes of outdoor walking to step away from screens.",
+             "rationale": "Physical activity after long gaming sessions is beneficial.",
+             "tags": ["Walk", "Detox", "Outdoors"], "estimated_minutes": 30},
+            {"category": "Social", "title": "Board Game Event",
+             "description": "Play face-to-face games at a board game cafe.",
+             "rationale": "A chance to bring your social gaming side into an in-person activity.",
+             "tags": ["Board Game", "Social", "Fun"], "estimated_minutes": 90},
         ],
     },
-    "PROFESYONEL": {
-        "display": "Profesyonel",
+    "PROFESSIONAL": {
+        "display": "Professional",
         "traits": [
-            {"label": "Kariyer Odaklı", "confidence": 0.90},
-            {"label": "Verimli", "confidence": 0.88},
-            {"label": "Ağ Kurucu", "confidence": 0.80},
+            {"label": "Career-Focused", "confidence": 0.90},
+            {"label": "Efficient", "confidence": 0.88},
+            {"label": "Networker", "confidence": 0.80},
         ],
         "preferences": {"culture": 0.8, "social": 0.7, "food": 0.6, "outdoor": 0.4},
         "recommendations": [
-            {"category": "Social", "title": "Networking Etkinliği",
-             "description": "Sektörüne uygun bir networking veya konferansa katıl.",
-             "rationale": "Profesyonel aktivite örüntün bu tür etkinliklere çok uygun.",
-             "tags": ["Network", "Kariyer", "Profesyonel"], "estimated_minutes": 120},
-            {"category": "Recharge", "title": "Öğle Molası — Restoran",
-             "description": "İş arkadaşlarınla ya da yalnız kaliteli öğle yemeği ye.",
-             "rationale": "Verimli çalışma için düzenli mola şart.",
-             "tags": ["Yemek", "Mola", "Enerji"], "estimated_minutes": 60},
-            {"category": "Learning", "title": "Sektör Podcast / Webinar",
-             "description": "Commute sırasında sektörüne ait içerik dinle.",
-             "rationale": "Profesyonel gelişim için commute zamanını değerlendir.",
-             "tags": ["Podcast", "Öğrenme", "Commute"], "estimated_minutes": 30},
+            {"category": "Social", "title": "Networking Event",
+             "description": "Attend a networking event or conference relevant to your field.",
+             "rationale": "Your professional activity pattern is a strong match for these events.",
+             "tags": ["Network", "Career", "Professional"], "estimated_minutes": 120},
+            {"category": "Recharge", "title": "Lunch Break — Restaurant",
+             "description": "Have a quality lunch with colleagues or on your own.",
+             "rationale": "Regular breaks are essential for sustained productivity.",
+             "tags": ["Food", "Break", "Energy"], "estimated_minutes": 60},
+            {"category": "Learning", "title": "Industry Podcast / Webinar",
+             "description": "Listen to industry content during your commute.",
+             "rationale": "Make the most of your commute time for professional development.",
+             "tags": ["Podcast", "Learning", "Commute"], "estimated_minutes": 30},
         ],
     },
-    "SEYYAH": {
-        "display": "Seyyah",
+    "TRAVELER": {
+        "display": "Traveler",
         "traits": [
-            {"label": "Aktif Gezgin", "confidence": 0.92},
-            {"label": "Keşif Tutkunu", "confidence": 0.88},
-            {"label": "Açık Hava Sever", "confidence": 0.85},
+            {"label": "Active Explorer", "confidence": 0.92},
+            {"label": "Discovery-Driven", "confidence": 0.88},
+            {"label": "Outdoors Lover", "confidence": 0.85},
         ],
         "preferences": {"outdoor": 0.95, "culture": 0.80, "food": 0.70, "social": 0.60},
         "recommendations": [
-            {"category": "Movement", "title": "Şehir Keşif Turu",
-             "description": "Hiç gitmediğin bir mahallede detaylı keşif yürüyüşü.",
-             "rationale": "Yüksek mobilite yarıçapın ve çeşitli konum geçmişin keşif profili çiziyor.",
-             "tags": ["Keşif", "Yürüyüş", "Şehir"], "estimated_minutes": 90},
-            {"category": "Health", "title": "Doğa Yürüyüşü",
-             "description": "Şehir dışında doğa yürüyüşü veya bisiklet turu.",
-             "rationale": "Yüksek günlük mesafe ve hareket profilin doğa aktivitelerine ideal.",
-             "tags": ["Doğa", "Bisiklet", "Aktif"], "estimated_minutes": 120},
-            {"category": "Social", "title": "Seyahat Topluluğu",
-             "description": "Şehirdeki seyahat veya yürüyüş grubuna katıl.",
-             "rationale": "Aktif ve sosyal profil bu tür gruplara çok uygun.",
-             "tags": ["Grup", "Seyahat", "Sosyal"], "estimated_minutes": 90},
+            {"category": "Movement", "title": "City Discovery Tour",
+             "description": "Detailed exploration walk through a neighborhood you've never visited.",
+             "rationale": "Your high mobility radius and varied location history signal an explorer profile.",
+             "tags": ["Explore", "Walk", "City"], "estimated_minutes": 90},
+            {"category": "Health", "title": "Nature Hike",
+             "description": "Nature hike or cycling tour outside the city.",
+             "rationale": "Your high daily distance and movement profile are ideal for outdoor activities.",
+             "tags": ["Nature", "Cycling", "Active"], "estimated_minutes": 120},
+            {"category": "Social", "title": "Travel Community",
+             "description": "Join a travel or hiking group in your city.",
+             "rationale": "Your active and social profile is a great fit for these groups.",
+             "tags": ["Group", "Travel", "Social"], "estimated_minutes": 90},
         ],
     },
-    "SOSYAL": {
-        "display": "Sosyal Kelebek",
+    "SOCIAL": {
+        "display": "Social Butterfly",
         "traits": [
-            {"label": "Sosyal & Dışa Dönük", "confidence": 0.92},
-            {"label": "Etkinlik Sever", "confidence": 0.88},
-            {"label": "Ağ Kurucu", "confidence": 0.80},
+            {"label": "Social & Extroverted", "confidence": 0.92},
+            {"label": "Event Lover", "confidence": 0.88},
+            {"label": "Networker", "confidence": 0.80},
         ],
         "preferences": {"social": 0.95, "culture": 0.80, "food": 0.75, "outdoor": 0.50},
         "recommendations": [
-            {"category": "Social", "title": "Sosyal Etkinlik / Buluşma",
-             "description": "Arkadaşlarla buluşma veya yeni tanışma etkinliğine katıl.",
-             "rationale": "Yüksek sosyal medya ve sosyal uygulama kullanımın dışa dönük bir profil gösteriyor.",
-             "tags": ["Sosyal", "Buluşma", "Eğlence"], "estimated_minutes": 120},
-            {"category": "Social", "title": "Sanat Galerisi / Sergi",
-             "description": "Bir sanat galerisini veya sergisini ziyaret et.",
-             "rationale": "Sosyal ve kültürel profil bu tür etkinliklere uygun.",
-             "tags": ["Sanat", "Kültür", "Sosyal"], "estimated_minutes": 90},
-            {"category": "Movement", "title": "Grup Yürüyüşü",
-             "description": "Bir şehir yürüyüş grubuna katıl.",
-             "rationale": "Sosyal aktiviteler birleştirmek profiline ideal.",
-             "tags": ["Grup", "Yürüyüş", "Sosyal"], "estimated_minutes": 60},
+            {"category": "Social", "title": "Social Event / Meetup",
+             "description": "Join a meetup with friends or a new social gathering.",
+             "rationale": "Your high social media and social app usage indicates an extroverted profile.",
+             "tags": ["Social", "Meetup", "Fun"], "estimated_minutes": 120},
+            {"category": "Social", "title": "Art Gallery / Exhibition",
+             "description": "Visit an art gallery or exhibition.",
+             "rationale": "Your social and cultural profile fits these events well.",
+             "tags": ["Art", "Culture", "Social"], "estimated_minutes": 90},
+            {"category": "Movement", "title": "Group Walk",
+             "description": "Join a city walking group.",
+             "rationale": "Combining social activities with movement is ideal for your profile.",
+             "tags": ["Group", "Walk", "Social"], "estimated_minutes": 60},
         ],
     },
-    "SPORCU": {
-        "display": "Sporcu",
+    "ATHLETE": {
+        "display": "Athlete",
         "traits": [
-            {"label": "Spor Tutkunu", "confidence": 0.95},
-            {"label": "Sağlık Odaklı", "confidence": 0.90},
-            {"label": "Disiplinli", "confidence": 0.85},
+            {"label": "Sports Enthusiast", "confidence": 0.95},
+            {"label": "Health-Focused", "confidence": 0.90},
+            {"label": "Disciplined", "confidence": 0.85},
         ],
         "preferences": {"outdoor": 0.95, "health": 0.95, "food": 0.65, "social": 0.55},
         "recommendations": [
-            {"category": "Health", "title": "Sabah Antrenmanı",
-             "description": "Koşu, bisiklet veya spor salonu antrenmanı.",
-             "rationale": "Fitness uygulama kullanımın ve yüksek hareket profilin sporcu kimliğini gösteriyor.",
-             "tags": ["Antrenman", "Sabah", "Fitness"], "estimated_minutes": 60},
-            {"category": "Health", "title": "Spor Kulübü / Grup Dersi",
-             "description": "Bir spor kulübü veya grup fitness dersine katıl.",
-             "rationale": "Aktif yaşam tarzın grup sporuna çok uygun.",
-             "tags": ["Spor Kulübü", "Grup", "Sosyal"], "estimated_minutes": 60},
-            {"category": "Recharge", "title": "Sporcu Beslenmesi",
-             "description": "Organik veya sağlıklı bir restoranda beslen.",
-             "rationale": "Aktif yaşam tarzı doğru beslenme ile tamamlanır.",
-             "tags": ["Sağlıklı", "Beslenme", "Toparlanma"], "estimated_minutes": 45},
+            {"category": "Health", "title": "Morning Workout",
+             "description": "Running, cycling, or gym training.",
+             "rationale": "Your fitness app usage and high movement profile confirm an athlete identity.",
+             "tags": ["Workout", "Morning", "Fitness"], "estimated_minutes": 60},
+            {"category": "Health", "title": "Sports Club / Group Class",
+             "description": "Join a sports club or group fitness class.",
+             "rationale": "Your active lifestyle is a great fit for group sports.",
+             "tags": ["Sports Club", "Group", "Social"], "estimated_minutes": 60},
+            {"category": "Recharge", "title": "Athlete Nutrition",
+             "description": "Eat at an organic or healthy restaurant.",
+             "rationale": "An active lifestyle is completed with proper nutrition.",
+             "tags": ["Healthy", "Nutrition", "Recovery"], "estimated_minutes": 45},
         ],
     },
 }
@@ -551,6 +563,101 @@ class SuggestionResponse(BaseModel):
     weather: Optional[str] = None
     created_at: str
 
+# ─────────────────────────────────────────── timezone helpers ────────────────
+
+def _compute_tz_offset(gps_df: pd.DataFrame) -> int:
+    """Return the user's UTC offset in whole hours using GPS coordinates.
+    Uses timezonefinder for exact lookup; falls back to longitude estimate."""
+    if gps_df.empty or "latitude" not in gps_df.columns or "longitude" not in gps_df.columns:
+        return 0
+    try:
+        from timezonefinder import TimezoneFinder
+        import pytz
+        tf = TimezoneFinder()
+        lat = float(gps_df["latitude"].median())
+        lon = float(gps_df["longitude"].median())
+        tz_name = tf.timezone_at(lat=lat, lng=lon)
+        if tz_name:
+            tz = pytz.timezone(tz_name)
+            now_utc = datetime.now(timezone.utc)
+            offset_td = tz.utcoffset(now_utc.replace(tzinfo=None))
+            return int(offset_td.total_seconds() // 3600)
+    except Exception:
+        pass
+    # Longitude-based fallback (±1h accuracy)
+    median_lon = float(gps_df["longitude"].median())
+    return max(-12, min(14, round(median_lon / 15.0)))
+
+
+def _apply_tz_to_apps(apps: pd.DataFrame, tz_offset: int) -> pd.DataFrame:
+    """Shift hour and weekday columns to local time for circadian features."""
+    if apps.empty or tz_offset == 0:
+        return apps
+    apps = apps.copy()
+    local_ts = apps["timestamp"] + pd.Timedelta(hours=tz_offset)
+    apps["hour"]    = local_ts.dt.hour
+    apps["weekday"] = local_ts.dt.weekday
+    return apps
+
+
+# ─────────────────────────────────────────── persona cache (users table) ─────
+
+_PERSONA_CACHE_TTL_H = 24  # re-classify after this many hours
+
+
+def _load_persona_cache(user_id: str) -> Optional[tuple[str, dict, dict]]:
+    """Return (persona_class, meta, context) from users.persona_json if fresh, else None."""
+    rows = _supa_get("users", {
+        "id": f"eq.{user_id}",
+        "select": "persona_json,persona_updated_at",
+    })
+    if not rows or not rows[0].get("persona_json") or not rows[0].get("persona_updated_at"):
+        return None
+    try:
+        updated_at = datetime.fromisoformat(rows[0]["persona_updated_at"].replace("Z", "+00:00"))
+        age_h = (datetime.now(timezone.utc) - updated_at).total_seconds() / 3600
+        if age_h > _PERSONA_CACHE_TTL_H:
+            return None
+        pj = rows[0]["persona_json"]
+        persona_class = pj["persona_id"]
+        meta = _PERSONA_META.get(persona_class, _PERSONA_META["HYBRID"])
+        ctx = pj.get("context", {})
+        logger.info("[persona_cache] HIT for %s — persona=%s age=%.1fh", user_id, persona_class, age_h)
+        return persona_class, meta, ctx
+    except Exception as e:
+        logger.warning("[persona_cache] parse error: %s", e)
+        return None
+
+
+def _save_persona_cache(user_id: str, persona_class: str, signals_today: int, ctx: dict) -> None:
+    """Write persona result to users.persona_json and persona_updated_at."""
+    meta = _PERSONA_META.get(persona_class, _PERSONA_META["HYBRID"])
+    now_str = datetime.now(timezone.utc).isoformat()
+    payload = {
+        "persona_id": persona_class,
+        "persona_name": meta["display"],
+        "traits": meta["traits"],
+        "preferences": meta["preferences"],
+        "signals_today": signals_today,
+        "context": ctx,
+        "classified_at": now_str,
+    }
+    try:
+        with httpx.Client(timeout=10) as client:
+            resp = client.patch(
+                f"{SUPABASE_URL}/rest/v1/users",
+                headers=_SUPA_HEADERS,
+                params={"id": f"eq.{user_id}"},
+                json={"persona_json": payload, "persona_updated_at": now_str},
+            )
+        if resp.status_code in (200, 204):
+            logger.info("[persona_cache] WRITE %s → %s", user_id, persona_class)
+        else:
+            logger.warning("[persona_cache] PATCH failed status=%s body=%s", resp.status_code, resp.text[:300])
+    except Exception as e:
+        logger.warning("[persona_cache] write failed: %s", e)
+
+
 # ─────────────────────────────────────────── data fetching ───────────────────
 
 def _fetch_gps(user_id: str) -> pd.DataFrame:
@@ -592,28 +699,28 @@ def _fetch_screen_events(user_id: str) -> pd.DataFrame:
 # ─────────────────────────────────────────── LLM (local Mistral / Ollama) ────
 
 _LLM_SYSTEM = (
-    "Sen kişiselleştirilmiş etkinlik öneri asistanısın. "
-    "Verilen kullanıcı profili, güncel bağlam ve yakın mekan listesine göre "
-    "Türkçe olarak tam olarak 3 etkinlik önerisi üret. "
-    "Sadece geçerli JSON dizisi döndür, başka hiçbir metin yazma."
+    "You are a personalized event recommendation assistant. "
+    "Based on the given user profile, current context, and nearby venue list, "
+    "generate exactly 3 activity recommendations in English. "
+    "Return only a valid JSON array — no other text."
 )
 
 _MOV_LABELS = {
-    "stationary": "Hareketsiz", "walking": "Yürüyor",
-    "cycling": "Bisiklet sürüyor", "transit": "Toplu taşımada",
-    "vehicle": "Araçta",
+    "stationary": "Stationary", "walking": "Walking",
+    "cycling": "Cycling", "transit": "On public transit",
+    "vehicle": "In a vehicle",
 }
 _CAT_LABELS = {
-    "social": "sosyal medya", "gaming": "oyun", "streaming": "dizi/film",
-    "music": "müzik", "productivity": "iş/verimlilik", "education": "eğitim",
-    "shopping": "alışveriş", "news": "haber", "fitness": "fitness",
-    "messaging": "mesajlaşma", "video": "video", "reading": "okuma",
-    "browser": "web gezintisi", "short_video": "kısa video",
+    "social": "social media", "gaming": "gaming", "streaming": "streaming",
+    "music": "music", "productivity": "work/productivity", "education": "education",
+    "shopping": "shopping", "news": "news", "fitness": "fitness",
+    "messaging": "messaging", "video": "video", "reading": "reading",
+    "browser": "web browsing", "short_video": "short-form video",
 }
 _TIME_LABELS = [
-    (0, 6, "Gece"), (6, 9, "Sabah erken"), (9, 12, "Sabah"),
-    (12, 14, "Öğle"), (14, 17, "Öğleden sonra"), (17, 20, "Akşam üstü"),
-    (20, 24, "Gece"),
+    (0, 6, "Night"), (6, 9, "Early morning"), (9, 12, "Morning"),
+    (12, 14, "Midday"), (14, 17, "Afternoon"), (17, 20, "Evening"),
+    (20, 24, "Night"),
 ]
 
 
@@ -625,60 +732,60 @@ def _build_llm_prompt(
     now: datetime,
 ) -> str:
     hour = now.hour
-    time_label = next((l for a, b, l in _TIME_LABELS if a <= hour < b), "Gece")
+    time_label = next((l for a, b, l in _TIME_LABELS if a <= hour < b), "Night")
 
     traits_str = ", ".join(
         f"{t['label']} (%{int(t['confidence'] * 100)})" for t in meta["traits"]
     )
     prefs = meta["preferences"]
     prefs_str = (
-        f"açık hava={prefs.get('outdoor', 0):.1f}, "
-        f"sosyal={prefs.get('social', 0):.1f}, "
-        f"yemek={prefs.get('food', 0):.1f}, "
-        f"kültür={prefs.get('culture', 0):.1f}"
+        f"outdoor={prefs.get('outdoor', 0):.1f}, "
+        f"social={prefs.get('social', 0):.1f}, "
+        f"food={prefs.get('food', 0):.1f}, "
+        f"culture={prefs.get('culture', 0):.1f}"
     )
 
-    movement = _MOV_LABELS.get(ctx.get("movement_state", "stationary"), "Hareketsiz")
-    top_cat = _CAT_LABELS.get(ctx.get("top_app_category", ""), "belirsiz")
+    movement = _MOV_LABELS.get(ctx.get("movement_state", "stationary"), "Stationary")
+    top_cat = _CAT_LABELS.get(ctx.get("top_app_category", ""), "unknown")
 
     places_lines = []
     for i, p in enumerate(raw_places[:8]):
         name = (p.get("displayName") or {}).get("text", "?")
         types = p.get("types") or []
-        cat = next((_TYPE_TO_CATEGORY.get(t) for t in types if t in _TYPE_TO_CATEGORY), "Mekan")
+        cat = next((_TYPE_TO_CATEGORY.get(t) for t in types if t in _TYPE_TO_CATEGORY), "Venue")
         addr = p.get("shortFormattedAddress", "")
         rating = p.get("rating")
         r_str = f" ★{rating:.1f}" if rating else ""
         places_lines.append(f"{i + 1}. {name} — {cat}{r_str} — {addr}")
 
-    places_str = "\n".join(places_lines) or "Yakın mekan bulunamadı."
+    places_str = "\n".join(places_lines) or "No nearby venues found."
 
-    return f"""## Kullanıcı Profili
+    return f"""## User Profile
 Persona: {meta['display']} ({persona_class})
-Özellikler: {traits_str}
-Tercihler: {prefs_str}
+Traits: {traits_str}
+Preferences: {prefs_str}
 
-## Güncel Bağlam
-Zaman: {time_label} ({hour:02d}:{now.minute:02d})
-Hareket durumu: {movement}
-Son 24 saatte ağırlıklı uygulama türü: {top_cat}
+## Current Context
+Time: {time_label} ({hour:02d}:{now.minute:02d})
+Movement: {movement}
+Dominant app category in the last 24h: {top_cat}
 
-## Yakındaki Mekanlar (1.5 km içinde)
+## Nearby Venues (within 1.5 km)
 {places_str}
 
-## Görev
-Bu kullanıcı için en uygun 3 mekanı seç ve etkinlik öner. JSON formatında döndür:
+## Task
+Select the 3 most suitable venues for this user and suggest an activity. Return as JSON:
 [
   {{
-    "title": "kısa etkinlik başlığı",
-    "description": "1-2 cümle açıklama",
-    "rationale": "neden bu kullanıcıya uygun (1 cümle)",
+    "title": "short activity title",
+    "description": "1-2 sentence description",
+    "rationale": "why this fits the user (1 sentence)",
     "category": "Movement|Recharge|Learning|Social|Health",
     "venue_index": 0,
     "estimated_minutes": 30
   }}
 ]
-venue_index, yukarıdaki numaralı listede hangi mekanı seçtiğini belirtir (0-indexed)."""
+venue_index refers to which venue from the numbered list above was selected (0-indexed)."""
 
 
 def _call_mistral(
@@ -696,7 +803,7 @@ def _call_mistral(
             resp = client.post(
                 f"{MISTRAL_URL}/v1/chat/completions",
                 json={
-                    "model": "mistral",
+                    "model": LLM_MODEL,
                     "messages": [
                         {"role": "system", "content": _LLM_SYSTEM},
                         {"role": "user", "content": prompt},
@@ -714,7 +821,7 @@ def _call_mistral(
         parsed = json.loads(text[start:end])
         return parsed if isinstance(parsed, list) else None
     except httpx.ConnectError as e:
-        logger.warning("[mistral] Bağlantı kurulamadı → %s: %s", MISTRAL_URL, e)
+        logger.warning("[mistral] Connection failed → %s: %s", MISTRAL_URL, e)
         return None
     except Exception:
         return None
@@ -758,11 +865,27 @@ def _llm_to_suggestions(
 
 # ─────────────────────────────────────────── classification ──────────────────
 
-def _classify(user_id: str) -> tuple[str, dict, int, dict]:
-    """Returns (persona_class, meta_dict, signals_today, context_summary)."""
+def _classify(user_id: str, force: bool = False) -> tuple[str, dict, int, dict]:
+    """Returns (persona_class, meta_dict, signals_today, context_summary).
+
+    Reads from users.persona_json cache when fresh (< PERSONA_CACHE_TTL_H hours).
+    Set force=True to bypass cache and re-run the model.
+    """
+    if not force:
+        cached = _load_persona_cache(user_id)
+        if cached is not None:
+            persona_class, meta, ctx = cached
+            return persona_class, meta, 0, ctx
+
     gps    = _fetch_gps(user_id)
     apps   = _fetch_app_sessions(user_id)
     screen = _fetch_screen_events(user_id)
+
+    # Estimate user's local timezone from GPS coordinates and adjust hour features
+    tz_offset = _compute_tz_offset(gps)
+    if tz_offset != 0:
+        logger.info("[classify] GPS-derived tz_offset=%+dh for user %s", tz_offset, user_id)
+    apps = _apply_tz_to_apps(apps, tz_offset)
 
     # signals_today = GPS pings from today
     signals_today = 0
@@ -773,6 +896,15 @@ def _classify(user_id: str) -> tuple[str, dict, int, dict]:
 
     feat = extract_user_features(user_id, gps, apps, screen, episode_user=None)
 
+    # Episode features are empty in production (no labelled data). Fill the 15 ep_share_*
+    # + episodes_per_day values using the rule-based episode detector.
+    # On error leave as zero — do not break the request.
+    try:
+        ep_feats = compute_episode_shares(gps, apps, screen, tz_offset=tz_offset)
+        feat.update(ep_feats)
+    except Exception as e:
+        logger.warning("[episodes] inference failed for %s: %s", user_id, e)
+
     # Build feature vector in the exact column order the model expects
     row = {col: feat.get(col, 0.0) for col in _feature_columns}
     X = pd.DataFrame([row])[_feature_columns]
@@ -780,7 +912,7 @@ def _classify(user_id: str) -> tuple[str, dict, int, dict]:
 
     pred_idx = int(_model.predict(X)[0])
     persona_class = _label_classes[pred_idx]
-    meta = _PERSONA_META.get(persona_class, _PERSONA_META["HIBRIT"])
+    meta = _PERSONA_META.get(persona_class, _PERSONA_META["HYBRID"])
 
     # Build lightweight context summary for LLM prompt
     context_summary: dict = {}
@@ -806,6 +938,8 @@ def _classify(user_id: str) -> tuple[str, dict, int, dict]:
     else:
         context_summary["top_app_category"] = "unknown"
 
+    _save_persona_cache(user_id, persona_class, signals_today, context_summary)
+
     return persona_class, meta, signals_today, context_summary
 
 # ─────────────────────────────────────────── routes ──────────────────────────
@@ -829,9 +963,35 @@ def health_llm():
         return {"url": MISTRAL_URL, "status": "unreachable", "error": str(e)}
 
 
+@app.get("/api/debug/episodes/{user_id}")
+def debug_episodes(user_id: str):
+    gps    = _fetch_gps(user_id)
+    apps   = _fetch_app_sessions(user_id)
+    screen = _fetch_screen_events(user_id)
+
+    try:
+        ep_shares = compute_episode_shares(gps, apps, screen)
+    except Exception as e:
+        return {"error": str(e), "user_id": user_id}
+
+    active = {k: round(v, 4) for k, v in ep_shares.items() if v > 0}
+    all_shares = {k: round(v, 4) for k, v in ep_shares.items()}
+
+    return {
+        "user_id": user_id,
+        "data_summary": {
+            "gps_rows": len(gps),
+            "app_rows": len(apps),
+            "screen_rows": len(screen),
+        },
+        "active_episodes": active,
+        "all_episode_shares": all_shares,
+    }
+
+
 @app.get("/api/persona/{user_id}", response_model=PersonaResponse)
-def get_persona(user_id: str):
-    persona_class, meta, signals_today, _ = _classify(user_id)
+def get_persona(user_id: str, force: bool = Query(False)):
+    persona_class, meta, signals_today, _ = _classify(user_id, force=force)
     return PersonaResponse(
         persona_id=persona_class,
         persona_name=meta["display"],
@@ -847,15 +1007,15 @@ def get_recommendations(
     user_id: str,
     lat: Optional[float] = Query(None),
     lon: Optional[float] = Query(None),
+    force: bool = Query(False),
 ):
-    persona_class, meta, _, ctx = _classify(user_id)
+    persona_class, meta, _, ctx = _classify(user_id, force=force)
     now = datetime.now(timezone.utc)
     now_str = now.isoformat()
 
     # When GPS provided, fetch real nearby venues and generate LLM recommendations.
     if lat is not None and lon is not None and GOOGLE_PLACES_KEY:
-        place_types = _PERSONA_PLACE_TYPES.get(persona_class, _PERSONA_PLACE_TYPES["HIBRIT"])
-        raw_places = _fetch_google_places(lat, lon, place_types)
+        raw_places = _fetch_google_places(lat, lon)
 
         # Tier 1: LLM-enriched recommendations (persona + places + app context → Mistral)
         if raw_places:

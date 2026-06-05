@@ -27,7 +27,7 @@ class GpsCollectionService {
   final ScreenEventService _screenEvents;
 
   static const _interval = Duration(minutes: 5);
-  static const _appUsageEveryNTicks = 12; // every 60 minutes
+  static const _appUsageEveryNTicks = 1; // every 5 minutes
 
   int _tickCount = 0;
 

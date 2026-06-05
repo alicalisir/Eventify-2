@@ -66,6 +66,52 @@ def _radius_of_gyration(lats: np.ndarray, lons: np.ndarray) -> float:
     return float(np.sqrt(np.mean(d * d)))
 
 
+def _movement_state_from_speed(speed_mps: float) -> str:
+    if speed_mps < 0.5:  return "stationary"
+    if speed_mps < 2.0:  return "walking"
+    if speed_mps < 5.0:  return "cycling"
+    if speed_mps < 20.0: return "transit"
+    return "vehicle"
+
+
+def _enrich_gps_with_derived_speed(gps_df: pd.DataFrame) -> pd.DataFrame:
+    """When device reports speed_mps == 0 for all pings, derive speed from
+    consecutive GPS coordinates. Skips gaps > 15 minutes to avoid false highs.
+    Also re-derives movement_state when it is uniformly 'stationary'."""
+    if gps_df.empty or len(gps_df) < 2:
+        return gps_df
+
+    # Only enrich when device speed is effectively zero
+    if "speed_mps" in gps_df.columns and float(gps_df["speed_mps"].max()) >= 0.5:
+        return gps_df
+
+    df = gps_df.copy()
+    df["_ts"] = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
+    df = df.sort_values("_ts").reset_index(drop=True)
+
+    derived = [0.0]
+    for i in range(1, len(df)):
+        dt_s = (df.at[i, "_ts"] - df.at[i - 1, "_ts"]).total_seconds()
+        # Ignore gaps > 15 min — position jump doesn't imply motion
+        if dt_s <= 0 or dt_s > 900:
+            derived.append(0.0)
+            continue
+        dist_m = _haversine_m(
+            float(df.at[i - 1, "latitude"]), float(df.at[i - 1, "longitude"]),
+            float(df.at[i, "latitude"]),     float(df.at[i, "longitude"]),
+        )
+        derived.append(min(dist_m / dt_s, 50.0))  # cap at 180 km/h
+
+    df["speed_mps"] = derived
+    df = df.drop(columns=["_ts"])
+
+    # Re-derive movement_state when uniformly stationary
+    if "movement_state" not in df.columns or (df["movement_state"] == "stationary").all():
+        df["movement_state"] = df["speed_mps"].apply(_movement_state_from_speed)
+
+    return df
+
+
 # ============================================================================
 # 1. PER-USER EXTRACTOR
 # ============================================================================
@@ -80,6 +126,10 @@ def extract_user_features(
     """Compute the full feature dict for one user given their event slices."""
 
     feat = {"user_id": user_id}
+
+    # Enrich GPS with derived speed/movement when device reports zero velocity
+    if not gps_user.empty:
+        gps_user = _enrich_gps_with_derived_speed(gps_user)
 
     # ---------------------------------------------------- app/session feats
     if not apps_user.empty:

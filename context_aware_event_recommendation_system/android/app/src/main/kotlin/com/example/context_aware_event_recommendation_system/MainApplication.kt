@@ -4,14 +4,22 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import java.util.concurrent.TimeUnit
 
 class MainApplication : Application() {
     override fun onCreate() {
         super.onCreate()
+        createNotificationChannels()
+        scheduleAppUsageWorker()
+    }
+
+    private fun createNotificationChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val nm = getSystemService(NotificationManager::class.java)
 
-            // ScreenEventService channel
             nm?.createNotificationChannel(
                 NotificationChannel(
                     "caers_tracking",
@@ -23,7 +31,6 @@ class MainApplication : Application() {
                 }
             )
 
-            // flutter_background_service channel
             nm?.createNotificationChannel(
                 NotificationChannel(
                     "caers_bg_service",
@@ -35,5 +42,15 @@ class MainApplication : Application() {
                 }
             )
         }
+    }
+
+    private fun scheduleAppUsageWorker() {
+        val request = PeriodicWorkRequestBuilder<AppUsageWorker>(15, TimeUnit.MINUTES)
+            .build()
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            "app_usage_collection",
+            ExistingPeriodicWorkPolicy.KEEP,
+            request
+        )
     }
 }

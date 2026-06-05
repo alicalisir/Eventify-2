@@ -3,13 +3,12 @@ package com.example.context_aware_event_recommendation_system
 import android.app.*
 import android.content.*
 import android.os.Build
-import android.os.Handler
 import android.os.IBinder
-import android.os.Looper
 import androidx.core.app.NotificationCompat
 import org.json.JSONArray
 import org.json.JSONObject
-import java.time.Instant
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 class ScreenEventService : Service() {
 
@@ -21,14 +20,6 @@ class ScreenEventService : Service() {
         // via SharedPreferences.getInstance().getString('screen_events_buffer')
         private const val FLUTTER_PREFS = "FlutterSharedPreferences"
         private const val FLUTTER_KEY   = "flutter.screen_events_buffer"
-    }
-
-    private val handler = Handler(Looper.getMainLooper())
-    private val appUsageRunnable = object : Runnable {
-        override fun run() {
-            AppUsageCollector.collectAndBuffer(applicationContext)
-            handler.postDelayed(this, 5 * 60 * 1000L)
-        }
     }
 
     private val screenReceiver = object : BroadcastReceiver() {
@@ -58,16 +49,14 @@ class ScreenEventService : Service() {
         }
         registerReceiver(screenReceiver, filter)
 
-        // Immediate first collection, then every 60 min
+        // Initial collection on service start; periodic collection is handled by AppUsageWorker (WorkManager)
         AppUsageCollector.collectAndBuffer(applicationContext)
-        handler.postDelayed(appUsageRunnable, 5 * 60 * 1000L)
 
         return START_STICKY
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        handler.removeCallbacks(appUsageRunnable)
         runCatching { unregisterReceiver(screenReceiver) }
         stopForeground(true)
     }
@@ -79,7 +68,7 @@ class ScreenEventService : Service() {
         val arr = JSONArray(prefs.getString(FLUTTER_KEY, "[]") ?: "[]")
         arr.put(JSONObject().apply {
             put("event_type", eventType)
-            put("timestamp", Instant.now().toString())
+            put("timestamp", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
         })
         prefs.edit().putString(FLUTTER_KEY, arr.toString()).apply()
     }

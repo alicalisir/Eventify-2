@@ -1,4 +1,5 @@
 import 'package:app_usage/app_usage.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../utils/app_logger.dart';
@@ -57,6 +58,9 @@ class AppUsageService {
     'com.soundcloud.android': 'music',
     'com.deezer.android': 'music',
     // Gaming
+    'io.coldplay.snake': 'gaming',       // Snake.io
+    'com.bestcasual.snake': 'gaming',    // Snake.io (alternatif)
+    'com.playertwo.snake': 'gaming',     // Snake.io (alternatif)
     'com.mobile.legends': 'gaming',
     'com.tencent.ig': 'gaming',          // PUBG Mobile
     'com.tencent.tmgp.pubgmhd': 'gaming',
@@ -78,6 +82,7 @@ class AppUsageService {
     'com.todoist.android.Todoist': 'productivity',
     'com.anydo': 'productivity',
     // Browser
+    'com.android.vending': 'shopping',  // Google Play Store
     'com.android.chrome': 'browser',
     'org.mozilla.firefox': 'browser',
     'com.opera.browser': 'browser',
@@ -151,7 +156,7 @@ class AppUsageService {
     if (direct != null) return direct;
 
     final lower = pkg.toLowerCase();
-    if (lower.contains('game') || lower.contains('puzzle')) return 'gaming';
+    if (lower.contains('game') || lower.contains('puzzle') || lower.contains('snake') || lower.contains('clash') || lower.contains('craft')) return 'gaming';
     if (lower.contains('news') || lower.contains('haber')) return 'news';
     if (lower.contains('music') || lower.contains('muzik')) return 'music';
     if (lower.contains('shop') || lower.contains('market')) return 'shopping';
@@ -159,7 +164,39 @@ class AppUsageService {
     if (lower.contains('bank') || lower.contains('pay')) return 'finance';
     if (lower.contains('edu') || lower.contains('learn')) return 'education';
     if (lower.contains('photo') || lower.contains('camera')) return 'photo';
-    return null; // unknown — skip
+    return null;
+  }
+
+  // Android PackageManager'dan uygulama kategorisini okur.
+  static const _appInfoChannel = MethodChannel('com.example.caers/app_info');
+  static final _androidCatCache = <String, String>{};
+
+  static Future<String> _categoryFromSystem(String packageName) async {
+    if (_androidCatCache.containsKey(packageName)) {
+      return _androidCatCache[packageName]!;
+    }
+    try {
+      final categoryInt = await _appInfoChannel.invokeMethod<int>(
+        'getAppCategory',
+        {'packageName': packageName},
+      ) ?? -1;
+      // Android ApplicationInfo.category sabitleri
+      final result = switch (categoryInt) {
+        0 => 'gaming',       // CATEGORY_GAME
+        1 => 'music',        // CATEGORY_AUDIO
+        2 => 'video',        // CATEGORY_VIDEO
+        3 => 'photo',        // CATEGORY_IMAGE
+        4 => 'social',       // CATEGORY_SOCIAL
+        5 => 'news',         // CATEGORY_NEWS
+        6 => 'navigation',   // CATEGORY_MAPS
+        7 => 'productivity', // CATEGORY_PRODUCTIVITY
+        _ => 'other',
+      };
+      _androidCatCache[packageName] = result;
+      return result;
+    } catch (_) {
+      return 'other';
+    }
   }
 
   // ───────────────────────────────────────────────── public API ─────────────
@@ -183,10 +220,10 @@ class AppUsageService {
 
       for (final info in usage) {
         final durationMin = info.usage.inSeconds / 60.0;
-        if (durationMin < 0.5) continue;
+        if (durationMin < 0.1) continue; // ~6 saniyeden kısa oturumları atla
 
-        final category = _category(info.packageName);
-        if (category == null) continue;
+        final hardcoded = _category(info.packageName);
+        final category = hardcoded ?? await _categoryFromSystem(info.packageName);
 
         sessions.add({
           'user_id': userId,
