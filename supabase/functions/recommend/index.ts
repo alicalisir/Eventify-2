@@ -1,12 +1,14 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import type { RecommendRequest, NearbyEvent, PersonaJson, RecommendResponse } from "./types.ts";
+import type { RecommendRequest, NearbyEvent, PersonaJson, RecommendResponse, Suggestion } from "./types.ts";
 import { SYSTEM_PROMPT, buildUserMessage } from "./prompt.ts";
-import { callSelfHost, isSelfHostHealthy } from "./llm_self_host.ts";
-import { callClaude } from "./llm_claude.ts";
-import { applyHardConstraints } from "./parser.ts";
+import { callSelfHost, callSelfHostStream, isSelfHostHealthy } from "./llm_self_host.ts";
+import { callClaude, callClaudeStream } from "./llm_claude.ts";
+import { applyHardConstraints, StreamingJsonParser } from "./parser.ts";
 import { buildCacheKeySync } from "./cache.ts";
+import { logLangfuse } from "./langfuse.ts";
 
 const SELF_HOST_URL = Deno.env.get("MISTRAL_URL") ?? "";
+const SELF_HOST_MODEL = Deno.env.get("SELF_HOST_MODEL") ?? "mistral-nemo:12b-instruct-q4_k_m";
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
 const ALLOW_CLOUD_FALLBACK = Deno.env.get("ALLOW_CLOUD_FALLBACK") === "true";
 const CACHE_TTL_MINUTES = 30;
@@ -14,9 +16,25 @@ const CACHE_TTL_MINUTES = 30;
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, accept",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
+
+/** Maps onboarding interest labels → event DB categories used in nearby_events RPC. */
+function normalizeInterest(label: string): string {
+  const map: Record<string, string> = {
+    "music & concerts": "music",
+    "sports & activity": "sports",
+    "arts & culture": "culture",
+    "food & drink": "food",
+    "nature & outdoors": "outdoor",
+    "education & workshops": "workshop",
+    "family & kids": "family",
+    "entertainment & nightlife": "music",
+    "calm & solo": "culture",
+  };
+  return map[label.toLowerCase()] ?? label.toLowerCase();
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -34,13 +52,28 @@ Deno.serve(async (req) => {
   }
 });
 
-async function handleRequest(req: Request): Promise<Response> {
+// ─── Request setup ────────────────────────────────────────────────────────────
 
-  // --- Auth ---
+interface Setup {
+  supabase: ReturnType<typeof createClient>;
+  userId: string;
+  body: RecommendRequest;
+  enrichedBody: RecommendRequest;
+  persona: PersonaJson | null;
+  cacheKey: string;
+  userMessage: string;
+  dismissedTitles: string[];
+  selfHostAvailable: boolean;
+  llmProvider: string;
+  start: number;
+}
+
+async function handleRequest(req: Request): Promise<Response> {
+  const acceptsSse = req.headers.get("Accept")?.includes("text/event-stream") ?? false;
+
+  // ── Auth ──────────────────────────────────────────────────────────────────
   const authHeader = req.headers.get("Authorization");
-  if (!authHeader) {
-    return errorResponse("Missing Authorization header", 401);
-  }
+  if (!authHeader) return errorResponse("Missing Authorization header", 401);
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -49,24 +82,21 @@ async function handleRequest(req: Request): Promise<Response> {
   );
 
   const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) {
-    return errorResponse("Unauthorized", 401);
-  }
+  if (authError || !user) return errorResponse("Unauthorized", 401);
   const userId = user.id;
 
-  // --- Parse body ---
+  // ── Parse body ────────────────────────────────────────────────────────────
   let body: RecommendRequest;
   try {
     body = await req.json();
   } catch {
     return errorResponse("Invalid JSON body", 400);
   }
-
   if (!body.lat || !body.lng || !body.city) {
     return errorResponse("lat, lng, city are required", 400);
   }
 
-  // --- Load persona ---
+  // ── Persona ───────────────────────────────────────────────────────────────
   const { data: userData } = await supabase
     .from("users")
     .select("persona_json, persona_updated_at, interests")
@@ -75,9 +105,10 @@ async function handleRequest(req: Request): Promise<Response> {
 
   const persona: PersonaJson | null = userData?.persona_json ?? null;
   const personaVersion = persona?.model_version ?? "no-persona";
-  const userInterests: string[] = userData?.interests ?? body.user_interests ?? [];
+  const rawInterests: string[] = userData?.interests ?? body.user_interests ?? [];
+  const userInterests = rawInterests.map(normalizeInterest);
 
-  // --- Cache check ---
+  // ── Cache check ───────────────────────────────────────────────────────────
   const cacheKey = buildCacheKeySync(userId, body, personaVersion);
   const { data: cached } = await supabase
     .from("cached_suggestions")
@@ -88,25 +119,44 @@ async function handleRequest(req: Request): Promise<Response> {
 
   if (cached) {
     console.log(`[recommend] cache HIT key=${cacheKey}`);
-    const response: RecommendResponse = {
-      suggestions: cached.payload.suggestions,
-      llm_provider: cached.llm_provider,
+    const cacheData = {
+      suggestions: cached.payload.suggestions as Suggestion[],
+      llm_provider: cached.llm_provider as string,
+    };
+    await logLangfuse({
+      traceId: crypto.randomUUID(),
+      userId,
+      llmProvider: cacheData.llm_provider,
+      model: cacheData.llm_provider,
+      systemPrompt: "",
+      userMessage: "",
+      suggestions: cacheData.suggestions,
+      promptTokens: 0,
+      completionTokens: 0,
+      latencyMs: 0,
+      cacheHit: true,
+      city: body.city,
+      weatherCondition: body.weather_condition,
+      hour: body.hour,
+    });
+    if (acceptsSse) return sseFromCache(cacheData);
+    return jsonResponse({
+      suggestions: cacheData.suggestions,
+      llm_provider: cacheData.llm_provider,
       cache_hit: true,
       latency_ms: 0,
-    };
-    return jsonResponse(response);
+    } as RecommendResponse);
   }
 
-  // --- Load nearby events ---
+  // ── Nearby events ─────────────────────────────────────────────────────────
   const { data: events } = await supabase.rpc("nearby_events", {
     p_city: body.city,
     p_interests: userInterests,
     p_limit: 15,
   }) as { data: NearbyEvent[] | null };
-
   const nearbyEvents: NearbyEvent[] = events ?? [];
 
-  // --- Recent dismissed titles + liked categories ---
+  // ── Dismissed / liked (parallel) ──────────────────────────────────────────
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
 
@@ -126,13 +176,17 @@ async function handleRequest(req: Request): Promise<Response> {
   ]);
 
   const dismissedTitles: string[] = (dismissedRows ?? [])
-    .map((r: { suggestion_snapshot: Record<string, unknown> }) => String(r.suggestion_snapshot?.title ?? ""))
+    .map((r: { suggestion_snapshot: Record<string, unknown> }) =>
+      String(r.suggestion_snapshot?.title ?? "")
+    )
     .filter(Boolean);
 
   const likedCategories: string[] = [
     ...new Set(
       (likedRows ?? [])
-        .map((r: { suggestion_snapshot: Record<string, unknown> }) => String(r.suggestion_snapshot?.category ?? ""))
+        .map((r: { suggestion_snapshot: Record<string, unknown> }) =>
+          String(r.suggestion_snapshot?.category ?? "")
+        )
         .filter(Boolean),
     ),
   ];
@@ -144,106 +198,331 @@ async function handleRequest(req: Request): Promise<Response> {
     recent_liked_categories: likedCategories,
   };
 
-  // --- Build prompt ---
+  // ── Rate limit check ─────────────────────────────────────────────────────
+  // Each LLM call inserts 3 "view" rows into user_feedback (one per suggestion).
+  // 10 calls/hr × 3 = 30 rows threshold.
+  const oneHourAgo = new Date(Date.now() - 3_600_000).toISOString();
+  const { count: viewCount } = await supabase
+    .from("user_feedback")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("action", "view")
+    .gt("created_at", oneHourAgo);
+
+  if ((viewCount ?? 0) >= 30) {
+    console.warn(`[recommend] rate limited userId=${userId} views=${viewCount}/hr`);
+    const { data: staleCache } = await supabase
+      .from("cached_suggestions")
+      .select("payload, llm_provider")
+      .eq("user_id", userId)
+      .order("expires_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (staleCache) {
+      const staleSuggestions = staleCache.payload.suggestions as Suggestion[];
+      const staleData = { suggestions: staleSuggestions, llm_provider: staleCache.llm_provider as string };
+      if (acceptsSse) return sseFromCache(staleData);
+      return jsonResponse({ ...staleData, cache_hit: true, rate_limited: true, latency_ms: 0 });
+    }
+    return errorResponse("Rate limit exceeded: max 10 LLM calls per hour", 429);
+  }
+
+  // ── Build prompt ──────────────────────────────────────────────────────────
   const nearbyPlaces = body.nearby_places ?? [];
   const userMessage = buildUserMessage(enrichedBody, persona, nearbyEvents, nearbyPlaces);
 
-  // --- LLM call ---
-  let llmProvider = "unknown";
-  let result: Awaited<ReturnType<typeof callSelfHost>>;
-
+  // ── Provider selection ────────────────────────────────────────────────────
   const selfHostAvailable = SELF_HOST_URL
     ? await isSelfHostHealthy(SELF_HOST_URL)
     : false;
 
+  let llmProvider: string;
   if (selfHostAvailable) {
+    llmProvider = SELF_HOST_MODEL;
+  } else if (ALLOW_CLOUD_FALLBACK && ANTHROPIC_API_KEY) {
+    llmProvider = "claude-sonnet-4-6";
+  } else {
+    return errorResponse("LLM unavailable", 503);
+  }
+
+  const setup: Setup = {
+    supabase,
+    userId,
+    body,
+    enrichedBody,
+    persona,
+    cacheKey,
+    userMessage,
+    dismissedTitles,
+    selfHostAvailable,
+    llmProvider,
+    start: Date.now(),
+  };
+
+  // ── Branch ────────────────────────────────────────────────────────────────
+  return acceptsSse ? buildSseStream(setup) : buildJsonResponse(setup);
+}
+
+// ─── JSON path (original behaviour) ──────────────────────────────────────────
+
+async function buildJsonResponse(s: Setup): Promise<Response> {
+  let result: Awaited<ReturnType<typeof callSelfHost>>;
+
+  if (s.selfHostAvailable) {
     try {
-      console.log("[recommend] calling self-host LLM");
-      result = await callSelfHost(SELF_HOST_URL, SYSTEM_PROMPT, userMessage);
-      llmProvider = "mistral-nemo-12b";
+      console.log("[recommend] calling self-host LLM (JSON)");
+      result = await callSelfHost(SELF_HOST_URL, SYSTEM_PROMPT, s.userMessage);
     } catch (e) {
       console.error("[recommend] self-host failed:", e);
       if (!ALLOW_CLOUD_FALLBACK || !ANTHROPIC_API_KEY) {
         return errorResponse("LLM unavailable", 503);
       }
-      console.log("[recommend] falling back to Claude");
-      result = await callClaude(ANTHROPIC_API_KEY, SYSTEM_PROMPT, userMessage);
-      llmProvider = "claude-sonnet-4-6";
+      console.log("[recommend] falling back to Claude (JSON)");
+      result = await callClaude(ANTHROPIC_API_KEY, SYSTEM_PROMPT, s.userMessage);
+      s.llmProvider = "claude-sonnet-4-6";
     }
-  } else if (ALLOW_CLOUD_FALLBACK && ANTHROPIC_API_KEY) {
-    console.log("[recommend] self-host offline, using Claude fallback");
-    result = await callClaude(ANTHROPIC_API_KEY, SYSTEM_PROMPT, userMessage);
-    llmProvider = "claude-sonnet-4-6";
   } else {
-    return errorResponse("Self-host LLM offline and cloud fallback disabled", 503);
+    console.log("[recommend] self-host offline, using Claude (JSON)");
+    result = await callClaude(ANTHROPIC_API_KEY, SYSTEM_PROMPT, s.userMessage);
   }
 
-  // --- Hard constraints ---
   const filtered = applyHardConstraints(
     result.suggestions,
-    body.weather_condition,
-    body.hour,
-    dismissedTitles,
+    s.body.weather_condition,
+    s.body.hour,
+    s.dismissedTitles,
   );
-
   const suggestions = filtered.slice(0, 3);
 
-  // --- Write cache ---
-  const expiresAt = new Date(Date.now() + CACHE_TTL_MINUTES * 60 * 1000).toISOString();
-  await supabase.from("cached_suggestions").upsert({
-    cache_key: cacheKey,
-    user_id: userId,
-    payload: { suggestions },
-    llm_provider: llmProvider,
-    prompt_tokens: result.tokens.prompt,
-    completion_tokens: result.tokens.completion,
+  await writeCacheAndFeedback(s, suggestions, result.tokens, result.latency_ms);
+
+  await logLangfuse({
+    traceId: crypto.randomUUID(),
+    userId: s.userId,
+    llmProvider: s.llmProvider,
+    model: s.llmProvider,
+    systemPrompt: SYSTEM_PROMPT,
+    userMessage: s.userMessage,
+    suggestions,
+    promptTokens: result.tokens.prompt,
+    completionTokens: result.tokens.completion,
+    latencyMs: result.latency_ms,
+    cacheHit: false,
+    city: s.body.city,
+    weatherCondition: s.body.weather_condition,
+    hour: s.body.hour,
+  });
+
+  console.log(
+    `[recommend] JSON done provider=${s.llmProvider} suggestions=${suggestions.length} latency=${result.latency_ms}ms`,
+  );
+
+  return jsonResponse({
+    suggestions,
+    llm_provider: s.llmProvider,
+    cache_hit: false,
     latency_ms: result.latency_ms,
+  } as RecommendResponse);
+}
+
+// ─── SSE path ─────────────────────────────────────────────────────────────────
+
+function sseFromCache(cached: { suggestions: Suggestion[]; llm_provider: string }): Response {
+  const enc = new TextEncoder();
+  const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
+  const writer = writable.getWriter();
+
+  (async () => {
+    try {
+      for (let i = 0; i < cached.suggestions.length; i++) {
+        await writer.write(enc.encode(sseEvent("suggestion", {
+          suggestion: cached.suggestions[i],
+          index: i,
+          llm_provider: cached.llm_provider,
+          cache_hit: true,
+        })));
+      }
+      await writer.write(enc.encode(sseEvent("done", {
+        latency_ms: 0,
+        cache_hit: true,
+        total: cached.suggestions.length,
+      })));
+    } finally {
+      writer.close();
+    }
+  })();
+
+  return new Response(readable, { headers: sseHeaders() });
+}
+
+function buildSseStream(s: Setup): Response {
+  const enc = new TextEncoder();
+  const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
+  const writer = writable.getWriter();
+
+  (async () => {
+    const parser = new StreamingJsonParser();
+    let sentCount = 0;
+    const llmStart = Date.now();
+    let latency_ms = 0;
+
+    try {
+      const tokenStream: AsyncGenerator<string> = s.selfHostAvailable
+        ? callSelfHostStream(SELF_HOST_URL, SYSTEM_PROMPT, s.userMessage)
+        : callClaudeStream(ANTHROPIC_API_KEY, SYSTEM_PROMPT, s.userMessage);
+
+      console.log(`[recommend] SSE streaming provider=${s.llmProvider}`);
+
+      for await (const token of tokenStream) {
+        const newSuggestions = parser.feed(token);
+
+        for (const suggestion of newSuggestions) {
+          const rainy = ["rain", "snow", "drizzle", "thunderstorm"].some((w) =>
+            s.body.weather_condition.toLowerCase().includes(w)
+          );
+          if (rainy && suggestion.category === "outdoor") continue;
+          if (s.dismissedTitles.some(
+            (d) => d.toLowerCase() === suggestion.title.toLowerCase(),
+          )) continue;
+
+          await writer.write(enc.encode(sseEvent("suggestion", {
+            suggestion,
+            index: sentCount++,
+            llm_provider: s.llmProvider,
+            cache_hit: false,
+          })));
+        }
+      }
+
+      latency_ms = Date.now() - llmStart;
+
+      if (sentCount === 0) {
+        console.warn(`[recommend] SSE sentCount=0 — parser buf preview: ${parser.bufPreview}`);
+      }
+
+      const approxTokens = Math.round(parser.suggestions.reduce(
+        (acc, sg) => acc + sg.title.length + sg.rationale.length,
+        0,
+      ) / 4);
+
+      await writeCacheAndFeedback(
+        s,
+        parser.suggestions.slice(0, 3),
+        { prompt: 0, completion: approxTokens },
+        latency_ms,
+      );
+
+      // done event — may fail if client already disconnected after receiving suggestions
+      try {
+        await writer.write(enc.encode(sseEvent("done", {
+          latency_ms,
+          llm_provider: s.llmProvider,
+          total: sentCount,
+        })));
+      } catch { /* client disconnected before done — that's fine */ }
+
+      console.log(
+        `[recommend] SSE done provider=${s.llmProvider} sent=${sentCount} latency=${latency_ms}ms`,
+      );
+    } catch (e) {
+      console.error("[recommend] SSE error:", e);
+      latency_ms = latency_ms || Date.now() - llmStart;
+      try {
+        await writer.write(enc.encode(sseEvent("error", { error: String(e) })));
+      } catch { /* writer may already be closed */ }
+    } finally {
+      // Always log to Langfuse regardless of whether client disconnected mid-stream
+      const approxTokens = Math.round(parser.suggestions.reduce(
+        (acc, sg) => acc + sg.title.length + sg.rationale.length,
+        0,
+      ) / 4);
+      await logLangfuse({
+        traceId: crypto.randomUUID(),
+        userId: s.userId,
+        llmProvider: s.llmProvider,
+        model: s.llmProvider,
+        systemPrompt: SYSTEM_PROMPT,
+        userMessage: s.userMessage,
+        suggestions: parser.suggestions.slice(0, 3),
+        promptTokens: 0,
+        completionTokens: approxTokens,
+        latencyMs: latency_ms,
+        cacheHit: false,
+        city: s.body.city,
+        weatherCondition: s.body.weather_condition,
+        hour: s.body.hour,
+      });
+      writer.close().catch(() => {});
+    }
+  })();
+
+  return new Response(readable, { headers: sseHeaders() });
+}
+
+// ─── Shared helpers ───────────────────────────────────────────────────────────
+
+async function writeCacheAndFeedback(
+  s: Setup,
+  suggestions: Suggestion[],
+  tokens: { prompt: number; completion: number },
+  latency_ms: number,
+) {
+  const expiresAt = new Date(
+    Date.now() + CACHE_TTL_MINUTES * 60 * 1000,
+  ).toISOString();
+
+  await s.supabase.from("cached_suggestions").upsert({
+    cache_key: s.cacheKey,
+    user_id: s.userId,
+    payload: { suggestions },
+    llm_provider: s.llmProvider,
+    prompt_tokens: tokens.prompt,
+    completion_tokens: tokens.completion,
+    latency_ms,
     expires_at: expiresAt,
   });
 
-  // --- Write feedback log (view event) ---
   if (suggestions.length > 0) {
-    const feedbackRows = suggestions.map((s) => ({
-      user_id: userId,
-      suggestion_id: s.id,
-      event_id: s.event_id ?? null,
+    const feedbackRows = suggestions.map((sg) => ({
+      user_id: s.userId,
+      suggestion_id: sg.id,
+      event_id: sg.event_id ?? null,
       action: "view",
-      suggestion_snapshot: s,
+      suggestion_snapshot: sg,
       context_snapshot: {
-        lat: Math.round(body.lat * 1000) / 1000,
-        lng: Math.round(body.lng * 1000) / 1000,
-        city: body.city,
-        weather: body.weather_condition,
-        temp_c: body.weather_temp_c,
-        hour: body.hour,
-        dow: body.day_of_week,
-        motion: body.motion_state,
+        lat: Math.round(s.body.lat * 1000) / 1000,
+        lng: Math.round(s.body.lng * 1000) / 1000,
+        city: s.body.city,
+        weather: s.body.weather_condition,
+        temp_c: s.body.weather_temp_c,
+        hour: s.body.hour,
+        dow: s.body.day_of_week,
+        motion: s.body.motion_state,
       },
-      llm_provider: llmProvider,
+      llm_provider: s.llmProvider,
     }));
-    await supabase.from("user_feedback").insert(feedbackRows);
+    await s.supabase.from("user_feedback").insert(feedbackRows);
   }
+}
 
-  console.log(
-    `[recommend] done provider=${llmProvider} suggestions=${suggestions.length} latency=${result.latency_ms}ms`,
-  );
+function sseEvent(event: string, data: unknown): string {
+  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+}
 
-  const response: RecommendResponse = {
-    suggestions,
-    llm_provider: llmProvider,
-    cache_hit: false,
-    latency_ms: result.latency_ms,
+function sseHeaders(): Record<string, string> {
+  return {
+    ...CORS_HEADERS,
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive",
   };
-  return jsonResponse(response);
 }
 
 function jsonResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
     status,
-    headers: {
-      ...CORS_HEADERS,
-      "Content-Type": "application/json",
-    },
+    headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
   });
 }
 

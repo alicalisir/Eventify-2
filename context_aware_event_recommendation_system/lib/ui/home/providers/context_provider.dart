@@ -3,18 +3,17 @@ import 'package:context_aware_event_recommendation_system/di/providers.dart';
 import 'package:context_aware_event_recommendation_system/domain/models/context_state.dart';
 import 'package:context_aware_event_recommendation_system/domain/models/persona_model.dart';
 import 'package:context_aware_event_recommendation_system/domain/models/suggestion_model.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 export 'package:context_aware_event_recommendation_system/di/providers.dart'
-    show contextRepositoryProvider, suggestionRepositoryProvider;
+    show
+        contextRepositoryProvider,
+        suggestionRepositoryProvider,
+        suggestionStreamProvider,
+        SuggestionStreamNotifier;
 
 part 'context_provider.g.dart';
-
-/// Raw suggestions from the repository (TTL-cached, backed by ContextService).
-@riverpod
-Future<List<SuggestionModel>> suggestion(Ref ref) {
-  return ref.watch(suggestionRepositoryProvider).getSuggestions();
-}
 
 /// Current ambient context (greeting, location, weather, activity).
 @riverpod
@@ -48,10 +47,12 @@ class DismissedSuggestions extends _$DismissedSuggestions {
   }
 }
 
-/// Suggestions visible to the user — raw list minus dismissed.
-@riverpod
-Future<List<SuggestionModel>> visibleSuggestions(Ref ref) async {
-  final all = await ref.watch(suggestionProvider.future);
-  final dismissed = await ref.watch(dismissedSuggestionsProvider.future);
+/// Visible suggestions = stream results minus dismissed IDs.
+/// Plain synchronous Provider — no loading flicker when new suggestions arrive.
+final visibleSuggestionsProvider = Provider<List<SuggestionModel>>((ref) {
+  final allAsync = ref.watch(suggestionStreamProvider);
+  final dismissedAsync = ref.watch(dismissedSuggestionsProvider);
+  final all = allAsync.value ?? const [];
+  final dismissed = dismissedAsync.value ?? const <String>{};
   return all.where((s) => !dismissed.contains(s.id)).toList();
-}
+});

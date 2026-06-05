@@ -19,6 +19,7 @@ import '../data/services/location_service.dart';
 import '../data/services/places_service.dart';
 import '../data/services/screen_event_service.dart';
 import '../data/services/weather_service.dart';
+import '../domain/models/suggestion_model.dart';
 
 /// Bootstrapped in main.dart via ProviderScope.overrides before runApp.
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
@@ -112,6 +113,8 @@ final llmServiceProvider = Provider<LlmService>((ref) {
     ref.watch(locationRepositoryProvider),
     ref.watch(weatherServiceProvider),
     ref.watch(placesRepositoryProvider),
+    supabaseUrl: dotenv.env['SUPABASE_URL'] ?? '',
+    supabaseAnonKey: dotenv.env['SUPABASE_ANON_KEY'] ?? '',
   );
 });
 
@@ -123,3 +126,37 @@ final suggestionRepositoryProvider = Provider<SuggestionRepository>((ref) {
     ref.watch(llmServiceProvider),
   );
 });
+
+// ─── Streaming suggestion providers ──────────────────────────────────────────
+
+/// Progressive suggestion loader — starts as AsyncLoading, grows as each
+/// suggestion arrives via SSE, completing when the stream closes.
+final suggestionStreamProvider =
+    AsyncNotifierProvider<SuggestionStreamNotifier, List<SuggestionModel>>(
+  SuggestionStreamNotifier.new,
+);
+
+class SuggestionStreamNotifier
+    extends AsyncNotifier<List<SuggestionModel>> {
+  @override
+  Future<List<SuggestionModel>> build() async {
+    final accumulated = <SuggestionModel>[];
+
+    await for (final s
+        in ref.read(suggestionRepositoryProvider).getSuggestionsStream()) {
+      accumulated.add(s);
+      // Progressively expose each card as it arrives
+      state = AsyncData(List.unmodifiable(accumulated));
+    }
+
+    return accumulated;
+  }
+
+  Future<void> refresh() async {
+    ref.invalidateSelf();
+    await future;
+  }
+}
+
+// visibleSuggestionsProvider is defined in context_provider.dart
+// (it needs dismissedSuggestionsProvider which lives there).

@@ -509,3 +509,211 @@ lib/ui/suggestion/widgets/suggestion_actions_bar.dart
 - **Throughput:** 3080'de 12B Q4 yavaş kalırsa → Llama 3.3 8B'ye geç (~50% daha hızlı).
 - **Demo kullanıcı sayısı:** Jüri için n=1 mi n=3 mü? Yük testi gerekli mi?
 - **Faz 1 önce mi sonra mı:** app_sessions/screen_events olmadan ML sinyalleri eksik kalır. Tezde "Faz 1 V2'ye ertelendi" notu yeterli mi?
+
+---
+
+## Sprint V2 — Branch: `feature/faz3-llm-pipeline-v2`
+
+**Tarih:** 2026-05-25
+**Durum:** Aktif geliştirme — Edge Function v6 deployed, canlı.
+
+Bu sprint Faz 3a'nın üzerine inşa edilmiştir. Tüm çalışmalar `feature/faz3-llm-pipeline-v2` branch'inde, commit `206dbd3` ile tamamlanmıştır.
+
+---
+
+### Sprint V2 — Tamamlananlar
+
+#### 1. Google Places API → LLM Pipeline Entegrasyonu
+
+**Problem:** `PlacesRepository` ve `LlmService` birbirinden kopuktu; Edge Function yakındaki mekanları göremiyordu.
+
+**Yapılanlar:**
+
+*Flutter tarafı (`lib/data/services/llm_service.dart`):*
+- `PlacesRepository` 4. constructor bağımlılığı olarak eklendi
+- Weather ve places fetching paralel hale getirildi (`Future.wait` benzeri pattern)
+- Nearby places serialize edilerek Edge Function request body'sine `nearby_places` field'ı olarak eklendi
+- `lib/di/providers.dart`: `llmServiceProvider` → `placesRepositoryProvider` 4. argüman olarak geçiliyor
+
+*Edge Function tarafı:*
+- `supabase/functions/recommend/types.ts`:
+  - `NearbyPlace` interface eklendi (`id, name, types, distance_m, address?, rating?, price_level?`)
+  - `RecommendRequest`'e `nearby_places?: NearbyPlace[]` eklendi
+- `supabase/functions/recommend/index.ts`:
+  - `body.nearby_places ?? []` alınıp `buildUserMessage()`'a geçiliyor
+  - Liked categories fetching `Promise.all` ile dismissed titles ile paralel hale getirildi
+- `supabase/functions/recommend/prompt.ts`:
+  - `buildUserMessage()` fonksiyonuna 4. parametre olarak `places: NearbyPlace[]` eklendi
+  - User message template'e `NEARBY PLACES (N):` bloğu eklendi (name, primary type, distance, rating, price_level)
+
+**Sonuç:** LLM artık hem yakın DB etkinliklerini hem de Google Places API'dan gelen gerçek zamanlı yakın mekanları görüyor ve öneri üretirken bu veriyi kullanıyor.
+
+---
+
+#### 2. Tam İngilizce Geçiş
+
+**Karar:** Uygulamanın tek dili İngilizce — Türkçe string kalmayacak.
+
+**Yapılanlar:**
+
+*Edge Function (`supabase/functions/recommend/prompt.ts`):*
+- System prompt: tamamı İngilizce
+- Few-shot örnekler: İngilizce
+- User message template: `"USER CONTEXT:"`, `"NEARBY EVENTS:"`, `"NEARBY PLACES:"`, `"Generate 3 suggestions."` — tamamı İngilizce
+- Day names: `["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]`
+- Persona fallback label: `"New user — no persona"`
+
+*Flutter (`lib/ui/onboarding/widgets/onboarding_screen.dart`):*
+- Consent sayfası metni İngilizce
+- Interest kategorileri İngilizce: `Sports & Activity | Food & Drink | Arts & Culture | Nature & Outdoors | Entertainment & Nightlife | Education & Workshops | Music & Concerts | Family & Kids | Calm & Solo`
+- CTA butonlar: "Continue", "Get Started"
+- Validation mesajı: "Select at least 3 interests"
+
+*Flutter (`lib/ui/home/widgets/recommendation_card.dart`):*
+- Tooltip'ler: "Like" / "Liked" / "Dismiss"
+
+---
+
+#### 3. Kocaeli Seed Verisi
+
+**Problem:** Ankara seed verisi kullanılıyordu; projenin hedef şehri Kocaeli.
+
+**Yapılanlar (`supabase/seed/events_istanbul_ankara.sql`):**
+- Ankara etkinlikleri (14 satır) Supabase'den silindi
+- Kocaeli etkinlikleri üretildi ve Supabase'e yüklendi (14 satır)
+- Tüm 42 seed etkinliği (28 İstanbul + 14 Kocaeli) İngilizce olacak şekilde güncellendi
+- Kocaeli mekanları: Seka Park, Sapanca Gölü, Kartepe Kayak Merkezi, Körfez Marina, Kocaeli Müzesi, İzmit Körfezi kıyı yolu, vb.
+
+**Smoke test (`test/places_api_smoke_test.dart`):**
+- Koordinatlar: `lat = 40.7654, lon = 29.9408` (İzmit merkezi)
+- Radius: 1000m → 1500m
+- Yorum: `// Kocaeli (İzmit) coordinates`
+
+---
+
+#### 4. Kritik Bug Düzeltmeleri
+
+**Bug #1 — `SuggestionCategoryX` Yanlış Kategori Adları**
+
+*Dosya:* `lib/domain/models/suggestion_category.dart`
+
+*Problem:* Extension, eski `movement | recharge | learning | social | health` kategorilerini map ediyordu. LLM `music | sports | culture | food | outdoor | workshop | family` çıktısı üretiyor. Tüm kartlar fallback icon (`Icons.auto_awesome`) ve aynı mor gradyan (hue 250) gösteriyordu.
+
+*Düzeltme:*
+```dart
+// Eski (yanlış):
+case 'movement': return Icons.directions_walk_outlined;  // hue 150
+case 'recharge': return Icons.local_cafe_outlined;       // hue 30
+case 'learning': return Icons.menu_book_outlined;        // hue 270
+case 'social':   return Icons.people_outline;            // hue 210
+case 'health':   return Icons.favorite_outline;          // hue 340
+
+// Yeni (doğru — LLM çıktısıyla eşleşiyor):
+case 'music':    return Icons.music_note_outlined;       // hue 280
+case 'sports':   return Icons.directions_run_outlined;   // hue 150
+case 'culture':  return Icons.museum_outlined;           // hue 220
+case 'food':     return Icons.restaurant_outlined;       // hue 30
+case 'outdoor':  return Icons.park_outlined;             // hue 120
+case 'workshop': return Icons.build_outlined;            // hue 45
+case 'family':   return Icons.family_restroom_outlined;  // hue 200
+```
+
+**Bug #2 — Onboarding İlgi Alanı Etiketleri ≠ DB Kategori Slug'ları**
+
+*Dosya:* `supabase/functions/recommend/index.ts`
+
+*Problem:* `nearby_events` RPC'de sıralama `case when category = any(p_interests) then 0 else 1 end` ile yapılıyor. Ancak `p_interests` `"Music & Concerts"` içerirken `category` kolonu `"music"` tutuyor — hiçbir zaman eşleşme olmuyordu, interests-first sıralama hiç çalışmıyordu.
+
+*Düzeltme:* `normalizeInterest()` fonksiyonu eklendi:
+```typescript
+function normalizeInterest(label: string): string {
+  const map: Record<string, string> = {
+    "music & concerts":        "music",
+    "sports & activity":       "sports",
+    "arts & culture":          "culture",
+    "food & drink":            "food",
+    "nature & outdoors":       "outdoor",
+    "education & workshops":   "workshop",
+    "family & kids":           "family",
+    "entertainment & nightlife": "music",
+    "calm & solo":             "culture",
+  };
+  return map[label.toLowerCase()] ?? label.toLowerCase();
+}
+```
+`userInterests` artık RPC'ye geçmeden önce `rawInterests.map(normalizeInterest)` ile normalize ediliyor.
+
+---
+
+### Sprint V2 — Mevcut Sistem Durumu
+
+```
+Flutter App
+  LlmService(supabase, location, weather, places)  ← places entegre
+      ↓ POST /functions/v1/recommend (JWT)
+      body: { lat, lng, city, weather_*, hour, dow, motion,
+              user_interests[], nearby_places[] }   ← places gönderiliyor
+
+Edge Function v6 (ACTIVE, deployed 2026-05-25)
+  normalizeInterest() → userInterests (slug'lar)
+  → nearby_events RPC (interests-first sıralama ÇALIŞIYOR)
+  → buildUserMessage(req, persona, nearbyEvents, nearbyPlaces)
+  → LLM (self-host Mistral / fallback Claude)
+  → parser → hard constraints → cache → response
+
+SuggestionCategoryX
+  music    → Icons.music_note_outlined    (hue 280)
+  sports   → Icons.directions_run_outlined (hue 150)
+  culture  → Icons.museum_outlined        (hue 220)
+  food     → Icons.restaurant_outlined    (hue 30)
+  outdoor  → Icons.park_outlined          (hue 120)
+  workshop → Icons.build_outlined         (hue 45)
+  family   → Icons.family_restroom_outlined (hue 200)
+
+Seed Data
+  28 Istanbul + 14 Kocaeli events (tümü İngilizce)
+  Edge Function URL: /functions/v1/recommend
+```
+
+---
+
+### Sprint V2 — Kalan / Sonraki Adımlar
+
+Aşağıdaki işler Faz 3b ve V2 roadmap'ine göre sıralıdır. Yeni bir chat'te buradan devam edilecek.
+
+#### Faz 3b — Polish (Kısa Vadeli, ~1 Hafta)
+
+| # | İş | Dosya / Konum | Notlar |
+|---|---|---|---|
+| 1 | **Server cache aktif + invalidation logic** | `supabase/functions/recommend/index.ts`, `cached_suggestions` tablosu | Cache key zaten üretiliyor, SELECT/UPSERT zaten var; eksik: Flutter tarafında konum delta >500m ve hava değişimi cache invalidation tetikleyicisi |
+| 2 | **Rate limiting** | `index.ts` başına kullanıcı bazlı sayaç | Son 1 saatte ≤10 LLM çağrısı; aşılınca cached veya 429 |
+| 3 | **Langfuse entegrasyonu** | `supabase/functions/recommend/langfuse.ts` | Her LLM çağrısı için trace: provider, latency, prompt/completion tokens, user_id. Bitirme savunması için screenshot hazır olacak. Ücretsiz tier yeterli. |
+| 4 | **SSE Streaming (Edge Function → Flutter)** | `index.ts` + `lib/data/services/llm_service.dart` | Self-host LLM yanıt ~18-23s; streaming ile ilk kart 3-4s'de görünür. Flutter'da `Stream<SuggestionModel>` ile kart kart render. |
+| 5 | **Cold start blend logic** | `index.ts` veya Flutter `SuggestionRepository` | İlk 14 gün: `weight_ml = days/14`, `weight_manual = 1 - weight_ml`. Persona yoksa manuel interests %100. |
+| 6 | **KVKK "Verilerimi sil" butonu** | `lib/ui/profile/` | Supabase cascading delete: `users` → tüm bağlı tablolar. Profile ekranında dialog. |
+| 7 | **Golden set + LLM-as-judge eval** | `docs/eval_golden_set.json` (10 senaryo) | Claude API ile haftalık offline değerlendirme. Ortalama ≥7/10 hedefi. |
+
+#### V2 — Uzun Vadeli (Tez Sonrası / Extension)
+
+| # | İş | Dal | Detay |
+|---|---|---|---|
+| 1 | **Web Scraping Pipeline** | Dal 1 | Biletinial + Mobilet + biletimGO. Headless Playwright, dakikada 1 req. Dedupe: title+venue+starts_at hash. `source='scraped'`. Biletix/Passo ertelendi (anti-bot). |
+| 2 | **pgvector RAG Aktivasyonu** | Dal 3 | Eşik: events >300 satır VEYA scraping aktif VEYA çoklu şehir. `embedding vector(1024)` kolonu zaten şemada var (boş). Embedding job: yeni event → Supabase trigger → `embed-events` Edge Function. Embedding model: `cohere-embed-multilingual-v3`. Query: cosine + BM25 hybrid + RRF. |
+| 3 | **Multi-Model A/B Testi** | Dal 2 | Mistral Nemo 12B vs Llama 3.3 8B vs Claude Sonnet — kalite/hız/maliyet karşılaştırması. Langfuse'dan A/B metrics. |
+| 4 | **Ollama → vLLM Migrasyonu** | Dal 2 | vLLM: batching, daha yüksek throughput (2-3x), OpenAI-uyumlu API aynı kalır. `SELF_HOST_MODEL` env var'ı değişmez. |
+| 5 | **Online A/B + Diversity Optimization** | Dal 6 | CTR = open/view. Diversity score = 3 önerinin kategori entropisi. Persona-fit: visit_confirmed/like ile traits korelasyonu. |
+| 6 | **Persona Blend Tuning** | Dal 7 | Explicit (onboarding) vs implicit (ML) signal füzyonu. 1000+ feedback sonrası LoRA fine-tune opsiyonu (stil, bilgi değil). |
+| 7 | **Çoklu Şehir Desteği** | Dal 1 | Şu an İstanbul + Kocaeli. V2'de tüm büyük şehirler. Scraping tetikleyicisi. |
+
+---
+
+### Yeni Chat için Başlangıç Kontrol Listesi
+
+Yeni bir chat açıldığında bu dosyayı okuttuktan sonra şu adımlarla devam edilebilir:
+
+1. **Mevcut branch:** `feature/faz3-llm-pipeline-v2`
+2. **Edge Function:** `recommend` v6, Supabase project `oovocuwnkewmwmgmcmip` üzerinde deployed ve aktif
+3. **Seed data:** 28 İstanbul + 14 Kocaeli eventi Supabase'de mevcut (tümü İngilizce)
+4. **Öncelikli sonraki iş:** Faz 3b #3 Langfuse entegrasyonu VEYA #4 SSE Streaming
+5. **Dikkat:** `nearby_events` RPC `p_interests` parametresi artık normalize slug alıyor (`"music"` gibi) — onboarding'den gelen ham label'ları Edge Function'a göndermeden önce normalize etme artık `index.ts`'de yapılıyor
+6. **Dikkat:** `SuggestionCategoryX` artık doğru kategorileri map ediyor — yeni bir kategori LLM'den gelirse `suggestion_category.dart`'a eklenmeli

@@ -1,6 +1,10 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:math';
+
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../domain/models/place_model.dart';
 import '../../domain/models/suggestion_model.dart';
 import '../../utils/app_logger.dart';
 import '../repositories/location_repository.dart';
@@ -8,33 +12,86 @@ import '../repositories/places_repository.dart';
 import '../services/weather_service.dart' show WeatherData, WeatherService;
 
 class LlmService {
-  LlmService(this._supabase, this._location, this._weather, this._places);
+  LlmService(
+    this._supabase,
+    this._location,
+    this._weather,
+    this._places, {
+    required String supabaseUrl,
+    required String supabaseAnonKey,
+  })  : _functionUrl = '$supabaseUrl/functions/v1/recommend',
+        _supabaseAnonKey = supabaseAnonKey;
 
   final SupabaseClient _supabase;
   final LocationRepository _location;
   final WeatherService _weather;
   final PlacesRepository _places;
+  final String _functionUrl;
+  final String _supabaseAnonKey;
 
+  // Tracks the context of the last successful fetch for cache invalidation.
+  double? _lastLat;
+  double? _lastLng;
+  String? _lastWeather;
+
+  /// Returns true if location moved >500m or weather condition changed since
+  /// the last fetch. Returns false if no fetch has happened yet.
+  bool hasMoved(double lat, double lng, String weather) {
+    if (_lastLat == null) return false;
+    final dist = _haversineMeters(_lastLat!, _lastLng!, lat, lng);
+    return dist > 500 || _lastWeather != weather;
+  }
+
+  static double _haversineMeters(
+      double lat1, double lng1, double lat2, double lng2) {
+    const r = 6371000.0;
+    final dLat = (lat2 - lat1) * pi / 180;
+    final dLng = (lng2 - lng1) * pi / 180;
+    final a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(lat1 * pi / 180) *
+            cos(lat2 * pi / 180) *
+            sin(dLng / 2) *
+            sin(dLng / 2);
+    return r * 2 * atan2(sqrt(a), sqrt(1 - a));
+  }
+
+  // ── Public API ────────────────────────────────────────────────────────────
+
+  /// SSE streaming — yields each suggestion as it arrives from the LLM.
+  Stream<SuggestionModel> getSuggestionsStream() {
+    return _streamSuggestions();
+  }
+
+  /// Non-streaming fallback — awaits the full SSE stream and returns the list.
   Future<List<SuggestionModel>> getSuggestions() async {
-    final position = await _location.getCurrentPosition();
+    final results = <SuggestionModel>[];
+    await for (final s in _streamSuggestions()) {
+      results.add(s);
+    }
+    return results;
+  }
 
+  // ── Implementation ────────────────────────────────────────────────────────
+
+  Stream<SuggestionModel> _streamSuggestions() async* {
+    final position = await _location.getCurrentPosition();
     final lat = position?.latitude ?? 41.0082;
     final lng = position?.longitude ?? 28.9784;
 
-    // Weather ve places paralel çalışsın
+    // Start both fetches in parallel, then await each with correct types
     final weatherFuture = position != null
         ? _weather.getCurrentWeather(lat, lng)
         : Future<WeatherData?>.value(null);
     final placesFuture = _places.getNearbyPlaces();
 
-    final WeatherData? weatherData = await weatherFuture;
+    final weatherData = await weatherFuture;
     final nearbyPlaces = await placesFuture;
 
     final locationLabel = position != null
         ? await _location.getAddressLabel(lat, lng)
         : null;
 
-    final city = _extractCity(locationLabel) ?? 'İstanbul';
+    final city = _extractCity(locationLabel) ?? 'Istanbul';
     final now = DateTime.now();
 
     final placesPayload = nearbyPlaces
@@ -43,7 +100,7 @@ class LlmService {
             'id': p.id,
             'name': p.name,
             'types': p.types,
-            'distance_m': p.distanceMeters.round(),
+            'distance_m': (p.distanceMeters as num).round(),
             if (p.address != null) 'address': p.address,
             if (p.rating != null) 'rating': p.rating,
             if (p.priceLevel != null) 'price_level': p.priceLevel,
@@ -51,10 +108,12 @@ class LlmService {
         )
         .toList();
 
-    AppLogger.i(
-      '[LlmService] ${nearbyPlaces.length} mekan yüklendi '
-      '(places API)',
-    );
+    AppLogger.i('[LlmService] ${nearbyPlaces.length} places loaded, city=$city');
+
+    // Record fetch context for cache invalidation checks.
+    _lastLat = lat;
+    _lastLng = lng;
+    _lastWeather = weatherData?.condition ?? 'clear';
 
     final body = {
       'lat': lat,
@@ -71,87 +130,103 @@ class LlmService {
       'nearby_places': placesPayload,
     };
 
+    // Get user JWT for auth header
+    final token = _supabase.auth.currentSession?.accessToken;
+    if (token == null) throw Exception('[LlmService] Not authenticated');
+
     AppLogger.i(
-      '[LlmService] recommend çağrılıyor — city=$city '
-      'weather=${weatherData?.condition ?? 'unknown'} '
-      'hour=${now.hour}',
+      '[LlmService] SSE stream start — city=$city '
+      'weather=${weatherData?.condition ?? 'unknown'} hour=${now.hour}',
     );
 
+    final client = http.Client();
     try {
-      final response = await _supabase.functions.invoke(
-        'recommend',
-        body: body,
-      );
+      final request = http.Request('POST', Uri.parse(_functionUrl));
+      request.headers['Authorization'] = 'Bearer $token';
+      request.headers['apikey'] = _supabaseAnonKey;
+      request.headers['Content-Type'] = 'application/json';
+      request.headers['Accept'] = 'text/event-stream';
+      request.body = jsonEncode(body);
 
-      if (response.status != 200) {
-        AppLogger.w(
-          '[LlmService] Edge Function hata: ${response.status} — mekanlar gösteriliyor',
+      final streamedResponse = await client.send(request);
+
+      if (streamedResponse.statusCode != 200) {
+        final errorBody = await streamedResponse.stream.bytesToString();
+        throw Exception(
+          '[LlmService] Edge Function error ${streamedResponse.statusCode}: $errorBody',
         );
-        return _placesToSuggestions(nearbyPlaces);
       }
 
-      final data = response.data as Map<String, dynamic>;
-      final rawList = data['suggestions'] as List<dynamic>? ?? [];
-      final provider = data['llm_provider'] as String? ?? 'unknown';
-      final cacheHit = data['cache_hit'] as bool? ?? false;
-      final latencyMs = data['latency_ms'] as int? ?? 0;
+      // SSE parser state
+      String? currentEvent;
+      String? currentData;
+      var lineBuffer = '';
 
-      AppLogger.i(
-        '[LlmService] ${rawList.length} öneri alındı — '
-        'provider=$provider cacheHit=$cacheHit latency=${latencyMs}ms',
-      );
+      await for (final chunk
+          in streamedResponse.stream.transform(utf8.decoder)) {
+        lineBuffer += chunk;
 
-      if (rawList.isEmpty) {
-        AppLogger.w('[LlmService] LLM boş liste döndü — mekanlar gösteriliyor');
-        return _placesToSuggestions(nearbyPlaces);
+        while (true) {
+          final newlineIdx = lineBuffer.indexOf('\n');
+          if (newlineIdx == -1) break;
+
+          final line = lineBuffer.substring(0, newlineIdx);
+          lineBuffer = lineBuffer.substring(newlineIdx + 1);
+          final trimmed = line.trimRight();
+
+          if (trimmed.isEmpty) {
+            // Blank line = event separator
+            if (currentEvent != null && currentData != null) {
+              yield* _handleSseEvent(currentEvent, currentData);
+            }
+            currentEvent = null;
+            currentData = null;
+          } else if (trimmed.startsWith('event: ')) {
+            currentEvent = trimmed.substring(7);
+          } else if (trimmed.startsWith('data: ')) {
+            currentData = trimmed.substring(6);
+          }
+        }
       }
+    } finally {
+      client.close();
+    }
+  }
 
-      return rawList
-          .map((s) => _parseSuggestion(s as Map<String, dynamic>))
-          .toList();
+  Stream<SuggestionModel> _handleSseEvent(
+    String event,
+    String data,
+  ) async* {
+    try {
+      final json = jsonDecode(data) as Map<String, dynamic>;
+
+      if (event == 'suggestion') {
+        final suggestionJson = json['suggestion'] as Map<String, dynamic>;
+        final cacheHit = json['cache_hit'] as bool? ?? false;
+        final provider = json['llm_provider'] as String? ?? 'unknown';
+        final index = json['index'] as int? ?? 0;
+        final suggestion = _parseSuggestion(suggestionJson);
+
+        AppLogger.i(
+          '[LlmService] SSE[$index] ${suggestion.title} '
+          '(provider=$provider cacheHit=$cacheHit)',
+        );
+        yield suggestion;
+      } else if (event == 'done') {
+        AppLogger.i(
+          '[LlmService] SSE done — latency=${json['latency_ms']}ms '
+          'total=${json['total']} cacheHit=${json['cache_hit']}',
+        );
+      } else if (event == 'error') {
+        throw Exception('[LlmService] LLM error: ${json['error']}');
+      }
     } catch (e) {
-      AppLogger.w('[LlmService] LLM erişilemiyor — mekanlar gösteriliyor: $e');
-      return _placesToSuggestions(nearbyPlaces);
+      if (event == 'error') rethrow;
+      AppLogger.e('[LlmService] SSE event parse error (event=$event)', e);
     }
   }
 
-  static List<SuggestionModel> _placesToSuggestions(List<PlaceModel> places) {
-    return places.map((p) {
-      final category = _categoryFromTypes(p.types);
-      return SuggestionModel(
-        id: p.id,
-        title: p.name,
-        description: p.address ?? '',
-        rationale: '',
-        category: category,
-        distance: p.distanceMeters > 0 ? p.distanceMeters / 1000 : null,
-        address: p.address,
-        tags: p.types.take(3).toList(),
-        createdAt: DateTime.now(),
-      );
-    }).toList();
-  }
-
-  static String _categoryFromTypes(List<String> types) {
-    for (final t in types) {
-      if (t.contains('restaurant') || t.contains('food') || t.contains('cafe')) {
-        return 'food';
-      }
-      if (t.contains('park') || t.contains('gym') || t.contains('sport')) {
-        return 'outdoor';
-      }
-      if (t.contains('museum') || t.contains('art') || t.contains('theater')) {
-        return 'culture';
-      }
-      if (t.contains('bar') || t.contains('night') || t.contains('club')) {
-        return 'nightlife';
-      }
-      if (t.contains('shop') || t.contains('store') || t.contains('mall')) {
-        return 'shopping';
-      }
-    }
-    return 'culture';
-  }
+  // ── Parsers / helpers ─────────────────────────────────────────────────────
 
   static SuggestionModel _parseSuggestion(Map<String, dynamic> s) {
     final distanceM = (s['distance_m'] as num?)?.toDouble();

@@ -56,14 +56,14 @@ class _SuggestionDetailScreenState
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final secondaryText = theme.colorScheme.onSurfaceVariant;
-    final asyncSuggestions = ref.watch(suggestionProvider);
+    final asyncSuggestions = ref.watch(suggestionStreamProvider);
 
     return asyncSuggestions.when(
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (_, _) => Scaffold(
         body: ErrorStateWidget.error(
-          onRetry: () => ref.invalidate(suggestionProvider),
+          onRetry: () => ref.invalidate(suggestionStreamProvider),
         ),
       ),
       data: (all) {

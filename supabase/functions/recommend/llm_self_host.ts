@@ -4,6 +4,11 @@ import { extractSuggestions } from "./parser.ts";
 const MODEL = Deno.env.get("SELF_HOST_MODEL") ?? "mistral-nemo:12b-instruct-q4_k_m";
 const TIMEOUT_MS = 30_000;
 
+const COMMON_HEADERS = {
+  "Content-Type": "application/json",
+  "ngrok-skip-browser-warning": "true",
+};
+
 export async function callSelfHost(
   baseUrl: string,
   systemPrompt: string,
@@ -18,11 +23,7 @@ export async function callSelfHost(
   try {
     resp = await fetch(`${baseUrl}/v1/chat/completions`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        // ngrok free tier requires this header to skip browser warning page
-        "ngrok-skip-browser-warning": "true",
-      },
+      headers: COMMON_HEADERS,
       body: JSON.stringify({
         model: MODEL,
         messages: [
@@ -55,6 +56,61 @@ export async function callSelfHost(
     },
     latency_ms,
   };
+}
+
+/** Streaming variant — yields individual text tokens from the LLM as they arrive. */
+export async function* callSelfHostStream(
+  baseUrl: string,
+  systemPrompt: string,
+  userMessage: string,
+): AsyncGenerator<string> {
+  const resp = await fetch(`${baseUrl}/v1/chat/completions`, {
+    method: "POST",
+    headers: COMMON_HEADERS,
+    body: JSON.stringify({
+      model: MODEL,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMessage },
+      ],
+      temperature: 0.7,
+      max_tokens: 1024,
+      stream: true,
+    }),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
+
+  if (!resp.ok) {
+    throw new Error(`Self-host LLM stream error: ${resp.status} ${await resp.text()}`);
+  }
+
+  const reader = resp.body!.getReader();
+  const decoder = new TextDecoder();
+  let leftover = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    leftover += decoder.decode(value, { stream: true });
+    const lines = leftover.split("\n");
+    leftover = lines.pop() ?? "";
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data: ")) continue;
+      const data = trimmed.slice(6);
+      if (data === "[DONE]") return;
+
+      try {
+        const json = JSON.parse(data);
+        const content = json.choices?.[0]?.delta?.content;
+        if (content) yield content as string;
+      } catch {
+        // skip malformed lines
+      }
+    }
+  }
 }
 
 export async function isSelfHostHealthy(baseUrl: string): Promise<boolean> {

@@ -27,6 +27,13 @@ class SuggestionRepository {
   List<SuggestionModel>? _cached;
   DateTime? _cacheExpiresAt;
 
+  /// Streaming variant — yields each suggestion as it arrives from the Edge Function SSE.
+  Stream<SuggestionModel> getSuggestionsStream() {
+    return _llmService.getSuggestionsStream().handleError((Object e, StackTrace s) {
+      AppLogger.e('[SuggestionRepository] SSE stream error', e);
+    });
+  }
+
   Future<List<SuggestionModel>> getSuggestions() async {
     final now = DateTime.now();
     if (_cached != null &&

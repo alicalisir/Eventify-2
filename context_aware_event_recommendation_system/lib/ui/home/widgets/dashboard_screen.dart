@@ -6,6 +6,9 @@ import 'package:go_router/go_router.dart';
 import '../../../config/constants/app_colors.dart';
 import '../../../config/constants/app_spacing.dart';
 import '../../../config/constants/app_strings.dart';
+import '../../../di/providers.dart'
+    show locationRepositoryProvider, llmServiceProvider, weatherServiceProvider;
+import '../../../utils/app_logger.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../core/ui/app_snackbar.dart';
 import '../../core/ui/error_state_widget.dart';
@@ -17,22 +20,66 @@ import 'home_drawer.dart';
 import 'recommendation_card.dart';
 import 'section_label.dart';
 
-/// Dashboard — context hero, today's suggestions, drawer.
-class DashboardScreen extends ConsumerWidget {
+/// Dashboard — context hero, today's suggestions (streamed one by one), drawer.
+class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
 
-  Future<void> _refresh(WidgetRef ref) async {
-    ref.read(suggestionRepositoryProvider).invalidateCache();
-    ref.read(contextRepositoryProvider).invalidateContext();
-    await ref.read(dismissedSuggestionsProvider.notifier).clear();
-    ref.invalidate(suggestionProvider);
-    ref.invalidate(ambientContextProvider);
-    await ref.read(suggestionProvider.future);
+  @override
+  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends ConsumerState<DashboardScreen>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final visibleAsync = ref.watch(visibleSuggestionsProvider);
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkAndRefreshIfMoved();
+    }
+  }
+
+  Future<void> _checkAndRefreshIfMoved() async {
+    final llmService = ref.read(llmServiceProvider);
+    final locationRepo = ref.read(locationRepositoryProvider);
+    final weatherService = ref.read(weatherServiceProvider);
+
+    final position = await locationRepo.getCurrentPosition();
+    if (position == null) return;
+
+    final weather =
+        await weatherService.getCurrentWeather(position.latitude, position.longitude);
+    final weatherCondition = weather?.condition ?? 'clear';
+
+    if (llmService.hasMoved(position.latitude, position.longitude, weatherCondition)) {
+      AppLogger.i('[Dashboard] Context changed >500m or weather shifted — refreshing');
+      await _refresh();
+    }
+  }
+
+  Future<void> _refresh() async {
+    ref.read(suggestionRepositoryProvider).invalidateCache();
+    ref.read(contextRepositoryProvider).invalidateContext();
+    await ref.read(dismissedSuggestionsProvider.notifier).clear();
+    ref.invalidate(suggestionStreamProvider);
+    ref.invalidate(ambientContextProvider);
+    await ref.read(suggestionStreamProvider.future);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final suggestionsAsync = ref.watch(suggestionStreamProvider);
+    final visible = ref.watch(visibleSuggestionsProvider);
     final contextAsync = ref.watch(ambientContextProvider);
     final user = ref.watch(authProvider).user;
 
@@ -51,7 +98,7 @@ class DashboardScreen extends ConsumerWidget {
             icon: const Icon(Icons.refresh),
             tooltip: AppStrings.refreshContext,
             onPressed: () async {
-              await _refresh(ref);
+              await _refresh();
               if (context.mounted) {
                 AppSnackbar.show(
                   context,
@@ -65,7 +112,7 @@ class DashboardScreen extends ConsumerWidget {
       ),
       drawer: const HomeDrawer(),
       body: RefreshIndicator(
-        onRefresh: () => _refresh(ref),
+        onRefresh: _refresh,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.lg,
@@ -84,27 +131,38 @@ class DashboardScreen extends ConsumerWidget {
               error: (_, _) => const SizedBox.shrink(),
             ),
             const SizedBox(height: AppSpacing.lg),
-            // Suggestions
-            visibleAsync.when(
-              data: (suggestions) {
-                if (suggestions.isEmpty) {
-                  return EmptyDashboard(onRefresh: () => _refresh(ref));
+            // Suggestions — streamed card by card
+            suggestionsAsync.when(
+              // Loading: show shimmer until the first card arrives
+              loading: () => const _SuggestionListShimmer(),
+              // Error: show retry button
+              error: (_, _) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+                child: ErrorStateWidget.error(
+                  onRetry: () => ref.invalidate(suggestionStreamProvider),
+                ),
+
+              ),
+              // Data: render visible (filtered) list — grows as stream emits
+              data: (_) {
+                if (visible.isEmpty) {
+                  return EmptyDashboard(onRefresh: _refresh);
                 }
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     SectionLabel(
                       label: 'For you, right now',
-                      count: suggestions.length,
+                      count: visible.length,
                     ),
                     const SizedBox(height: AppSpacing.md),
-                    for (var i = 0; i < suggestions.length; i++) ...[
+                    for (var i = 0; i < visible.length; i++) ...[
                       Semantics(
                         customSemanticsActions: {
                           const CustomSemanticsAction(label: 'Dismiss'): () {
                             ref
                                 .read(dismissedSuggestionsProvider.notifier)
-                                .dismiss(suggestions[i].id);
+                                .dismiss(visible[i].id);
                             AppSnackbar.show(
                               context,
                               message: "Got it — we'll suggest fewer like that",
@@ -113,13 +171,13 @@ class DashboardScreen extends ConsumerWidget {
                           },
                         },
                         child: Dismissible(
-                          key: ValueKey(suggestions[i].id),
+                          key: ValueKey(visible[i].id),
                           direction: DismissDirection.endToStart,
                           background: const _DismissBackground(),
                           onDismissed: (_) {
                             ref
                                 .read(dismissedSuggestionsProvider.notifier)
-                                .dismiss(suggestions[i].id);
+                                .dismiss(visible[i].id);
                             AppSnackbar.show(
                               context,
                               message: "Got it — we'll suggest fewer like that",
@@ -127,11 +185,11 @@ class DashboardScreen extends ConsumerWidget {
                             );
                           },
                           child: RecommendationCard(
-                            suggestion: suggestions[i],
+                            suggestion: visible[i],
                             priority: i == 0,
                             onTap: () => context.pushNamed(
                               'suggestion',
-                              pathParameters: {'id': suggestions[i].id},
+                              pathParameters: {'id': visible[i].id},
                             ),
                           ),
                         ),
@@ -142,13 +200,6 @@ class DashboardScreen extends ConsumerWidget {
                   ],
                 );
               },
-              loading: () => const _SuggestionListShimmer(),
-              error: (_, _) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
-                child: ErrorStateWidget.error(
-                  onRetry: () => ref.invalidate(suggestionProvider),
-                ),
-              ),
             ),
           ],
         ),

@@ -26,18 +26,16 @@ export function extractSuggestions(raw: string): Suggestion[] {
 }
 
 function extractJsonBlock(text: string): string | null {
-  // Primary: <json>...</json>
   const tagMatch = text.match(/<json>([\s\S]*?)<\/json>/);
   if (tagMatch) return tagMatch[1].trim();
 
-  // Fallback: first {...} block
   const braceMatch = text.match(/\{[\s\S]*\}/);
   if (braceMatch) return braceMatch[0];
 
   return null;
 }
 
-function validateSuggestion(s: unknown, index: number): Suggestion {
+export function validateSuggestion(s: unknown, index: number): Suggestion {
   if (typeof s !== "object" || s === null) {
     throw new Error(`Suggestion[${index}] is not an object`);
   }
@@ -88,6 +86,107 @@ export function applyHardConstraints(
     if (dismissedTitles.some((d) => d.toLowerCase() === s.title.toLowerCase())) return false;
     return true;
   });
+}
+
+/** Streaming parser: accumulates LLM token output and extracts Suggestion objects
+ *  as soon as each JSON object is complete within the `"suggestions":[...]` array. */
+export class StreamingJsonParser {
+  private _buf = "";
+  private _arrayStart = -1;
+  private _cursor = 0;
+  private _results: Suggestion[] = [];
+
+  get suggestions(): Suggestion[] {
+    return this._results;
+  }
+
+  /** First 400 chars of the accumulated buffer — for debugging empty parse results. */
+  get bufPreview(): string {
+    return this._buf.slice(0, 400);
+  }
+
+  /** Feed a new token chunk. Returns newly completed suggestions (0-N per call). */
+  feed(token: string): Suggestion[] {
+    this._buf += token;
+
+    // Locate the start of the suggestions array on first match.
+    // Handle both `"suggestions":[` and `"suggestions": [` (LLM may add whitespace).
+    if (this._arrayStart === -1) {
+      const keyIdx = this._buf.indexOf('"suggestions"');
+      if (keyIdx === -1) return [];
+      const bracketIdx = this._buf.indexOf('[', keyIdx + '"suggestions"'.length);
+      if (bracketIdx === -1) return [];
+      this._arrayStart = bracketIdx + 1;
+      this._cursor = this._arrayStart;
+    }
+
+    const newly: Suggestion[] = [];
+    let s: Suggestion | null;
+    while ((s = this._extractNext()) !== null) {
+      newly.push(s);
+    }
+    return newly;
+  }
+
+  private _extractNext(): Suggestion | null {
+    const text = this._buf;
+    let pos = this._cursor;
+
+    // Skip whitespace and commas between objects
+    while (pos < text.length) {
+      const c = text[pos];
+      if (c === "," || c === " " || c === "\n" || c === "\r" || c === "\t") {
+        pos++;
+      } else {
+        break;
+      }
+    }
+
+    if (pos >= text.length) return null;
+    if (text[pos] === "]") return null; // end of array
+
+    if (text[pos] !== "{") {
+      this._cursor = pos + 1;
+      return null;
+    }
+
+    // Track brace depth to find the matching closing brace
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    const objStart = pos;
+
+    for (let i = pos; i < text.length; i++) {
+      const c = text[i];
+
+      if (escape) { escape = false; continue; }
+      if (c === "\\" && inString) { escape = true; continue; }
+      if (c === '"') { inString = !inString; continue; }
+      if (inString) continue;
+
+      if (c === "{") {
+        depth++;
+      } else if (c === "}") {
+        depth--;
+        if (depth === 0) {
+          // Complete JSON object found
+          const objStr = text.slice(objStart, i + 1);
+          this._cursor = i + 1;
+          try {
+            const parsed = JSON.parse(objStr);
+            const suggestion = validateSuggestion(parsed, this._results.length);
+            this._results.push(suggestion);
+            return suggestion;
+          } catch {
+            return null;
+          }
+        }
+      }
+    }
+
+    // Incomplete object — wait for more tokens
+    return null;
+  }
 }
 
 function clamp(val: number, min: number, max: number): number {
