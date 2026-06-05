@@ -242,7 +242,7 @@ def _cat(updates: Dict[str, float]) -> Dict[str, float]:
 
 # 1. GECE KUŞU (Night Owl) -----------------------------------------------------
 GECE_KUSU = PersonaPrior(
-    name="Gece Kuşu", persona_id="GECE_KUSU",
+    name="Night Owl", persona_id="NIGHT_OWL",
     age_range=(18, 35),
     occupations=[("student", 0.4), ("freelancer", 0.3), ("creative", 0.2), ("unemployed", 0.1)],
     weekday_work_prob=0.5,
@@ -272,7 +272,7 @@ GECE_KUSU = PersonaPrior(
 
 # 2. ERKENCI (Early Bird) ------------------------------------------------------
 ERKENCI = PersonaPrior(
-    name="Erkenci", persona_id="ERKENCI",
+    name="Early Bird", persona_id="EARLY_BIRD",
     age_range=(25, 60),
     occupations=[("professional", 0.5), ("teacher", 0.2), ("retired", 0.15), ("freelancer", 0.15)],
     weekday_work_prob=0.85,
@@ -302,7 +302,7 @@ ERKENCI = PersonaPrior(
 
 # 3. SOSYAL (Social Media Heavy) ----------------------------------------------
 SOSYAL = PersonaPrior(
-    name="Sosyal", persona_id="SOSYAL",
+    name="Social", persona_id="SOCIAL",
     age_range=(16, 32),
     occupations=[("student", 0.4), ("influencer", 0.2), ("retail", 0.2), ("professional", 0.2)],
     weekday_work_prob=0.7,
@@ -332,7 +332,7 @@ SOSYAL = PersonaPrior(
 
 # 4. OYUNCU (Gamer) ------------------------------------------------------------
 OYUNCU = PersonaPrior(
-    name="Oyuncu", persona_id="OYUNCU",
+    name="Gamer", persona_id="GAMER",
     age_range=(15, 35),
     occupations=[("student", 0.4), ("freelancer", 0.25), ("unemployed", 0.15), ("professional", 0.2)],
     weekday_work_prob=0.55,
@@ -363,7 +363,7 @@ OYUNCU = PersonaPrior(
 
 # 5. ICERIK_TUKETICI (Content Consumer) ---------------------------------------
 ICERIK_TUKETICI = PersonaPrior(
-    name="İçerik Tüketicisi", persona_id="ICERIK_TUKETICI",
+    name="Content Consumer", persona_id="CONTENT_CONSUMER",
     age_range=(18, 50),
     occupations=[("professional", 0.4), ("freelancer", 0.2), ("student", 0.2), ("homemaker", 0.2)],
     weekday_work_prob=0.7,
@@ -393,7 +393,7 @@ ICERIK_TUKETICI = PersonaPrior(
 
 # 6. SPORCU (Fitness-Oriented) ------------------------------------------------
 SPORCU = PersonaPrior(
-    name="Sporcu", persona_id="SPORCU",
+    name="Athlete", persona_id="ATHLETE",
     age_range=(20, 50),
     occupations=[("professional", 0.5), ("trainer", 0.2), ("student", 0.15), ("freelancer", 0.15)],
     weekday_work_prob=0.85,
@@ -423,7 +423,7 @@ SPORCU = PersonaPrior(
 
 # 7. OGRENCI (Akademik / Student) ---------------------------------------------
 OGRENCI = PersonaPrior(
-    name="Öğrenci", persona_id="OGRENCI",
+    name="Student", persona_id="STUDENT",
     age_range=(17, 27),
     occupations=[("student", 0.85), ("intern", 0.1), ("part_time", 0.05)],
     weekday_work_prob=0.95,
@@ -454,7 +454,7 @@ OGRENCI = PersonaPrior(
 
 # 8. PROFESYONEL (Working Professional) --------------------------------------
 PROFESYONEL = PersonaPrior(
-    name="Profesyonel", persona_id="PROFESYONEL",
+    name="Professional", persona_id="PROFESSIONAL",
     age_range=(25, 55),
     occupations=[("professional", 0.85), ("manager", 0.1), ("consultant", 0.05)],
     weekday_work_prob=0.97,
@@ -484,7 +484,7 @@ PROFESYONEL = PersonaPrior(
 
 # 9. EVCIMEN (Home-Centered) --------------------------------------------------
 EVCIMEN = PersonaPrior(
-    name="Evcimen", persona_id="EVCIMEN",
+    name="Homebody", persona_id="HOMEBODY",
     age_range=(22, 65),
     occupations=[("homemaker", 0.4), ("remote_worker", 0.3), ("retired", 0.15), ("freelancer", 0.15)],
     weekday_work_prob=0.5,
@@ -515,7 +515,7 @@ EVCIMEN = PersonaPrior(
 
 # 10. SEYYAH (Traveler / Explorer) -------------------------------------------
 SEYYAH = PersonaPrior(
-    name="Seyyah", persona_id="SEYYAH",
+    name="Traveler", persona_id="TRAVELER",
     age_range=(20, 45),
     occupations=[("freelancer", 0.4), ("photographer", 0.2), ("blogger", 0.2), ("professional", 0.2)],
     weekday_work_prob=0.6,
@@ -546,7 +546,7 @@ SEYYAH = PersonaPrior(
 
 # 11. KRIZ_DUZENSIZ (Chaotic / Irregular) ------------------------------------
 KRIZ_DUZENSIZ = PersonaPrior(
-    name="Kriz / Düzensiz", persona_id="KRIZ_DUZENSIZ",
+    name="Irregular", persona_id="IRREGULAR",
     age_range=(18, 55),
     occupations=[("unemployed", 0.4), ("freelancer", 0.3), ("gig_worker", 0.2), ("student", 0.1)],
     weekday_work_prob=0.4,
@@ -580,7 +580,7 @@ KRIZ_DUZENSIZ = PersonaPrior(
 # their priors at sampling time.
 
 HIBRIT_BASE = PersonaPrior(
-    name="Hibrit", persona_id="HIBRIT",
+    name="Hybrid", persona_id="HYBRID",
     age_range=(20, 45),
     occupations=[("professional", 0.35), ("student", 0.25), ("freelancer", 0.25), ("creative", 0.15)],
     weekday_work_prob=0.7,
@@ -596,35 +596,35 @@ HIBRIT_BASE = PersonaPrior(
 # ============================================================================
 
 PERSONAS: Dict[str, PersonaPrior] = {
-    "GECE_KUSU":       GECE_KUSU,
-    "ERKENCI":         ERKENCI,
-    "SOSYAL":          SOSYAL,
-    "OYUNCU":          OYUNCU,
-    "ICERIK_TUKETICI": ICERIK_TUKETICI,
-    "SPORCU":          SPORCU,
-    "OGRENCI":         OGRENCI,
-    "PROFESYONEL":     PROFESYONEL,
-    "EVCIMEN":         EVCIMEN,
-    "SEYYAH":          SEYYAH,
-    "KRIZ_DUZENSIZ":   KRIZ_DUZENSIZ,
-    "HIBRIT":          HIBRIT_BASE,
+    "NIGHT_OWL":       GECE_KUSU,
+    "EARLY_BIRD":         ERKENCI,
+    "SOCIAL":          SOSYAL,
+    "GAMER":          OYUNCU,
+    "CONTENT_CONSUMER": ICERIK_TUKETICI,
+    "ATHLETE":          SPORCU,
+    "STUDENT":         OGRENCI,
+    "PROFESSIONAL":     PROFESYONEL,
+    "HOMEBODY":         EVCIMEN,
+    "TRAVELER":          SEYYAH,
+    "IRREGULAR":   KRIZ_DUZENSIZ,
+    "HYBRID":          HIBRIT_BASE,
 }
 
 # Distribution used when randomly assigning personas to a population.
 # Tuned roughly to a realistic urban smartphone-user mix.
 PERSONA_POPULATION_WEIGHTS: Dict[str, float] = {
-    "PROFESYONEL":     0.18,
-    "OGRENCI":         0.13,
-    "SOSYAL":          0.12,
-    "ICERIK_TUKETICI": 0.11,
-    "EVCIMEN":         0.09,
-    "GECE_KUSU":       0.08,
-    "ERKENCI":         0.07,
-    "OYUNCU":          0.06,
-    "SPORCU":          0.05,
-    "SEYYAH":          0.04,
-    "KRIZ_DUZENSIZ":   0.04,
-    "HIBRIT":          0.03,
+    "PROFESSIONAL":     0.18,
+    "STUDENT":         0.13,
+    "SOCIAL":          0.12,
+    "CONTENT_CONSUMER": 0.11,
+    "HOMEBODY":         0.09,
+    "NIGHT_OWL":       0.08,
+    "EARLY_BIRD":         0.07,
+    "GAMER":          0.06,
+    "ATHLETE":          0.05,
+    "TRAVELER":          0.04,
+    "IRREGULAR":   0.04,
+    "HYBRID":          0.03,
 }
 
 
@@ -640,7 +640,7 @@ def make_user_profile(persona_id: str | None = None) -> UserProfile:
     """Top-level convenience: pick a persona and return a sampled UserProfile."""
     if persona_id is None:
         persona_id = sample_persona_id()
-    if persona_id == "HIBRIT":
+    if persona_id == "HYBRID":
         return _sample_hibrit_profile()
     prior = PERSONAS[persona_id]
     return sample_user_profile(prior)
@@ -653,8 +653,8 @@ def _sample_hibrit_profile() -> UserProfile:
     around the blended means.
     """
     candidates = [
-        "PROFESYONEL", "OGRENCI", "SOSYAL", "ICERIK_TUKETICI",
-        "EVCIMEN", "SPORCU", "GECE_KUSU", "SEYYAH",
+        "PROFESSIONAL", "STUDENT", "SOCIAL", "CONTENT_CONSUMER",
+        "HOMEBODY", "ATHLETE", "NIGHT_OWL", "TRAVELER",
     ]
     k = np.random.choice([2, 3])
     chosen = list(np.random.choice(candidates, size=k, replace=False))
@@ -687,8 +687,8 @@ def _sample_hibrit_profile() -> UserProfile:
             blended_over[app] = blended_over.get(app, 0.0) + w * val
 
     blended_prior = PersonaPrior(
-        name="Hibrit",
-        persona_id="HIBRIT",
+        name="Hybrid",
+        persona_id="HYBRID",
         age_range=HIBRIT_BASE.age_range,
         occupations=HIBRIT_BASE.occupations,
         weekday_work_prob=HIBRIT_BASE.weekday_work_prob,

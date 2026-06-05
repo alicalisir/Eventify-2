@@ -1,17 +1,17 @@
 {
   "classes": [
-    "ERKENCI",
-    "EVCIMEN",
-    "GECE_KUSU",
-    "HIBRIT",
-    "ICERIK_TUKETICI",
-    "KRIZ_DUZENSIZ",
-    "OGRENCI",
-    "OYUNCU",
-    "PROFESYONEL",
-    "SEYYAH",
-    "SOSYAL",
-    "SPORCU"
+    "EARLY_BIRD",
+    "HOMEBODY",
+    "NIGHT_OWL",
+    "HYBRID",
+    "CONTENT_CONSUMER",
+    "IRREGULAR",
+    "STUDENT",
+    "GAMER",
+    "PROFESSIONAL",
+    "TRAVELER",
+    "SOCIAL",
+    "ATHLETE"
   ],
   "feature_set": "telemetry"
 }

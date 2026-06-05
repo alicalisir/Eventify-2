@@ -83,7 +83,7 @@ CATBOOST_PARAMS = {
     "random_seed":           42,
     "auto_class_weights":    "Balanced",        # handles residual imbalance
     "l2_leaf_reg":           3.0,
-    "task_type":             "CPU",
+    "task_type":             os.environ.get("CB_TASK_TYPE", "GPU"),
 }
 
 # ---------------------------------------------- file naming conventions ---

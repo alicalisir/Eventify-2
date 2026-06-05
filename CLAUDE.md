@@ -59,13 +59,13 @@ The CatBoost model expects features in the exact order from `backend/MLPipeline/
 - App session stats (6) + category shares (19) + hourly distribution (28: `hour_share_00..23` + 4 circadian summaries + weekend/p90/p10)
 - GPS/mobility (14): distance, radius, unique cells, speeds, movement state shares, dwell times
 - Screen events (5): unlocks, on, off, notifications, notif_per_unlock
-- Episode shares (15): `ep_share_SLEEP` etc. — **always 0 in production** (synthetic-only)
+- Episode shares (15): `ep_share_SLEEP` etc. — computed in production via rule-based `episodes.py` (`compute_episode_shares()`); zero only if data is insufficient or scoring threshold (≥15) not met
 
 Hour-bucket accuracy: `AppUsageService.dart` uses `info.lastForeground` per app (fixed) with a 24h window so a single collection populates all 24 hour buckets correctly. Upsert on `(user_id, app_name, timestamp)` prevents duplicates across hourly runs.
 
 ### 12 Personas
 `_PERSONA_META` dict in `backend/api/main.py` (line ~238) holds traits, preferences, and static recommendations for each:
-`ERKENCI, EVCIMEN, GECE_KUSU, HIBRIT, ICERIK_TUKETICI, KRIZ_DUZENSIZ, OGRENCI, OYUNCU, PROFESYONEL, SEYYAH, SOSYAL, SPORCU`
+`EARLY_BIRD, HOMEBODY, NIGHT_OWL, HYBRID, CONTENT_CONSUMER, IRREGULAR, STUDENT, GAMER, PROFESSIONAL, TRAVELER, SOCIAL, ATHLETE`
 
 ### Android Native ↔ Flutter Bridge
 Two MethodChannels in `MainActivity.kt`:

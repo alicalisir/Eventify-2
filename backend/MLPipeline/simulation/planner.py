@@ -139,34 +139,34 @@ class WeeklyPlanner(Planner):
 
     # base persona → theme distribution (weekday)
     _WEEKDAY_DIST = {
-        "PROFESYONEL":     {"FOCUSED_WORK": 0.7, "ROUTINE": 0.2, "FITNESS_DAY": 0.05, "ERRANDS_DAY": 0.05},
-        "ERKENCI":         {"FOCUSED_WORK": 0.55, "FITNESS_DAY": 0.2, "ROUTINE": 0.2, "ERRANDS_DAY": 0.05},
-        "OGRENCI":         {"FOCUSED_WORK": 0.6, "ROUTINE": 0.2, "SOCIAL_NIGHT": 0.15, "LAZY_DAY": 0.05},
-        "SPORCU":          {"FITNESS_DAY": 0.5, "FOCUSED_WORK": 0.3, "ROUTINE": 0.15, "EXPLORATION": 0.05},
-        "GECE_KUSU":       {"LAZY_DAY": 0.35, "ROUTINE": 0.3, "SOCIAL_NIGHT": 0.2, "FOCUSED_WORK": 0.15},
-        "OYUNCU":          {"LAZY_DAY": 0.5, "ROUTINE": 0.25, "FOCUSED_WORK": 0.15, "SOCIAL_NIGHT": 0.1},
-        "ICERIK_TUKETICI": {"LAZY_DAY": 0.4, "ROUTINE": 0.35, "FOCUSED_WORK": 0.2, "ERRANDS_DAY": 0.05},
-        "EVCIMEN":         {"LAZY_DAY": 0.45, "ROUTINE": 0.4, "ERRANDS_DAY": 0.1, "FOCUSED_WORK": 0.05},
-        "SOSYAL":          {"SOCIAL_NIGHT": 0.4, "ROUTINE": 0.25, "FOCUSED_WORK": 0.2, "EXPLORATION": 0.15},
-        "SEYYAH":          {"EXPLORATION": 0.55, "ROUTINE": 0.2, "FOCUSED_WORK": 0.15, "ERRANDS_DAY": 0.1},
-        "KRIZ_DUZENSIZ":   {"CHAOTIC": 0.55, "LAZY_DAY": 0.2, "ROUTINE": 0.15, "SOCIAL_NIGHT": 0.1},
-        "HIBRIT":          {"ROUTINE": 0.3, "FOCUSED_WORK": 0.25, "LAZY_DAY": 0.2, "SOCIAL_NIGHT": 0.15, "FITNESS_DAY": 0.1},
+        "PROFESSIONAL":     {"FOCUSED_WORK": 0.7, "ROUTINE": 0.2, "FITNESS_DAY": 0.05, "ERRANDS_DAY": 0.05},
+        "EARLY_BIRD":         {"FOCUSED_WORK": 0.55, "FITNESS_DAY": 0.2, "ROUTINE": 0.2, "ERRANDS_DAY": 0.05},
+        "STUDENT":         {"FOCUSED_WORK": 0.6, "ROUTINE": 0.2, "SOCIAL_NIGHT": 0.15, "LAZY_DAY": 0.05},
+        "ATHLETE":          {"FITNESS_DAY": 0.5, "FOCUSED_WORK": 0.3, "ROUTINE": 0.15, "EXPLORATION": 0.05},
+        "NIGHT_OWL":       {"LAZY_DAY": 0.35, "ROUTINE": 0.3, "SOCIAL_NIGHT": 0.2, "FOCUSED_WORK": 0.15},
+        "GAMER":          {"LAZY_DAY": 0.5, "ROUTINE": 0.25, "FOCUSED_WORK": 0.15, "SOCIAL_NIGHT": 0.1},
+        "CONTENT_CONSUMER": {"LAZY_DAY": 0.4, "ROUTINE": 0.35, "FOCUSED_WORK": 0.2, "ERRANDS_DAY": 0.05},
+        "HOMEBODY":         {"LAZY_DAY": 0.45, "ROUTINE": 0.4, "ERRANDS_DAY": 0.1, "FOCUSED_WORK": 0.05},
+        "SOCIAL":          {"SOCIAL_NIGHT": 0.4, "ROUTINE": 0.25, "FOCUSED_WORK": 0.2, "EXPLORATION": 0.15},
+        "TRAVELER":          {"EXPLORATION": 0.55, "ROUTINE": 0.2, "FOCUSED_WORK": 0.15, "ERRANDS_DAY": 0.1},
+        "IRREGULAR":   {"CHAOTIC": 0.55, "LAZY_DAY": 0.2, "ROUTINE": 0.15, "SOCIAL_NIGHT": 0.1},
+        "HYBRID":          {"ROUTINE": 0.3, "FOCUSED_WORK": 0.25, "LAZY_DAY": 0.2, "SOCIAL_NIGHT": 0.15, "FITNESS_DAY": 0.1},
     }
 
     # weekend overrides — most personas relax more
     _WEEKEND_DIST = {
-        "PROFESYONEL":     {"LAZY_DAY": 0.35, "ERRANDS_DAY": 0.2, "SOCIAL_NIGHT": 0.2, "FITNESS_DAY": 0.15, "EXPLORATION": 0.1},
-        "ERKENCI":         {"FITNESS_DAY": 0.35, "ERRANDS_DAY": 0.25, "EXPLORATION": 0.2, "ROUTINE": 0.2},
-        "OGRENCI":         {"SOCIAL_NIGHT": 0.4, "LAZY_DAY": 0.3, "FOCUSED_WORK": 0.2, "EXPLORATION": 0.1},
-        "SPORCU":          {"FITNESS_DAY": 0.55, "EXPLORATION": 0.2, "SOCIAL_NIGHT": 0.15, "ROUTINE": 0.1},
-        "GECE_KUSU":       {"LAZY_DAY": 0.5, "SOCIAL_NIGHT": 0.3, "ROUTINE": 0.2},
-        "OYUNCU":          {"LAZY_DAY": 0.65, "SOCIAL_NIGHT": 0.2, "ROUTINE": 0.15},
-        "ICERIK_TUKETICI": {"LAZY_DAY": 0.6, "ROUTINE": 0.25, "ERRANDS_DAY": 0.15},
-        "EVCIMEN":         {"LAZY_DAY": 0.6, "ROUTINE": 0.3, "ERRANDS_DAY": 0.1},
-        "SOSYAL":          {"SOCIAL_NIGHT": 0.55, "EXPLORATION": 0.2, "LAZY_DAY": 0.15, "ERRANDS_DAY": 0.1},
-        "SEYYAH":          {"EXPLORATION": 0.7, "SOCIAL_NIGHT": 0.2, "ROUTINE": 0.1},
-        "KRIZ_DUZENSIZ":   {"CHAOTIC": 0.6, "LAZY_DAY": 0.25, "SOCIAL_NIGHT": 0.15},
-        "HIBRIT":          {"LAZY_DAY": 0.3, "SOCIAL_NIGHT": 0.25, "EXPLORATION": 0.2, "ERRANDS_DAY": 0.15, "FITNESS_DAY": 0.1},
+        "PROFESSIONAL":     {"LAZY_DAY": 0.35, "ERRANDS_DAY": 0.2, "SOCIAL_NIGHT": 0.2, "FITNESS_DAY": 0.15, "EXPLORATION": 0.1},
+        "EARLY_BIRD":         {"FITNESS_DAY": 0.35, "ERRANDS_DAY": 0.25, "EXPLORATION": 0.2, "ROUTINE": 0.2},
+        "STUDENT":         {"SOCIAL_NIGHT": 0.4, "LAZY_DAY": 0.3, "FOCUSED_WORK": 0.2, "EXPLORATION": 0.1},
+        "ATHLETE":          {"FITNESS_DAY": 0.55, "EXPLORATION": 0.2, "SOCIAL_NIGHT": 0.15, "ROUTINE": 0.1},
+        "NIGHT_OWL":       {"LAZY_DAY": 0.5, "SOCIAL_NIGHT": 0.3, "ROUTINE": 0.2},
+        "GAMER":          {"LAZY_DAY": 0.65, "SOCIAL_NIGHT": 0.2, "ROUTINE": 0.15},
+        "CONTENT_CONSUMER": {"LAZY_DAY": 0.6, "ROUTINE": 0.25, "ERRANDS_DAY": 0.15},
+        "HOMEBODY":         {"LAZY_DAY": 0.6, "ROUTINE": 0.3, "ERRANDS_DAY": 0.1},
+        "SOCIAL":          {"SOCIAL_NIGHT": 0.55, "EXPLORATION": 0.2, "LAZY_DAY": 0.15, "ERRANDS_DAY": 0.1},
+        "TRAVELER":          {"EXPLORATION": 0.7, "SOCIAL_NIGHT": 0.2, "ROUTINE": 0.1},
+        "IRREGULAR":   {"CHAOTIC": 0.6, "LAZY_DAY": 0.25, "SOCIAL_NIGHT": 0.15},
+        "HYBRID":          {"LAZY_DAY": 0.3, "SOCIAL_NIGHT": 0.25, "EXPLORATION": 0.2, "ERRANDS_DAY": 0.15, "FITNESS_DAY": 0.1},
     }
 
     def pick_theme(self, agent, weekday: int) -> str:
