@@ -167,7 +167,7 @@ class AppUsageService {
     return null;
   }
 
-  // Android PackageManager'dan uygulama kategorisini okur.
+  // Reads app category from Android PackageManager.
   static const _appInfoChannel = MethodChannel('com.example.caers/app_info');
   static final _androidCatCache = <String, String>{};
 
@@ -180,7 +180,7 @@ class AppUsageService {
         'getAppCategory',
         {'packageName': packageName},
       ) ?? -1;
-      // Android ApplicationInfo.category sabitleri
+      // Android ApplicationInfo.category constants
       final result = switch (categoryInt) {
         0 => 'gaming',       // CATEGORY_GAME
         1 => 'music',        // CATEGORY_AUDIO
@@ -220,7 +220,7 @@ class AppUsageService {
 
       for (final info in usage) {
         final durationMin = info.usage.inSeconds / 60.0;
-        if (durationMin < 0.1) continue; // ~6 saniyeden kısa oturumları atla
+        if (durationMin < 0.1) continue; // skip sessions shorter than ~6 seconds
 
         final hardcoded = _category(info.packageName);
         final category = hardcoded ?? await _categoryFromSystem(info.packageName);

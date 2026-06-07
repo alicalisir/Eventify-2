@@ -248,7 +248,7 @@ class LlmService {
     );
   }
 
-  // "Kadıköy, İstanbul" → "İstanbul"; "İstanbul" → "İstanbul"
+  // e.g. "Kadikoy, Istanbul" -> "Istanbul"; bare "Istanbul" -> "Istanbul"
   static String? _extractCity(String? label) {
     if (label == null) return null;
     final parts = label.split(', ');
