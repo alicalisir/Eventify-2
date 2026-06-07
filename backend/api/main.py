@@ -13,6 +13,7 @@ import logging
 import math as _math
 import os
 import sys
+import time as _time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
@@ -969,10 +970,12 @@ def _call_mistral(
     nearby_events: list[dict],
     realtime_ctx: dict,
     now: datetime,
-) -> Optional[list[dict]]:
+) -> Optional[tuple[list[dict], int, int, int]]:
+    """Returns (items, prompt_tokens, completion_tokens, latency_ms) or None."""
     if not raw_places and not nearby_events:
         return None
     try:
+        t0 = _time.monotonic()
         prompt = _build_llm_prompt(persona_class, meta, raw_places, nearby_events, realtime_ctx, now)
         with httpx.Client(timeout=30) as client:
             resp = client.post(
@@ -987,19 +990,64 @@ def _call_mistral(
                     "stream": False,
                 },
             )
+        latency_ms = int((_time.monotonic() - t0) * 1000)
         if resp.status_code != 200:
             return None
-        text = resp.json()["choices"][0]["message"]["content"].strip()
+        body = resp.json()
+        usage = body.get("usage") or {}
+        prompt_tokens = int(usage.get("prompt_tokens", 0))
+        completion_tokens = int(usage.get("completion_tokens", 0))
+        text = body["choices"][0]["message"]["content"].strip()
         start, end = text.find("["), text.rfind("]") + 1
         if start == -1 or end == 0:
             return None
         parsed = json.loads(text[start:end])
-        return parsed if isinstance(parsed, list) else None
+        if not isinstance(parsed, list):
+            return None
+        return parsed, prompt_tokens, completion_tokens, latency_ms
     except httpx.ConnectError as e:
-        logger.warning("[mistral] Connection failed → %s: %s", MISTRAL_URL, e)
+        logger.warning("[mistral] Connection failed -> %s: %s", MISTRAL_URL, e)
         return None
     except Exception:
         return None
+
+
+def _save_cached_suggestions(
+    user_id: str,
+    payload: list[dict],
+    prompt_tokens: int = 0,
+    completion_tokens: int = 0,
+    latency_ms: int = 0,
+) -> None:
+    """Persist LLM recommendation output to the cached_suggestions table."""
+    import hashlib
+    now = datetime.now(timezone.utc)
+    hour_bucket = now.strftime("%Y%m%d%H")
+    cache_key = hashlib.sha1(f"{user_id}:{hour_bucket}".encode()).hexdigest()
+    expires_at = (now + timedelta(hours=1)).isoformat()
+    cache_headers = {**_SUPA_HEADERS, "Prefer": "resolution=merge-duplicates,return=minimal"}
+    try:
+        with httpx.Client(timeout=10) as client:
+            resp = client.post(
+                f"{SUPABASE_URL}/rest/v1/cached_suggestions",
+                headers=cache_headers,
+                json={
+                    "cache_key": cache_key,
+                    "user_id": user_id,
+                    "payload": payload,
+                    "llm_provider": LLM_MODEL,
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                    "latency_ms": latency_ms,
+                    "expires_at": expires_at,
+                },
+            )
+        if resp.status_code in (200, 201):
+            logger.info("[cache] saved suggestions for user %s (latency=%dms)", user_id, latency_ms)
+        else:
+            logger.warning("[cache] save failed status=%s body=%s", resp.status_code, resp.text[:200])
+    except Exception as e:
+        logger.warning("[cache] save error: %s", e)
 
 
 def _llm_to_suggestions(
@@ -1239,10 +1287,16 @@ def get_recommendations(
 
         # Tier 1: LLM-enriched recommendations (persona + places + events + realtime)
         if raw_places or nearby_events:
-            llm_items = _call_mistral(persona_class, meta, raw_places, nearby_events, realtime_ctx, now)
-            if llm_items:
+            llm_result = _call_mistral(persona_class, meta, raw_places, nearby_events, realtime_ctx, now)
+            if llm_result:
+                llm_items, prompt_tokens, completion_tokens, latency_ms = llm_result
                 suggestions = _llm_to_suggestions(llm_items, raw_places, nearby_events, lat, lon, now_str)
                 if suggestions:
+                    _save_cached_suggestions(
+                        user_id,
+                        [s.model_dump() for s in suggestions],
+                        prompt_tokens, completion_tokens, latency_ms,
+                    )
                     return suggestions
 
         # Tier 2: Direct Places results without LLM enrichment
