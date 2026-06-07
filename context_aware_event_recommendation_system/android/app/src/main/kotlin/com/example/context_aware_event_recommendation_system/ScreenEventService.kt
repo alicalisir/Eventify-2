@@ -75,8 +75,8 @@ class ScreenEventService : Service() {
 
     private fun buildNotification(): Notification =
         NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Bağlam takibi aktif")
-            .setContentText("Kişiselleştirilmiş öneriler için arka planda çalışıyor")
+            .setContentTitle("Context tracking active")
+            .setContentText("Running in background for personalized recommendations")
             .setSmallIcon(android.R.drawable.ic_menu_compass)
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .setOngoing(true)
@@ -87,10 +87,10 @@ class ScreenEventService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Bağlam Takibi",
+                "Context Tracking",
                 NotificationManager.IMPORTANCE_MIN
             ).apply {
-                description = "Ekran ve konum verilerini toplar"
+                description = "Collects screen and location data"
                 setShowBadge(false)
             }
             getSystemService(NotificationManager::class.java)

@@ -59,7 +59,7 @@ class ContextService {
     await Future.delayed(const Duration(milliseconds: 500));
     return ContextState(
       greeting: _greeting(DateTime.now()),
-      contextDescription: 'Konum & bağlam yükleniyor…',
+      contextDescription: 'Loading location & context…',
       isLocationEnabled: true,
       isNotificationsEnabled: true,
       lastUpdated: DateTime.now(),
@@ -74,41 +74,41 @@ class ContextService {
       SuggestionModel(
         id: 's1',
         category: 'Movement',
-        title: 'Riverside Park\'a 15 Dakikalık Yürüyüş',
+        title: '15-Minute Walk to Riverside Park',
         description:
-            '2 saat 40 dakikadır hareketsizsin. Kısa bir yürüyüş dikkatini sıfırlar.',
+            'You have been stationary for 2h 40min. A short walk will reset your focus.',
         rationale:
-            'Uzun hareketsizlik + altın saat ışığı + 600m mesafede temiz hava.',
+            'Long inactivity + golden hour light + fresh air just 600 m away.',
         distance: 0.6,
         estimatedMinutes: 15,
-        address: 'Riverside Park, Doğu Girişi',
-        tags: const ['Açık Hava', 'Düşük Efor'],
-        weather: '21° • Açık',
+        address: 'Riverside Park, East Entrance',
+        tags: const ['Outdoor', 'Low Effort'],
+        weather: '21° • Clear',
         createdAt: now,
       ),
       SuggestionModel(
         id: 's2',
         category: 'Recharge',
-        title: 'Mercer Coffee\'de Mola',
-        description: 'İki blok ötede sakin, az kalabalık bir kafe.',
-        rationale: 'Kafe doluluk oranı şu an düşük (%24). Öğleden sonra ritmine uyuyor.',
+        title: 'Coffee Break at Mercer Coffee',
+        description: 'A quiet, low-crowd cafe two blocks away.',
+        rationale: 'Cafe occupancy is low right now (24%). Fits your afternoon rhythm.',
         distance: 0.2,
         estimatedMinutes: 5,
         address: '88 Mercer St',
-        tags: const ['Sakin', r'$', 'Tek Başına'],
-        weather: '21° • Açık',
+        tags: const ['Quiet', r'$', 'Solo'],
+        weather: '21° • Clear',
         createdAt: now,
       ),
       SuggestionModel(
         id: 's3',
         category: 'Learning',
-        title: 'Kitaba Kaldığın Yerden Devam Et',
+        title: 'Continue Where You Left Off',
         description:
-            'Geçen Perşembe 12. dakikada bıraktın. Eve gitmene ~20 dakika var.',
-        rationale: 'Okuma geçmişi + takvim boşluğu + kulaklık bağlı.',
+            'You stopped at minute 12 last Thursday. You have ~20 min before heading home.',
+        rationale: 'Reading history + calendar gap + headphones connected.',
         estimatedMinutes: 22,
-        address: 'Sesli Kitap • 00:12:34\'ten devam et',
-        tags: const ['Sesli', 'Devam', 'Yolculuk Dostu'],
+        address: 'Audiobook • Resume from 00:12:34',
+        tags: const ['Audio', 'Resume', 'Commute-Friendly'],
         createdAt: now,
       ),
     ];
@@ -116,11 +116,11 @@ class ContextService {
 
   PersonaModel _mockPersona() => PersonaModel(
         traits: const [
-          PersonaTrait(label: 'Sabah İnsanı', confidence: 0.92),
-          PersonaTrait(label: 'Doğa Sever', confidence: 0.81),
-          PersonaTrait(label: 'Derin Çalışan', confidence: 0.88),
-          PersonaTrait(label: 'Kahve Ritüelcisi', confidence: 0.74),
-          PersonaTrait(label: 'İşitsel Öğrenici', confidence: 0.69),
+          PersonaTrait(label: 'Morning Person', confidence: 0.92),
+          PersonaTrait(label: 'Nature Lover', confidence: 0.81),
+          PersonaTrait(label: 'Deep Worker', confidence: 0.88),
+          PersonaTrait(label: 'Coffee Ritualist', confidence: 0.74),
+          PersonaTrait(label: 'Auditory Learner', confidence: 0.69),
         ],
         preferences: const {
           'culture': 0.9,
@@ -134,8 +134,8 @@ class ContextService {
 
   String _greeting(DateTime time) {
     final hour = time.hour;
-    if (hour < 12) return 'Günaydın';
-    if (hour < 17) return 'İyi günler';
-    return 'İyi akşamlar';
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
   }
 }

@@ -22,6 +22,6 @@ create policy "own_feedback_rw"
   on public.user_feedback for all
   using (auth.uid() = user_id);
 
-comment on table  public.user_feedback                     is 'Kullanıcı öneri etkileşimleri.';
-comment on column public.user_feedback.suggestion_snapshot is 'Öneri üretildiği andaki tam JSON — öneri silinse bile veri korunur.';
-comment on column public.user_feedback.context_snapshot    is 'Öneri üretildiği andaki context (saat, hava, konum, hareket).';
+comment on table  public.user_feedback                     is 'User interactions with recommendations (views, likes, dismissals, etc.)';
+comment on column public.user_feedback.suggestion_snapshot is 'Full suggestion JSON at the moment of generation — preserved even if the suggestion is later deleted.';
+comment on column public.user_feedback.context_snapshot    is 'Context at the time of suggestion generation (time, weather, location, movement).';
