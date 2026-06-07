@@ -7,3 +7,5 @@ python-dotenv==1.1.0
 catboost
 timezonefinder==6.5.2
 pytz==2024.1
+apscheduler==3.10.4
+beautifulsoup4==4.12.3
