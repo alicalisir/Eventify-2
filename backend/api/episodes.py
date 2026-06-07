@@ -1,18 +1,18 @@
 """
-Rule-based episode detection — production karşılığı.
+Rule-based episode detection — production counterpart of the simulator.
 
-Eğitimde simülatör 15 episode'u (SLEEP, WORK_DAY, ...) ground-truth olarak
-yazıyor; üretimde böyle bir etiket yok. Bu modül kullanıcının ham verisini
-30 dakikalık pencerelere böler, her pencereyi episode imzalarına karşı skorlar,
-en yüksek skorlu episode'u atar ve sonunda ep_share_* yüzdelerini döner.
+During training the simulator writes 15 episode types (SLEEP, WORK_DAY, ...)
+as ground-truth labels; in production no such labels exist. This module splits
+raw user data into 30-minute windows, scores each window against episode
+signatures, assigns the best-matching episode, and returns ep_share_*
+percentages.
 
-Simülatördeki utility fonksiyonları (simulation/episodic.py) referans alındı:
-her episode'un karakteristik baskın app kategorisi, saat aralığı, lokasyon
-gereksinimi ve hareket profili var. Burada bu imzaları gözlemlenebilir
-sinyallerle eşleştiriyoruz.
+References simulation/episodic.py for each episode's characteristic dominant
+app category, time range, location requirement, and movement profile. Those
+signatures are matched here against observable signals.
 
-Bu sürüm bilinçli olarak basit tutuldu. Gerçek dünya verisi etiketlenince
-yerine supervised bir model gelecek.
+This version is intentionally simple. Once real-world data is labelled, it will
+be replaced with a supervised model.
 """
 
 from __future__ import annotations
@@ -41,12 +41,13 @@ HOME_CELL_PRECISION = 3   # round(lat, 3) ≈ 100 m grid
 # =============================================================================
 
 def _detect_anchor_cells(gps: pd.DataFrame) -> Tuple[Optional[tuple], Optional[tuple]]:
-    """En sık ziyaret edilen iki GPS hücresini ev/iş olarak işaretle.
+    """Identify the two most-visited GPS cells as home and work.
 
-    - Ev: 00:00-07:00 arası en sık nokta (uyku saati ⇒ büyük ihtimalle ev)
-    - İş: hafta içi 09:00-17:00 en sık nokta (ev'den farklıysa)
+    - Home: most frequent cell during 00:00-07:00 (sleep hours -> likely home)
+    - Work: most frequent cell on weekdays 09:00-17:00 (if different from home)
 
-    Veri azsa None döner ve home/work-bağımlı kurallar devre dışı kalır.
+    Returns (None, None) when data is insufficient; home/work-dependent rules
+    are disabled in that case.
     """
     if gps.empty or len(gps) < 20:
         return None, None
@@ -88,9 +89,9 @@ def _build_windows(
     screen: pd.DataFrame,
     tz_offset: int = 0,
 ) -> pd.DataFrame:
-    """Tüm zaman aralığını 30dk pencerelere böl ve her pencere için özet üret."""
+    """Divide the full time range into 30-min windows and compute per-window summaries."""
 
-    # Hangi zaman aralığını tarayacağız?
+    # Determine the time range to scan
     stamps = []
     for df, col in [(gps, "timestamp"), (apps, "timestamp"), (screen, "timestamp")]:
         if not df.empty and col in df.columns:
@@ -108,7 +109,7 @@ def _build_windows(
     if len(window_starts) < 2:
         return pd.DataFrame()
 
-    # Önceden bin tagle
+    # Pre-bin all data frames
     apps_w = apps.copy() if not apps.empty else pd.DataFrame()
     if not apps_w.empty:
         apps_w["ts"] = pd.to_datetime(apps_w["timestamp"], utc=True, errors="coerce")
@@ -144,7 +145,7 @@ def _build_windows(
             "is_weekend": local_weekday >= 5,
         }
 
-        # ----- app aktivitesi
+        # ----- app activity
         if not apps_w.empty:
             slc = apps_w[apps_w["bin"] == w_start]
             if not slc.empty:
@@ -165,7 +166,7 @@ def _build_windows(
             rec["top_cat"] = None
             rec["top_cat_share"] = 0.0
 
-        # ----- GPS / hareket
+        # ----- GPS / movement
         if not gps_w.empty:
             slc = gps_w[gps_w["bin"] == w_start]
             if not slc.empty:
@@ -197,7 +198,7 @@ def _build_windows(
             rec["moving_share"] = 0.0
             rec["max_speed"] = 0.0
 
-        # ----- ekran
+        # ----- screen
         if not scr_w.empty:
             slc = scr_w[scr_w["bin"] == w_start]
             if not slc.empty:
@@ -219,8 +220,8 @@ def _build_windows(
 # 3. EPISODE SCORING (per window)
 # =============================================================================
 
-# Her episode'un baskın olmasını beklediğimiz app kategori grupları.
-# Pencerede top_cat bu grubun içindeyse "kategori imzası uyuyor" sayarız.
+# Dominant app category groups expected for each episode.
+# If the window's top_cat is in this set, the "category signature matches".
 _EP_CATEGORIES = {
     "SLEEP":            set(),
     "NIGHT_BROWSING":   {"short_video", "social", "video", "messaging"},
@@ -241,7 +242,7 @@ _EP_CATEGORIES = {
 
 
 def _is_home(w: dict, home_cell: Optional[tuple]) -> Optional[bool]:
-    """True/False/None (None = bilgi yok)."""
+    """True/False/None (None = insufficient data)."""
     if home_cell is None or w["dominant_cell"] is None:
         return None
     return w["dominant_cell"] == home_cell
@@ -254,7 +255,7 @@ def _is_work(w: dict, work_cell: Optional[tuple]) -> Optional[bool]:
 
 
 def _cat_match(w: dict, ep: str) -> float:
-    """0-1 arası: pencerenin baskın app'i episode'un imza grubuna uyuyor mu?"""
+    """0-1: does the window's dominant app fall in the episode's signature category group?"""
     cats = _EP_CATEGORIES.get(ep, set())
     if not cats or not w["top_cat"]:
         return 0.0
@@ -264,7 +265,7 @@ def _cat_match(w: dict, ep: str) -> float:
 
 
 def _in_window(h: float, lo: float, hi: float) -> bool:
-    """Saat aralığı kontrolü (gece yarısını da geçebilir)."""
+    """Time-range check; handles ranges that cross midnight."""
     if lo <= hi:
         return lo <= h < hi
     return h >= lo or h < hi
@@ -337,7 +338,7 @@ def _score(w: dict, ep: str, home_cell, work_cell) -> float:
         elif w["dominant_movement"] in ("walking", "cycling"):
             s += 15
         if at_home is True:
-            s -= 20  # hâlâ evdeyse muhtemelen yola çıkmadı
+            s -= 20  # still at home -> probably hasn't left yet
         return max(0.0, s)
 
     # -------------------------------------------------------- COMMUTE_HOME
@@ -358,7 +359,7 @@ def _score(w: dict, ep: str, home_cell, work_cell) -> float:
         if weekend or not (9 <= h < 18):
             return 0.0
         if at_home is True:
-            return 0.0  # iş = ev değil
+            return 0.0  # work location must differ from home
         s = 30 + 50 * cat_sig
         if at_work is True:
             s += 40
@@ -384,7 +385,7 @@ def _score(w: dict, ep: str, home_cell, work_cell) -> float:
         if w["app_total_min"] < 2:
             return 0.0
         s = 15 + 45 * cat_sig
-        # ev'de değil, iş'te de değil ve sabit ⇒ üçüncü bir mekan ihtimali
+        # not at home, not at work, and stationary -> likely a third location (cafe etc.)
         if at_home is False and at_work is False and not moving:
             s += 25
         if moving:
@@ -415,7 +416,7 @@ def _score(w: dict, ep: str, home_cell, work_cell) -> float:
             s += 50
         elif cat_sig > 0:
             s += 20 * cat_sig
-        if w["unique_cells"] >= 3:  # rota değişiyor
+        if w["unique_cells"] >= 3:  # route is changing
             s += 15
         if at_home is True and w["moving_share"] < 0.2:
             return 0.0
@@ -432,14 +433,14 @@ def _score(w: dict, ep: str, home_cell, work_cell) -> float:
             s += 20
         if moving:
             s -= 30
-        # ev'de, telefon hafifçe aktif: zayıf sinyal de olsa baseline'ı tutar
+        # at home with light phone activity: even a weak signal preserves the baseline
         if w["app_total_min"] > 0:
             s += 5
         return max(0.0, s)
 
     # ------------------------------------------------------ CONTENT_BINGE
     if ep == "CONTENT_BINGE":
-        if w["app_total_min"] < 15:  # binge için anlamlı süre lazım
+        if w["app_total_min"] < 15:  # binge requires meaningful screen time
             return 0.0
         if w["top_cat"] not in {"streaming", "video", "short_video"}:
             return 0.0
@@ -504,7 +505,7 @@ def compute_episode_shares(
     screen: pd.DataFrame,
     tz_offset: int = 0,
 ) -> Dict[str, float]:
-    """Ham veriden 15 ep_share_* + episodes_per_day döner.
+    """Compute 15 ep_share_* values + episodes_per_day from raw data.
 
     Returns:
         {
@@ -513,7 +514,7 @@ def compute_episode_shares(
           "ep_share_EXPLORATION_DAY": 0.0,
           "episodes_per_day": 6.2,
         }
-        Veri yetersizse hepsi 0.
+        All zeros when data is insufficient.
     """
     blank = {f"ep_share_{ep}": 0.0 for ep in EPISODE_TYPES}
     blank["episodes_per_day"] = 0.0
@@ -530,7 +531,7 @@ def compute_episode_shares(
         scores = {ep: _score(w_dict, ep, home_cell, work_cell) for ep in EPISODE_TYPES}
         best_ep = max(scores, key=scores.get)
         best_score = scores[best_ep]
-        # Çok düşük skor ⇒ "bilmiyorum" — paya katma
+        # Score too low -> "unknown" -- exclude from share calculation
         labels.append(best_ep if best_score >= 15.0 else None)
 
     valid = [l for l in labels if l is not None]
@@ -541,7 +542,7 @@ def compute_episode_shares(
     counts = pd.Series(valid).value_counts().to_dict()
     out = {f"ep_share_{ep}": float(counts.get(ep, 0)) / n for ep in EPISODE_TYPES}
 
-    # Episodes per day: ardışık aynı etiket = tek episode say
+    # Episodes per day: consecutive identical labels count as one episode
     distinct_episodes = 0
     prev = None
     for l in labels:
