@@ -23,7 +23,7 @@ import numpy as np
 import pandas as pd
 from catboost import CatBoostClassifier
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -831,7 +831,7 @@ _PERSONA_INTERESTS: dict[str, list[str]] = {
 
 def _fetch_nearby_events(lat: float, lon: float, persona_class: str) -> list[dict]:
     city = _nearest_city(lat, lon)
-    interests = _PERSONA_INTERESTS.get(persona_class, ["music", "art", "sports", "food"])
+    interests = _PERSONA_INTERESTS.get(persona_class, ["music", "culture", "sports", "food"])
     return _supa_rpc("nearby_events", {
         "p_city": city,
         "p_interests": interests,
@@ -1241,8 +1241,12 @@ def debug_episodes(user_id: str):
     }
 
 
+_ADMIN_SECRET = os.environ.get("ADMIN_SECRET", "")
+
 @app.post("/api/admin/scrape-events")
-def admin_scrape_events():
+def admin_scrape_events(x_admin_key: Optional[str] = Header(None)):
+    if not _ADMIN_SECRET or x_admin_key != _ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="Forbidden")
     from event_scraper import scrape_all_cities
     import threading
     threading.Thread(target=scrape_all_cities, daemon=True).start()

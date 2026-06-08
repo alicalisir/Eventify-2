@@ -3,7 +3,7 @@
 
 -- ─────────────────────────────────────────────────── gps_pings ───────────────
 
-create table public.gps_pings (
+create table if not exists public.gps_pings (
   id              bigserial     primary key,
   user_id         uuid          not null references public.users(id) on delete cascade,
   timestamp       timestamptz   not null,
@@ -27,7 +27,7 @@ create policy "gps_pings_own"
 
 -- ─────────────────────────────────────────────────── app_sessions ────────────
 
-create table public.app_sessions (
+create table if not exists public.app_sessions (
   id            bigserial   primary key,
   user_id       uuid        not null references public.users(id) on delete cascade,
   timestamp     timestamptz not null,
@@ -50,7 +50,7 @@ create policy "app_sessions_own"
 
 -- ─────────────────────────────────────────────────── screen_events ───────────
 
-create table public.screen_events (
+create table if not exists public.screen_events (
   id          bigserial   primary key,
   user_id     uuid        not null references public.users(id) on delete cascade,
   timestamp   timestamptz not null,
