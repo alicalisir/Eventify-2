@@ -13,5 +13,5 @@
     "STUDENT",
     "TRAVELER"
   ],
-  "feature_set": "telemetry"
+  "feature_set": "with_episodes"
 }
