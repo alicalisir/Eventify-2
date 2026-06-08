@@ -842,10 +842,12 @@ def _fetch_nearby_events(lat: float, lon: float, persona_class: str) -> list[dic
 # ─────────────────────────────────────────── LLM (local Mistral / Ollama) ────
 
 _LLM_SYSTEM = (
-    "You are a personalized event recommendation assistant. "
-    "Based on the given user profile, current context, and nearby venue list, "
-    "generate exactly 3 activity recommendations in English. "
-    "Return only a valid JSON array — no other text."
+    "You are a personalized activity recommendation assistant. "
+    "You will receive a user profile, real-time context, a list of nearby venues (V0, V1, ...) "
+    "and upcoming events (E0, E1, ...). "
+    "Select exactly 3 options and return ONLY a valid JSON array — no prose, no markdown, no explanation. "
+    "Each object must include item_ref (e.g. V2 or E1), title, description, rationale, "
+    "category, and estimated_minutes."
 )
 
 _MOV_LABELS = {
@@ -899,6 +901,7 @@ def _build_llm_prompt(
     ) or "no data"
     unlocks = realtime_ctx.get("screen_unlocks", 0)
 
+    # Venues prefixed V0, V1… — Events prefixed E0, E1…
     places_lines = []
     for i, p in enumerate(raw_places[:8]):
         name = (p.get("displayName") or {}).get("text", "?")
@@ -907,7 +910,7 @@ def _build_llm_prompt(
         addr = p.get("shortFormattedAddress", "")
         rating = p.get("rating")
         r_str = f" ★{rating:.1f}" if rating else ""
-        places_lines.append(f"{i + 1}. {name} — {cat}{r_str} — {addr}")
+        places_lines.append(f"V{i}. {name} — {cat}{r_str} — {addr}")
     places_str = "\n".join(places_lines) or "No nearby venues found."
 
     event_lines = []
@@ -921,11 +924,11 @@ def _build_llm_prompt(
             starts = dt.strftime("%a %d %b %H:%M")
         except Exception:
             pass
-        ticketed = "(ticketed)" if ev.get("is_ticketed") else ""
+        ticketed = " (ticketed)" if ev.get("is_ticketed") else ""
         price = ""
         if ev.get("price_min") and ev.get("price_max"):
             price = f" {int(ev['price_min'])}-{int(ev['price_max'])} {ev.get('currency', 'TRY')}"
-        event_lines.append(f"{i + 1}. {title} — {cat} — {venue} — {starts}{price} {ticketed}".strip())
+        event_lines.append(f"E{i}. {title} — {cat} — {venue} — {starts}{price}{ticketed}")
     events_str = "\n".join(event_lines) if event_lines else "No upcoming events found nearby."
 
     return f"""## User Profile
@@ -946,21 +949,20 @@ Screen unlocks: {unlocks}
 {events_str}
 
 ## Task
-Select the 3 most suitable options (venue OR event) for this user right now.
-Prefer events when they strongly match the persona and timing.
-Return as JSON array:
+Select the 3 most suitable options for this user right now.
+Prefer events (E-prefixed) when they match the persona and timing.
+For each selection use the ref code from the lists above: V0, V1, E0, E1, etc.
+Return ONLY a valid JSON array, no other text:
 [
   {{
-    "source": "venue",
-    "index": 0,
+    "item_ref": "E0",
     "title": "short activity title",
     "description": "1-2 sentence description",
     "rationale": "why this fits the user right now (1 sentence)",
     "category": "Movement|Recharge|Learning|Social|Health",
     "estimated_minutes": 30
   }}
-]
-source must be "venue" or "event". index is 0-based position in the respective list above."""
+]"""
 
 
 def _call_mistral(
@@ -1084,8 +1086,24 @@ def _llm_to_suggestions(
 ) -> list[SuggestionResponse]:
     results = []
     for item in llm_items[:3]:
-        source = item.get("source", "venue")
-        idx = item.get("index", item.get("venue_index", 0)) or 0
+        # Parse item_ref (new format: "V0", "E2"). Fall back to legacy source+index.
+        ref = item.get("item_ref", "")
+        if ref.upper().startswith("E"):
+            source = "event"
+            try:
+                idx = int(ref[1:])
+            except ValueError:
+                idx = 0
+        elif ref.upper().startswith("V"):
+            source = "venue"
+            try:
+                idx = int(ref[1:])
+            except ValueError:
+                idx = 0
+        else:
+            # Legacy fallback
+            source = item.get("source", "venue")
+            idx = item.get("index", item.get("venue_index", 0)) or 0
 
         if source == "event" and nearby_events:
             if not (0 <= idx < len(nearby_events)):
