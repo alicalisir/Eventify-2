@@ -40,11 +40,6 @@ _SUPA_HEADERS = {
     "Prefer": "resolution=merge-duplicates,return=minimal",
 }
 
-
-def _make_external_id(title: str, city: str, starts_at: Optional[str]) -> str:
-    key = f"{title.lower().strip()}|{city.lower()}|{starts_at or ''}"
-    return hashlib.sha1(key.encode()).hexdigest()
-
 SCRAPER_CITIES: list[str] = [
     c.strip() for c in os.environ.get(
         "SCRAPER_CITIES", "Istanbul,Ankara,Izmir,Bursa,Antalya,Kocaeli"
@@ -61,17 +56,18 @@ _BROWSER_HEADERS = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
 }
 
-# Valid DB categories: music, sports, culture, food, outdoor, workshop, family
+# Valid DB categories
 _CATEGORY_KEYWORDS: dict[str, list[str]] = {
     "music":    ["concert", "gig", "festival", "jazz", "rock", "pop", "live music",
-                 "band", "dj set", "dj", "hip hop", "electronic", "classical music"],
+                 "band", "dj set", "dj", "hip hop", "electronic", "classical music",
+                 "techno", "house", "indie", "r&b", "soul"],
     "sports":   ["football", "basketball", "match", "tournament", "race", "marathon",
-                 "tennis", "volleyball", "boxing", "wrestling", "cycling race"],
+                 "tennis", "volleyball", "boxing", "wrestling", "cycling race", "fitness"],
     "culture":  ["theater", "theatre", "play", "opera", "ballet", "exhibition", "gallery",
                  "museum", "art", "dance", "performance", "comedy", "stand-up",
                  "film", "cinema", "screening", "puppet", "circus"],
     "food":     ["food", "tasting", "gastronomy", "dinner", "brunch", "wine",
-                 "beer", "cocktail", "chef", "culinary"],
+                 "beer", "cocktail", "chef", "culinary", "degustasyon"],
     "outdoor":  ["hiking", "cycling", "trail", "park", "nature", "outdoor", "run",
                  "walk", "trekking", "kayak", "climbing"],
     "workshop": ["meetup", "workshop", "seminar", "conference", "fair", "talk",
@@ -79,28 +75,146 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
     "family":   ["family", "kids", "children", "circus", "puppet", "fairy tale"],
 }
 
-# Venue name patterns that strongly indicate a category
 _VENUE_CATEGORY_HINTS: dict[str, list[str]] = {
+    # Concert/music venues — checked first
     "music":   ["arena", "concert hall", "amphitheater", "amphitheatre", "pavilion",
-                "blind", "babylon", "jolly joker", "suada", "zorlu psm"],
-    "culture": ["performing arts", "theatre", "theater", "opera", "museum", "gallery",
-                "cultural center", "cultural centre", "art center"],
-    "sports":  ["stadium", "sports hall", "velodrome", "arena", "sports center"],
-    "food":    ["restaurant", "bistro", "brasserie"],
+                "blind", "babylon", "jolly joker", "suada", "zorlu", "uniq",
+                "maksimum", "maximum", "volkswagen arena", "turkcell", "if performance",
+                "performing arts", "stadium", "jj arena", "hall beşiktaş"],
+    "culture": ["theatre", "theater", "opera", "museum", "gallery",
+                "cultural center", "cultural centre", "art center", "bomontiada"],
+    "sports":  ["sports hall", "velodrome", "sports center", "arena spor"],
+    "food":    ["bistro", "brasserie"],  # "restaurant" removed — too many concert venues are restaurants
 }
 
+# Ticket-platform domains that strongly indicate a music event
+_MUSIC_TICKET_DOMAINS = {
+    "spotify.com", "songkick.com", "concertflow.com",
+    "setlist.fm", "bandsintown.com", "viagogo",
+}
 
-def _classify_category(title: str, description: str = "", venue: str = "") -> str:
+# More specific subcategory within each category
+_SUBCATEGORY_KEYWORDS: dict[str, list[str]] = {
+    "concert":       ["concert", "gig", "live music", "live show"],
+    "festival":      ["festival", "fest"],
+    "dj-night":      ["dj set", "dj", "techno", "house", "electronic", "nightclub"],
+    "open-air":      ["open air", "outdoor concert", "amphitheater", "amphitheatre"],
+    "stand-up":      ["stand-up", "comedy show", "comedy night"],
+    "theater":       ["theater", "theatre", "play", "tiyatro"],
+    "ballet-opera":  ["opera", "ballet", "bale"],
+    "exhibition":    ["exhibition", "gallery", "sergi", "expo"],
+    "film":          ["film", "cinema", "screening", "movie"],
+    "sports-match":  ["match", "tournament", "championship"],
+    "marathon-run":  ["marathon", "half marathon", "run", "race"],
+    "food-tasting":  ["tasting", "wine tasting", "beer tasting", "degustasyon"],
+    "brunch":        ["brunch", "breakfast event"],
+    "workshop":      ["workshop", "atölye", "craft"],
+    "conference":    ["conference", "summit", "seminar"],
+    "hackathon":     ["hackathon"],
+}
+
+# Domains that are ticket sales platforms (used to detect ticket_url and is_ticketed)
+_TICKET_DOMAINS = {
+    "bilet.com", "biletix.com", "passo.com.tr", "biletmaster.com.tr",
+    "ticketmaster.com", "eventbrite.com", "concertflow.com",
+    "jollyjoker.net", "mobilet.com", "ticketmaster.com.tr",
+}
+
+# Domains to skip when looking for ticket_url (info/streaming, not ticketing)
+_SKIP_DOMAINS = {"google.com", "spotify.com", "youtube.com", "facebook.com",
+                 "instagram.com", "twitter.com", "wikipedia.org"}
+
+
+def _make_external_id(title: str, city: str, starts_at: Optional[str]) -> str:
+    key = f"{title.lower().strip()}|{city.lower()}|{starts_at or ''}"
+    return hashlib.sha1(key.encode()).hexdigest()
+
+
+def _classify_category(title: str, description: str = "", venue: str = "",
+                        ticket_url: str = "", has_music_link: bool = False) -> str:
     text = (title + " " + description).lower()
     for category, keywords in _CATEGORY_KEYWORDS.items():
         if any(kw in text for kw in keywords):
             return category
-    # Fall back to venue-name hints
+    # Music platform link (Spotify concert, Songkick, etc.) → music
+    if has_music_link:
+        return "music"
+    if ticket_url:
+        m = re.search(r"://(?:www\.)?([^/]+)", ticket_url)
+        if m and any(d in m.group(1) for d in _MUSIC_TICKET_DOMAINS):
+            return "music"
     venue_lower = venue.lower()
     for category, hints in _VENUE_CATEGORY_HINTS.items():
         if any(h in venue_lower for h in hints):
             return category
     return "workshop"
+
+
+def _get_subcategory(title: str, description: str = "", venue: str = "",
+                     category: str = "") -> Optional[str]:
+    text = (title + " " + description + " " + venue).lower()
+    for sub, keywords in _SUBCATEGORY_KEYWORDS.items():
+        if any(kw in text for kw in keywords):
+            return sub
+    # Default subcategory when category is known but no specific sub matched
+    if category == "music":
+        return "concert"
+    if category == "sports":
+        return "sports-match"
+    return None
+
+
+def _get_tags(title: str, category: str, subcategory: Optional[str],
+              venue: str = "") -> list[str]:
+    tags: list[str] = []
+    text = (title + " " + venue).lower()
+    # Always include category
+    if category:
+        tags.append(category)
+    if subcategory and subcategory != category:
+        tags.append(subcategory)
+    # Music genre hints
+    for genre in ["jazz", "rock", "pop", "hip hop", "electronic", "techno",
+                  "house", "indie", "classical", "r&b", "soul"]:
+        if genre in text:
+            tags.append(genre)
+    # Venue type hints
+    for vt in ["open air", "outdoor", "rooftop", "club", "festival"]:
+        if vt in text:
+            tags.append(vt)
+    return list(dict.fromkeys(tags))[:6]  # deduplicate, max 6
+
+
+def _extract_links(container) -> tuple[Optional[str], bool]:
+    """Return (ticket_url, has_music_platform_link).
+
+    ticket_url  — first ticketing-platform URL (Spotify excluded).
+    has_music_platform_link — True if any Spotify/Songkick/etc. link exists,
+                              used as a music category signal even when no
+                              ticket URL is available.
+    """
+    links = [a["href"] for a in container.find_all("a", href=True)
+             if a["href"].startswith("http")]
+    ticket_url: Optional[str] = None
+    fallback_url: Optional[str] = None
+    has_music = False
+
+    for url in links:
+        m = re.search(r"://(?:www\.)?([^/]+)", url)
+        if not m:
+            continue
+        domain = m.group(1)
+        if any(d in domain for d in _MUSIC_TICKET_DOMAINS) or "spotify.com" in domain:
+            has_music = True
+        if any(d in domain for d in _SKIP_DOMAINS):
+            continue
+        if any(d in domain for d in _TICKET_DOMAINS):
+            ticket_url = url
+            break
+        if fallback_url is None:
+            fallback_url = url
+
+    return ticket_url or fallback_url, has_music
 
 
 def _geocode_address(address: str, city: str) -> tuple[Optional[float], Optional[float]]:
@@ -129,29 +243,46 @@ _MONTH_ABBREVS = {
 }
 
 
-def _parse_event_datetime(date_str: str) -> tuple[Optional[str], Optional[str]]:
-    """Parse Google Events date strings into (starts_at_iso, ends_at_iso).
+def _resolve_month_day(month_str: str, day_num: int,
+                       now: datetime) -> Optional[datetime.date]:
+    month_num = _MONTH_ABBREVS.get(month_str[:3].lower())
+    if not month_num:
+        return None
+    year = now.year
+    candidate = datetime(year, month_num, day_num, tzinfo=timezone.utc)
+    if candidate.date() < now.date():
+        year += 1
+    return datetime(year, month_num, day_num, tzinfo=timezone.utc).date()
 
-    Handles formats like:
-      "Sat, 19:00 - 23:00"   "Today, 20:30 - 23:30"
-      "Tomorrow, 18:00"       "Jun 15, 19:00 - 22:00"
+
+def _parse_event_datetime(date_str: str) -> tuple[Optional[str], Optional[str]]:
+    """Parse Google Events date strings → (starts_at_iso, ends_at_iso).
+
+    Handles:
+      "Sat, 19:00 – 23:00"        single-day with time range
+      "Today, 20:30 – 23:30"      relative single-day
+      "Tomorrow, 18:00"           single time
+      "Jun 15, 19:00 – 22:00"     month-day with time
+      "Sat, Jun 6 – Sun, Jun 7"   multi-day range (no time) → 00:00 / 23:59
+      "Jun 6 – Jun 8"             multi-day range (no time)
     """
     if not date_str:
         return None, None
 
     now = datetime.now(timezone.utc)
+    s = date_str.replace("–", "-").replace("—", "-").strip()
+    lower = s.lower()
 
-    # Normalize en/em dashes to hyphen
-    date_str = date_str.replace("–", "-").replace("—", "-").strip()
+    # ── 1. Time range present: "19:00 - 23:00" ──────────────────────────────
+    time_range = re.search(r"(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})", s)
+    single_time = re.search(r"(\d{1,2}:\d{2})", s)
 
-    # Extract time range "19:00 - 23:00" or single "19:00"
-    time_range = re.search(r"(\d{1,2}:\d{2})\s*[-]\s*(\d{1,2}:\d{2})", date_str)
-    single_time = re.search(r"(\d{1,2}:\d{2})", date_str)
-
-    start_time_str = time_range.group(1) if time_range else (single_time.group(1) if single_time else None)
+    start_time_str = time_range.group(1) if time_range else (
+        single_time.group(1) if single_time else None
+    )
     end_time_str = time_range.group(2) if time_range else None
 
-    lower = date_str.lower()
+    # ── 2. Resolve base_date for the start ──────────────────────────────────
     base_date = None
 
     if lower.startswith("today"):
@@ -159,32 +290,50 @@ def _parse_event_datetime(date_str: str) -> tuple[Optional[str], Optional[str]]:
     elif lower.startswith("tomorrow"):
         base_date = (now + timedelta(days=1)).date()
     else:
-        # Try "Jun 15" style
-        month_day = re.search(r"([a-zA-Z]{3,9})\s+(\d{1,2})", lower)
+        # "Jun 15" or "Sat, Jun 6" style — take the first month-day found
+        month_day = re.search(r"\b([a-zA-Z]{3,9})\s+(\d{1,2})\b", lower)
         if month_day:
-            month_str = month_day.group(1)[:3]
-            day_num = int(month_day.group(2))
-            month_num = _MONTH_ABBREVS.get(month_str)
-            if month_num:
-                year = now.year
-                candidate = datetime(year, month_num, day_num, tzinfo=timezone.utc)
-                if candidate.date() < now.date():
-                    year += 1
-                base_date = datetime(year, month_num, day_num, tzinfo=timezone.utc).date()
+            base_date = _resolve_month_day(month_day.group(1), int(month_day.group(2)), now)
         else:
-            # Try weekday abbreviation "Sat", "Mon", etc.
+            # Bare weekday: "Sat", "Mon"
             day_match = re.search(r"\b([a-zA-Z]{3})\b", lower)
             if day_match:
                 target_wd = _DAY_ABBREVS.get(day_match.group(1))
                 if target_wd is not None:
-                    delta = (target_wd - now.weekday()) % 7
-                    if delta == 0:
-                        delta = 7
+                    delta = (target_wd - now.weekday()) % 7 or 7
                     base_date = (now + timedelta(days=delta)).date()
 
-    if not base_date or not start_time_str:
+    if base_date is None:
         return None, None
 
+    # ── 3. Multi-day range with no time: "Jun 6 - Jun 7" or "Sat, Jun 6 - Sun, Jun 7" ──
+    if start_time_str is None:
+        # Try to parse an end date from the second half after " - "
+        end_date = None
+        parts = re.split(r"\s+-\s+", lower, maxsplit=1)
+        if len(parts) == 2:
+            end_md = re.search(r"\b([a-zA-Z]{3,9})\s+(\d{1,2})\b", parts[1])
+            if end_md:
+                end_date = _resolve_month_day(end_md.group(1), int(end_md.group(2)), now)
+            else:
+                end_day = re.search(r"\b([a-zA-Z]{3})\b", parts[1])
+                if end_day:
+                    target_wd = _DAY_ABBREVS.get(end_day.group(1))
+                    if target_wd is not None:
+                        delta = (target_wd - now.weekday()) % 7 or 7
+                        end_date = (now + timedelta(days=delta)).date()
+
+        starts_at = datetime(base_date.year, base_date.month, base_date.day,
+                             0, 0, tzinfo=timezone.utc).isoformat()
+        if end_date:
+            ends_at = datetime(end_date.year, end_date.month, end_date.day,
+                               23, 59, tzinfo=timezone.utc).isoformat()
+        else:
+            ends_at = datetime(base_date.year, base_date.month, base_date.day,
+                               23, 59, tzinfo=timezone.utc).isoformat()
+        return starts_at, ends_at
+
+    # ── 4. Single-day with time ──────────────────────────────────────────────
     try:
         sh, sm = map(int, start_time_str.split(":"))
         starts_at = datetime(base_date.year, base_date.month, base_date.day,
@@ -212,56 +361,77 @@ def _parse_google_events(html: str, city: str) -> list[dict]:
     soup = BeautifulSoup(html, "html.parser")
     events = []
 
-    # Strategy 1: JSON-LD structured data (most stable)
+    # Strategy 1: JSON-LD structured data (most stable when present)
     for script in soup.find_all("script", type="application/ld+json"):
         try:
             data = json.loads(script.string or "")
             items = data if isinstance(data, list) else [data]
             for item in items:
-                if item.get("@type") in ("Event", "MusicEvent", "SportsEvent"):
-                    loc = item.get("location", {})
-                    venue = loc.get("name", "") if isinstance(loc, dict) else str(loc)
-                    address = ""
-                    if isinstance(loc, dict) and isinstance(loc.get("address"), dict):
-                        address = loc["address"].get("streetAddress", "")
-                    start_str = item.get("startDate", "")
-                    end_str = item.get("endDate", "")
+                if item.get("@type") not in ("Event", "MusicEvent", "SportsEvent"):
+                    continue
+                loc = item.get("location", {})
+                venue = loc.get("name", "") if isinstance(loc, dict) else str(loc)
+                address = ""
+                if isinstance(loc, dict) and isinstance(loc.get("address"), dict):
+                    address = loc["address"].get("streetAddress", "")
+                start_str = item.get("startDate", "")
+                end_str = item.get("endDate", "")
+                try:
+                    starts_at = datetime.fromisoformat(
+                        start_str.replace("Z", "+00:00")) if start_str else None
+                except Exception:
+                    starts_at = None
+                try:
+                    ends_at = datetime.fromisoformat(
+                        end_str.replace("Z", "+00:00")) if end_str else None
+                except Exception:
+                    ends_at = None
+                title = item.get("name", "").strip()
+                if not title:
+                    continue
+                desc = item.get("description", "")
+                ticket_url_ld = (item.get("offers") or {}).get("url", "") if isinstance(item.get("offers"), dict) else ""
+                category    = _classify_category(title, desc, venue, ticket_url_ld)
+                subcategory = _get_subcategory(title, desc, venue, category)
+                offers = item.get("offers", {})
+                price_min = price_max = None
+                ticket_url = None
+                if isinstance(offers, dict):
                     try:
-                        starts_at = datetime.fromisoformat(start_str.replace("Z", "+00:00")) if start_str else None
+                        price_min = price_max = float(offers.get("price", 0)) or None
                     except Exception:
-                        starts_at = None
-                    try:
-                        ends_at = datetime.fromisoformat(end_str.replace("Z", "+00:00")) if end_str else None
-                    except Exception:
-                        ends_at = None
-                    title = item.get("name", "").strip()
-                    if not title:
-                        continue
-                    desc = item.get("description", "")
-                    category = _classify_category(title, desc, venue)
-                    events.append({
-                        "title": title,
-                        "description": desc[:500] if desc else None,
-                        "category": category,
-                        "venue_name": venue or None,
-                        "address": address or None,
-                        "city": city,
-                        "starts_at": starts_at.isoformat() if starts_at else None,
-                        "ends_at": ends_at.isoformat() if ends_at else None,
-                    })
+                        pass
+                    ticket_url = offers.get("url")
+                events.append({
+                    "title": title,
+                    "description": desc[:500] if desc else None,
+                    "category": category,
+                    "subcategory": subcategory,
+                    "venue_name": venue or None,
+                    "address": address or None,
+                    "city": city,
+                    "starts_at": starts_at.isoformat() if starts_at else None,
+                    "ends_at": ends_at.isoformat() if ends_at else None,
+                    "ticket_url": ticket_url,
+                    "price_min": price_min,
+                    "price_max": price_max,
+                    "is_ticketed": bool(ticket_url or price_min),
+                    "tags": _get_tags(title, category, subcategory, venue),
+                })
         except Exception:
             continue
 
     if events:
         return events
 
-    # Strategy 2: Google Events HTML (PaEvOc containers — observed structure)
-    # Title: class "YOGjf"
-    # Date/time: class "cEZxRc" (without "zvDXNd")
-    # Venue + address: class "cEZxRc zvDXNd" first element
-    # City/district:  class "cEZxRc zvDXNd" second element
-    containers = soup.find_all("div", class_="PaEvOc")
-    for container in containers[:25]:
+    # Strategy 2: Google Events HTML — use li.PaEvOc as the full container
+    # (li holds both the content div and the external links)
+    # Title:   class "YOGjf"
+    # Date:    class "cEZxRc" without "zvDXNd"
+    # Venue:   class "cEZxRc zvDXNd" [0]
+    # District:class "cEZxRc zvDXNd" [1]
+    li_containers = soup.find_all("li", class_="PaEvOc")
+    for container in li_containers[:25]:
         title_el = container.find(class_="YOGjf")
         if not title_el:
             continue
@@ -270,65 +440,78 @@ def _parse_google_events(html: str, city: str) -> list[dict]:
             continue
 
         all_cezxrc = container.find_all(class_="cEZxRc")
-        zvd_els = [el for el in all_cezxrc if "zvDXNd" in (el.get("class") or [])]
+        zvd_els     = [el for el in all_cezxrc if "zvDXNd" in (el.get("class") or [])]
         non_zvd_els = [el for el in all_cezxrc if "zvDXNd" not in (el.get("class") or [])]
 
-        date_str = non_zvd_els[0].get_text(strip=True) if non_zvd_els else ""
-        venue_addr = zvd_els[0].get_text(strip=True) if zvd_els else ""
-        city_district = zvd_els[1].get_text(strip=True) if len(zvd_els) > 1 else ""
+        date_str     = non_zvd_els[0].get_text(strip=True) if non_zvd_els else ""
+        venue_addr   = zvd_els[0].get_text(strip=True) if zvd_els else ""
+        city_district= zvd_els[1].get_text(strip=True) if len(zvd_els) > 1 else ""
 
-        # Split "Venue Name, Street Address" on first comma
-        venue_name = ""
-        street_address = ""
         if "," in venue_addr:
-            parts = venue_addr.split(",", 1)
-            venue_name = parts[0].strip()
-            street_address = parts[1].strip()
+            parts        = venue_addr.split(",", 1)
+            venue_name   = parts[0].strip()
+            street_addr  = parts[1].strip()
         else:
-            venue_name = venue_addr
+            venue_name   = venue_addr
+            street_addr  = ""
 
-        # Full address string for geocoding
         full_address = venue_addr
         if city_district and city_district not in full_address:
             full_address = f"{full_address}, {city_district}"
 
         starts_at_iso, ends_at_iso = _parse_event_datetime(date_str)
-        category = _classify_category(title, "", venue_name)
+        ticket_url, has_music_link = _extract_links(container)
+        category    = _classify_category(title, "", venue_name, ticket_url or "", has_music_link)
+        subcategory = _get_subcategory(title, "", venue_name, category)
 
         events.append({
             "title": title,
             "description": None,
             "category": category,
+            "subcategory": subcategory,
             "venue_name": venue_name or None,
-            "address": street_address or (venue_addr or None),
+            "address": street_addr or (venue_addr or None),
             "city": city,
             "starts_at": starts_at_iso,
             "ends_at": ends_at_iso,
-            "_geocode_addr": full_address,  # removed before upsert
+            "ticket_url": ticket_url,
+            "price_min": None,
+            "price_max": None,
+            "is_ticketed": ticket_url is not None,
+            "tags": _get_tags(title, category, subcategory, venue_name),
+            "_geocode_addr": full_address,
         })
 
-    # Strategy 3: older Google HTML fallback
+    # Strategy 3: legacy fallback (title only)
     if not events:
         for container in soup.select("div[data-eventid], g-card.TBGc5c")[:20]:
-            title_el = container.find(["h3", "span", "div"],
-                                      class_=re.compile(r"YOGjf|vlA7Fb|rZwiVb"))
+            title_el = container.find(
+                ["h3", "span", "div"], class_=re.compile(r"YOGjf|vlA7Fb|rZwiVb"))
             if not title_el:
                 spans = container.find_all("span", string=True)
-                title_el = next((s for s in spans if len(s.get_text(strip=True)) > 5), None)
+                title_el = next(
+                    (s for s in spans if len(s.get_text(strip=True)) > 5), None)
             if not title_el:
                 continue
             title = title_el.get_text(strip=True)
             if len(title) < 3:
                 continue
+            category = _classify_category(title)
             events.append({
                 "title": title,
                 "description": None,
-                "category": _classify_category(title),
+                "category": category,
+                "subcategory": _get_subcategory(title, category=category),
                 "venue_name": None,
                 "address": None,
                 "city": city,
                 "starts_at": None,
                 "ends_at": None,
+                "ticket_url": None,
+                "price_min": None,
+                "price_max": None,
+                "is_ticketed": False,
+                "tags": _get_tags(title, category, None),
             })
 
     return events
@@ -336,14 +519,10 @@ def _parse_google_events(html: str, city: str) -> list[dict]:
 
 def scrape_city(city: str) -> list[dict]:
     url = "https://www.google.com/search"
-    params = {
-        "q": f"events in {city}",
-        "ibp": "htl;events",
-        "hl": "en",
-        "gl": "tr",
-    }
+    params = {"q": f"events in {city}", "ibp": "htl;events", "hl": "en", "gl": "tr"}
     try:
-        with httpx.Client(timeout=15, headers=_BROWSER_HEADERS, follow_redirects=True) as client:
+        with httpx.Client(timeout=15, headers=_BROWSER_HEADERS,
+                          follow_redirects=True) as client:
             resp = client.get(url, params=params)
         if resp.status_code != 200:
             logger.warning("[scraper] %s HTTP %s", city, resp.status_code)
@@ -355,7 +534,8 @@ def scrape_city(city: str) -> list[dict]:
 
     enriched = []
     for ev in raw:
-        geocode_addr = ev.pop("_geocode_addr", None) or ev.get("address") or ev.get("venue_name") or ""
+        geocode_addr = (ev.pop("_geocode_addr", None)
+                        or ev.get("address") or ev.get("venue_name") or "")
         lat, lng = _geocode_address(geocode_addr, city)
         if lat:
             ev["lat"] = lat
@@ -370,28 +550,53 @@ def scrape_city(city: str) -> list[dict]:
 def upsert_events(events: list[dict]) -> int:
     if not events:
         return 0
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
     rows = []
     for ev in events:
-        title = ev["title"]
-        city = ev.get("city", "")
+        title    = ev["title"]
+        city     = ev.get("city", "")
         starts_at = ev.get("starts_at")
+        ends_at   = ev.get("ends_at")
+
+        # expires_at: event should disappear from recommendations after it ends
+        if ends_at:
+            expires_at = ends_at
+        elif starts_at:
+            # assume event lasts at most 8 hours if no end time
+            try:
+                st = datetime.fromisoformat(starts_at)
+                expires_at = (st + timedelta(hours=8)).isoformat()
+            except Exception:
+                expires_at = None
+        else:
+            expires_at = None
+
+        ticket_url = ev.get("ticket_url")
         rows.append({
-            "source": "scraped",
-            "external_id": _make_external_id(title, city, starts_at),
-            "title": title,
-            "description": ev.get("description"),
-            "category": ev.get("category", "workshop"),
-            "venue_name": ev.get("venue_name"),
-            "address": ev.get("address"),
-            "city": city,
-            "lat": ev.get("lat"),
-            "lng": ev.get("lng"),
-            "starts_at": starts_at,
-            "ends_at": ev.get("ends_at"),
-            "is_ticketed": False,
-            "language": "en",
-            "updated_at": now,
+            "source":       "scraped",
+            "external_id":  _make_external_id(title, city, starts_at),
+            "title":        title,
+            "description":  ev.get("description"),
+            "category":     ev.get("category", "workshop"),
+            "subcategory":  ev.get("subcategory"),
+            "venue_name":   ev.get("venue_name"),
+            "address":      ev.get("address"),
+            "city":         city,
+            "lat":          ev.get("lat"),
+            "lng":          ev.get("lng"),
+            "starts_at":    starts_at,
+            "ends_at":      ends_at,
+            "is_ticketed":  bool(ticket_url or ev.get("price_min")),
+            "price_min":    ev.get("price_min"),
+            "price_max":    ev.get("price_max"),
+            "currency":     "TRY",
+            "ticket_url":   ticket_url,
+            "tags":         ev.get("tags") or [],
+            "language":     "en",
+            "popularity_score": 0.5 if ticket_url else 0.0,
+            "expires_at":   expires_at,
+            "updated_at":   now_iso,
         })
     try:
         with httpx.Client(timeout=15) as client:
@@ -404,7 +609,8 @@ def upsert_events(events: list[dict]) -> int:
         if resp.status_code in (200, 201):
             logger.info("[scraper] upserted %d rows", len(rows))
             return len(rows)
-        logger.warning("[scraper] upsert status=%s body=%s", resp.status_code, resp.text[:200])
+        logger.warning("[scraper] upsert status=%s body=%s",
+                       resp.status_code, resp.text[:200])
         return 0
     except Exception as e:
         logger.warning("[scraper] upsert failed: %s", e)
@@ -423,12 +629,20 @@ def scrape_all_cities() -> None:
 
 if __name__ == "__main__":
     import sys
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s | %(message)s")
+    logging.basicConfig(level=logging.INFO,
+                        format="%(asctime)s %(levelname)s | %(message)s")
     cities = sys.argv[1:] if len(sys.argv) > 1 else SCRAPER_CITIES
     for city in cities:
         evs = scrape_city(city)
-        print(f"{city}: {len(evs)} events")
-        for e in evs[:5]:
-            print(f"  - {e['title']} | {e.get('category')} | {e.get('venue_name')} | "
-                  f"{e.get('starts_at')} | lat={e.get('lat')}")
+        print(f"\n{city}: {len(evs)} events")
+        for e in evs:
+            print(
+                f"  [{e['title']}] "
+                f"cat={e.get('category')} sub={e.get('subcategory')} "
+                f"venue={e.get('venue_name')} "
+                f"starts={e.get('starts_at')} ends={e.get('ends_at')} "
+                f"ticket={e.get('ticket_url')} "
+                f"tags={e.get('tags')} "
+                f"lat={e.get('lat')}"
+            )
         upsert_events(evs)
