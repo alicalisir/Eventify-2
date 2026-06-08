@@ -170,7 +170,7 @@ class GPSQualityModel:
         # Stationary at a fixed location (home/work) → indoor signal degradation
         at_fixed = (agent.current_location is getattr(agent, "home_poi", None) or
                     agent.current_location is getattr(agent, "work_poi", None))
-        if not agent.in_transit and at_fixed and random.random() < 0.012:
+        if not agent.in_transit and at_fixed and random.random() < 0.04:
             self.mode = "indoor"
             self._mode_end = tick + random.randint(6, 36)  # 30 min – 3 h
             return
@@ -249,11 +249,14 @@ class DeviceImperfectionModel:
         self._perm_off_end: int = -1   # permission-off window end tick (-1 = inactive)
         self._offline_end: int = -1    # offline window end tick
         self._batt_crit_end: int = -1  # battery-critical window end tick
+        # PACKAGE_USAGE_STATS permission — ~12% of users deny this on Android
+        self.has_app_usage_permission: bool = random.random() > 0.12
 
     def tick(self, tick: int, agent) -> None:
         """Evaluate outage activations each simulation tick."""
-        # Permission toggle — rare, user-initiated
-        if tick > self._perm_off_end and random.random() < 0.0006:
+        # Permission toggle — Android 10+ "only while using" location permission
+        # Real-world rate: ~once per 3.5 h average (was: once per 17 h)
+        if tick > self._perm_off_end and random.random() < 0.003:
             self._perm_off_end = tick + random.randint(24, 120)  # 2–10 h
 
         # Device offline (airplane mode, crash, dead battery)
@@ -263,6 +266,14 @@ class DeviceImperfectionModel:
         # Battery critical — proxy: use agent energy state as battery proxy
         if tick > self._batt_crit_end and agent.energy < 15.0:
             self._batt_crit_end = tick + random.randint(3, 12)   # 15 min – 1 h
+
+        # Android Doze mode — screen off + stationary at night kills background GPS
+        # Triggers 23:00–07:00; ~48% hourly probability matches real passive logging gaps
+        _h = agent.hour_of_day
+        agent_hour = _h() if callable(_h) else _h
+        if (agent_hour >= 23 or agent_hour < 7) and tick > self._offline_end:
+            if random.random() < 0.008:
+                self._offline_end = tick + random.randint(12, 72)  # 1–6 h GPS blackout
 
     # -- gate methods --------------------------------------------------------
 
@@ -281,6 +292,8 @@ class DeviceImperfectionModel:
 
     def can_record_app(self, tick: int) -> bool:
         """App-session recordable (not blocked by permission or offline)."""
+        if not self.has_app_usage_permission:
+            return False
         return not self.permission_off(tick) and not self.is_offline(tick)
 
     def can_record_screen(self, tick: int) -> bool:
