@@ -12,6 +12,7 @@ Usage (standalone test):
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -38,6 +39,11 @@ _SUPA_HEADERS = {
     "Content-Type": "application/json",
     "Prefer": "resolution=merge-duplicates,return=minimal",
 }
+
+
+def _make_external_id(title: str, city: str, starts_at: Optional[str]) -> str:
+    key = f"{title.lower().strip()}|{city.lower()}|{starts_at or ''}"
+    return hashlib.sha1(key.encode()).hexdigest()
 
 SCRAPER_CITIES: list[str] = [
     c.strip() for c in os.environ.get(
@@ -367,17 +373,21 @@ def upsert_events(events: list[dict]) -> int:
     now = datetime.now(timezone.utc).isoformat()
     rows = []
     for ev in events:
+        title = ev["title"]
+        city = ev.get("city", "")
+        starts_at = ev.get("starts_at")
         rows.append({
             "source": "scraped",
-            "title": ev["title"],
+            "external_id": _make_external_id(title, city, starts_at),
+            "title": title,
             "description": ev.get("description"),
             "category": ev.get("category", "workshop"),
             "venue_name": ev.get("venue_name"),
             "address": ev.get("address"),
-            "city": ev.get("city"),
+            "city": city,
             "lat": ev.get("lat"),
             "lng": ev.get("lng"),
-            "starts_at": ev.get("starts_at"),
+            "starts_at": starts_at,
             "ends_at": ev.get("ends_at"),
             "is_ticketed": False,
             "language": "en",
@@ -387,6 +397,7 @@ def upsert_events(events: list[dict]) -> int:
         with httpx.Client(timeout=15) as client:
             resp = client.post(
                 f"{SUPABASE_URL}/rest/v1/events",
+                params={"on_conflict": "external_id"},
                 headers=_SUPA_HEADERS,
                 json=rows,
             )

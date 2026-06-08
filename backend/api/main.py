@@ -1012,6 +1012,32 @@ def _call_mistral(
         return None
 
 
+def _cache_key_for(user_id: str) -> str:
+    import hashlib
+    hour_bucket = datetime.now(timezone.utc).strftime("%Y%m%d%H")
+    return hashlib.sha1(f"{user_id}:{hour_bucket}".encode()).hexdigest()
+
+
+def _read_cached_suggestions(user_id: str) -> Optional[list[dict]]:
+    """Return cached LLM payload if it exists and hasn't expired, else None."""
+    cache_key = _cache_key_for(user_id)
+    rows = _supa_get("cached_suggestions", {
+        "cache_key": f"eq.{cache_key}",
+        "select": "payload,expires_at",
+        "limit": "1",
+    })
+    if not rows:
+        return None
+    row = rows[0]
+    try:
+        expires_at = datetime.fromisoformat(row["expires_at"].replace("Z", "+00:00"))
+        if expires_at > datetime.now(timezone.utc):
+            return row["payload"]
+    except Exception:
+        pass
+    return None
+
+
 def _save_cached_suggestions(
     user_id: str,
     payload: list[dict],
@@ -1020,10 +1046,8 @@ def _save_cached_suggestions(
     latency_ms: int = 0,
 ) -> None:
     """Persist LLM recommendation output to the cached_suggestions table."""
-    import hashlib
     now = datetime.now(timezone.utc)
-    hour_bucket = now.strftime("%Y%m%d%H")
-    cache_key = hashlib.sha1(f"{user_id}:{hour_bucket}".encode()).hexdigest()
+    cache_key = _cache_key_for(user_id)
     expires_at = (now + timedelta(hours=1)).isoformat()
     cache_headers = {**_SUPA_HEADERS, "Prefer": "resolution=merge-duplicates,return=minimal"}
     try:
@@ -1282,6 +1306,16 @@ def get_recommendations(
     persona_class, meta, _, _ = _classify(user_id, force=force)
     now = datetime.now(timezone.utc)
     now_str = now.isoformat()
+
+    # Tier 0: Return cached LLM output if still valid (1h TTL), unless force=True.
+    if not force:
+        cached_payload = _read_cached_suggestions(user_id)
+        if cached_payload:
+            logger.info("[cache] hit for user %s", user_id)
+            try:
+                return [SuggestionResponse(**s) for s in cached_payload]
+            except Exception as e:
+                logger.warning("[cache] payload parse error, skipping: %s", e)
 
     # When GPS provided, fetch real nearby venues and generate LLM recommendations.
     if lat is not None and lon is not None and GOOGLE_PLACES_KEY:
