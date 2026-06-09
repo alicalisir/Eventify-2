@@ -40,10 +40,12 @@ class ErrorStateWidget extends StatelessWidget {
     final theme = Theme.of(context);
     final secondaryText = theme.colorScheme.onSurfaceVariant;
 
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
+    return Semantics(
+      label: 'Error: $title. $message',
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, size: 64, color: secondaryText),
@@ -68,6 +70,7 @@ class ErrorStateWidget extends StatelessWidget {
           ],
         ),
       ),
+    ),
     );
   }
 }

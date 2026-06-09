@@ -257,20 +257,39 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(_totalPages, (i) {
                   final active = i == _page;
-                  return AnimatedContainer(
-                    duration: MediaQuery.disableAnimationsOf(context)
-                        ? Duration.zero
-                        : AppDurations.quick,
-                    curve: AppCurves.standard,
-                    margin: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.xxs,
-                    ),
-                    width: active ? 28 : 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color:
-                          active ? AppColors.primary : theme.dividerColor,
-                      borderRadius: BorderRadius.circular(AppSpacing.xxs),
+                  return Semantics(
+                    label:
+                        'Page ${i + 1} of $_totalPages${active ? ", current" : ""}',
+                    button: true,
+                    child: GestureDetector(
+                      onTap: () => _pageController.animateToPage(
+                        i,
+                        duration: AppDurations.quick,
+                        curve: AppCurves.standard,
+                      ),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          minWidth: 44,
+                          minHeight: 44,
+                        ),
+                        child: Center(
+                          child: AnimatedContainer(
+                            duration: MediaQuery.disableAnimationsOf(context)
+                                ? Duration.zero
+                                : AppDurations.quick,
+                            curve: AppCurves.standard,
+                            width: active ? 28 : 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: active
+                                  ? AppColors.primary
+                                  : theme.dividerColor,
+                              borderRadius:
+                                  BorderRadius.circular(AppSpacing.xxs),
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   );
                 }),
@@ -397,7 +416,12 @@ class _InterestsPage extends StatelessWidget {
             runSpacing: AppSpacing.sm,
             children: _interestCategories.map((cat) {
               final isSelected = selected.contains(cat.label);
-              return AnimatedScale(
+              return Semantics(
+                label:
+                    '${cat.label}, ${isSelected ? "selected" : "not selected"}',
+                button: true,
+                excludeSemantics: true,
+                child: AnimatedScale(
                 scale: isSelected ? 1.05 : 1.0,
                 duration: AppDurations.instant,
                 curve: Curves.easeOut,
@@ -421,6 +445,7 @@ class _InterestsPage extends StatelessWidget {
                     onChanged(next);
                   },
                 ),
+              ),
               );
             }).toList(),
           ),
