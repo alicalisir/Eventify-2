@@ -3,6 +3,7 @@ import 'package:context_aware_event_recommendation_system/di/providers.dart';
 import 'package:context_aware_event_recommendation_system/domain/models/context_state.dart';
 import 'package:context_aware_event_recommendation_system/domain/models/persona_model.dart';
 import 'package:context_aware_event_recommendation_system/domain/models/suggestion_model.dart';
+import 'package:context_aware_event_recommendation_system/ui/auth/providers/auth_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -28,22 +29,30 @@ Future<PersonaModel> persona(Ref ref) {
 }
 
 /// IDs of suggestions the user has dismissed.
-/// Loads persisted state on first access; persists every change.
+/// Scoped to the current user — rebuilds automatically on login/logout.
 @Riverpod(keepAlive: true)
 class DismissedSuggestions extends _$DismissedSuggestions {
   SuggestionRepository get _repo => ref.read(suggestionRepositoryProvider);
+  String? get _uid => ref.watch(authProvider).user?.id;
 
   @override
-  Future<Set<String>> build() => _repo.getDismissedIds();
+  Future<Set<String>> build() async {
+    final uid = _uid;
+    if (uid == null) return {};
+    return _repo.getDismissedIds(uid);
+  }
 
   Future<void> dismiss(String id) async {
+    if (state.value?.contains(id) ?? false) return;
     state = AsyncData({...state.value ?? {}, id});
-    await _repo.dismiss(id);
+    final uid = ref.read(authProvider).user?.id;
+    if (uid != null) await _repo.dismiss(id, uid);
   }
 
   Future<void> clear() async {
     state = const AsyncData({});
-    await _repo.clearDismissed();
+    final uid = ref.read(authProvider).user?.id;
+    if (uid != null) await _repo.clearDismissed(uid);
   }
 }
 

@@ -268,10 +268,7 @@ class ProfileScreen extends ConsumerWidget {
             leadingIcon: Icons.logout,
             isOutlined: true,
             foregroundColor: AppColors.error,
-            onPressed: () async {
-              await ref.read(authProvider.notifier).signOut();
-              if (context.mounted) context.goNamed('login');
-            },
+            onPressed: () => ref.read(authProvider.notifier).signOut(),
           ),
         ],
       ),

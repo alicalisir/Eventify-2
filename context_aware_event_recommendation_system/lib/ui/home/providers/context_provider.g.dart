@@ -8,7 +8,6 @@ part of 'context_provider.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-
 /// Current ambient context (greeting, location, weather, activity).
 
 @ProviderFor(ambientContext)
@@ -129,7 +128,7 @@ final class DismissedSuggestionsProvider
 }
 
 String _$dismissedSuggestionsHash() =>
-    r'92b15900894a82a4ed01665e85baa7f768c0cfec';
+    r'f931e64de9dd490f0a92184bd2eca994e8a55733';
 
 /// IDs of suggestions the user has dismissed.
 /// Loads persisted state on first access; persists every change.

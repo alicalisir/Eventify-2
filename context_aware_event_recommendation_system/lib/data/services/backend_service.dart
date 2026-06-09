@@ -83,6 +83,7 @@ class BackendService {
           longitude: (m['longitude'] as num?)?.toDouble(),
           tags: (m['tags'] as List<dynamic>?)?.cast<String>() ?? const [],
           weather: m['weather'] as String?,
+          signals: (m['signals'] as List<dynamic>?)?.cast<String>() ?? const [],
           createdAt: DateTime.parse(m['created_at'] as String),
         );
       }).toList();

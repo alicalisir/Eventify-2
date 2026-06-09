@@ -21,7 +21,7 @@ class SuggestionRepository {
   final ContextRepository _contextRepository;
   final LlmService _llmService;
 
-  static const _dismissedKey = 'suggestions.dismissed_ids';
+  static String _dismissedKey(String uid) => 'suggestions.dismissed_ids_$uid';
   static const _cacheTtl = Duration(minutes: 5);
 
   List<SuggestionModel>? _cached;
@@ -91,17 +91,17 @@ class SuggestionRepository {
     return payload;
   }
 
-  Future<Set<String>> getDismissedIds() async {
-    final raw = _prefs.getStringList(_dismissedKey);
+  Future<Set<String>> getDismissedIds(String uid) async {
+    final raw = _prefs.getStringList(_dismissedKey(uid));
     return raw?.toSet() ?? {};
   }
 
-  Future<void> dismiss(String id) async {
-    final current = await getDismissedIds();
-    await _prefs.setStringList(_dismissedKey, [...current, id]);
+  Future<void> dismiss(String id, String uid) async {
+    final current = await getDismissedIds(uid);
+    await _prefs.setStringList(_dismissedKey(uid), [...current, id]);
   }
 
-  Future<void> clearDismissed() async {
-    await _prefs.remove(_dismissedKey);
+  Future<void> clearDismissed(String uid) async {
+    await _prefs.remove(_dismissedKey(uid));
   }
 }

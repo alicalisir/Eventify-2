@@ -83,6 +83,93 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     final contextAsync = ref.watch(ambientContextProvider);
     final user = ref.watch(authProvider).user;
 
+    // Build suggestion slivers based on async state
+    final List<Widget> suggestionSlivers;
+    if (suggestionsAsync.isLoading) {
+      suggestionSlivers = [
+        const SliverPadding(
+          padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+          sliver: SliverToBoxAdapter(child: _SuggestionListShimmer()),
+        ),
+      ];
+    } else if (suggestionsAsync.hasError) {
+      suggestionSlivers = [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, 0),
+          sliver: SliverToBoxAdapter(
+            child: ErrorStateWidget.error(
+              onRetry: () => ref.invalidate(suggestionStreamProvider),
+            ),
+          ),
+        ),
+      ];
+    } else if (visible.isEmpty) {
+      suggestionSlivers = [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.xxl),
+          sliver: SliverToBoxAdapter(child: EmptyDashboard(onRefresh: _refresh)),
+        ),
+      ];
+    } else {
+      suggestionSlivers = [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.md),
+          sliver: SliverToBoxAdapter(
+            child: SectionLabel(label: 'For you, right now', count: visible.length),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+          sliver: SliverList.builder(
+            itemCount: visible.length,
+            itemBuilder: (ctx, i) => Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.md),
+              child: Semantics(
+                customSemanticsActions: {
+                  const CustomSemanticsAction(label: 'Dismiss'): () {
+                    ref.read(dismissedSuggestionsProvider.notifier).dismiss(visible[i].id);
+                    AppSnackbar.show(
+                      context,
+                      message: "Got it — we'll suggest fewer like that",
+                      kind: SnackKind.info,
+                    );
+                  },
+                },
+                child: Dismissible(
+                  key: ValueKey(visible[i].id),
+                  direction: DismissDirection.endToStart,
+                  background: const _DismissBackground(),
+                  onDismissed: (_) {
+                    ref.read(dismissedSuggestionsProvider.notifier).dismiss(visible[i].id);
+                    AppSnackbar.show(
+                      context,
+                      message: "Got it — we'll suggest fewer like that",
+                      kind: SnackKind.info,
+                    );
+                  },
+                  child: RecommendationCard(
+                    suggestion: visible[i],
+                    priority: i == 0,
+                    onTap: () => context.pushNamed(
+                      'suggestion',
+                      pathParameters: {'id': visible[i].id},
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SliverPadding(
+          padding: EdgeInsets.fromLTRB(AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.xxl),
+          sliver: SliverToBoxAdapter(child: _SwipeHint()),
+        ),
+      ];
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Today'),
@@ -113,96 +200,25 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
       drawer: const HomeDrawer(),
       body: RefreshIndicator(
         onRefresh: _refresh,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.md,
-            AppSpacing.lg,
-            AppSpacing.xxl,
-          ),
-          children: [
-            // Context hero
-            contextAsync.when(
-              data: (ctx) => ContextHeaderCard(
-                contextState: ctx,
-                userName: user?.name.split(' ').first ?? 'there',
-              ),
-              loading: () => const _HeroShimmer(),
-              error: (_, _) => _ContextErrorCard(
-                onRetry: () => ref.invalidate(ambientContextProvider),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            // Suggestions — streamed card by card
-            suggestionsAsync.when(
-              // Loading: show shimmer until the first card arrives
-              loading: () => const _SuggestionListShimmer(),
-              // Error: show retry button
-              error: (_, _) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
-                child: ErrorStateWidget.error(
-                  onRetry: () => ref.invalidate(suggestionStreamProvider),
+        child: CustomScrollView(
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.lg),
+              sliver: SliverToBoxAdapter(
+                child: contextAsync.when(
+                  data: (ctx) => ContextHeaderCard(
+                    contextState: ctx,
+                    userName: user?.name.split(' ').first ?? 'there',
+                  ),
+                  loading: () => const _HeroShimmer(),
+                  error: (_, _) => _ContextErrorCard(
+                    onRetry: () => ref.invalidate(ambientContextProvider),
+                  ),
                 ),
-
               ),
-              // Data: render visible (filtered) list — grows as stream emits
-              data: (_) {
-                if (visible.isEmpty) {
-                  return EmptyDashboard(onRefresh: _refresh);
-                }
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    SectionLabel(
-                      label: 'For you, right now',
-                      count: visible.length,
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    for (var i = 0; i < visible.length; i++) ...[
-                      Semantics(
-                        customSemanticsActions: {
-                          const CustomSemanticsAction(label: 'Dismiss'): () {
-                            ref
-                                .read(dismissedSuggestionsProvider.notifier)
-                                .dismiss(visible[i].id);
-                            AppSnackbar.show(
-                              context,
-                              message: "Got it — we'll suggest fewer like that",
-                              kind: SnackKind.info,
-                            );
-                          },
-                        },
-                        child: Dismissible(
-                          key: ValueKey(visible[i].id),
-                          direction: DismissDirection.endToStart,
-                          background: const _DismissBackground(),
-                          onDismissed: (_) {
-                            ref
-                                .read(dismissedSuggestionsProvider.notifier)
-                                .dismiss(visible[i].id);
-                            AppSnackbar.show(
-                              context,
-                              message: "Got it — we'll suggest fewer like that",
-                              kind: SnackKind.info,
-                            );
-                          },
-                          child: RecommendationCard(
-                            suggestion: visible[i],
-                            priority: i == 0,
-                            onTap: () => context.pushNamed(
-                              'suggestion',
-                              pathParameters: {'id': visible[i].id},
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                    ],
-                    const _SwipeHint(),
-                  ],
-                );
-              },
             ),
+            ...suggestionSlivers,
           ],
         ),
       ),

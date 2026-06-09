@@ -302,15 +302,14 @@ class _SuggestionDetailScreenState
                                 ),
                               ),
                               const SizedBox(height: AppSpacing.sm),
-                              const Wrap(
+                              Wrap(
                                 spacing: 6,
                                 runSpacing: 6,
-                                children: [
-                                  _SignalPill(label: 'Time of day'),
-                                  _SignalPill(label: 'Activity'),
-                                  _SignalPill(label: 'Location'),
-                                  _SignalPill(label: 'Weather'),
-                                ],
+                                children: (suggestion.signals.isNotEmpty
+                                        ? suggestion.signals
+                                        : const ['Time of day', 'Activity', 'Location', 'Weather'])
+                                    .map((s) => _SignalPill(label: s))
+                                    .toList(),
                               ),
                             ],
                           ),

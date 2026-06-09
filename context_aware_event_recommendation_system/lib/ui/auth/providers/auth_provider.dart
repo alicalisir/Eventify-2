@@ -124,6 +124,11 @@ class Auth extends _$Auth {
   }
 
   Future<void> signOut() async {
+    // Clear user-specific in-memory caches before the session ends so
+    // the next user never briefly sees the previous user's data.
+    ref.read(suggestionRepositoryProvider).invalidateCache();
+    ref.read(contextRepositoryProvider).invalidateContext();
+    ref.read(contextRepositoryProvider).invalidatePersona();
     await ref.read(authRepositoryProvider).signOut();
     state = const AuthState(status: AuthStatus.unauthenticated);
   }

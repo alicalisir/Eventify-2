@@ -114,7 +114,6 @@ class HomeDrawer extends ConsumerWidget {
                   Navigator.of(context).pop();
                   try {
                     await ref.read(authProvider.notifier).signOut();
-                    if (context.mounted) context.goNamed('login');
                   } catch (_) {
                     if (context.mounted) {
                       AppSnackbar.show(
