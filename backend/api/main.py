@@ -1341,12 +1341,21 @@ def get_recommendations(
         nearby_events  = _fetch_nearby_events(lat, lon, persona_class)
         realtime_ctx   = _build_realtime_context(user_id)
 
+        # Keep only venue types that match this persona's interests (relevance filter).
+        preferred_types = set(_PERSONA_PLACE_TYPES.get(persona_class, _ALL_PLACE_TYPES))
+        persona_places = [
+            p for p in raw_places
+            if any(t in preferred_types for t in (p.get("types") or []))
+        ]
+        if not persona_places:
+            persona_places = raw_places  # fallback: send all if nothing matched
+
         # Tier 1: LLM-enriched recommendations (persona + places + events + realtime)
-        if raw_places or nearby_events:
-            llm_result = _call_mistral(persona_class, meta, raw_places, nearby_events, realtime_ctx, now)
+        if persona_places or nearby_events:
+            llm_result = _call_mistral(persona_class, meta, persona_places, nearby_events, realtime_ctx, now)
             if llm_result:
                 llm_items, prompt_tokens, completion_tokens, latency_ms = llm_result
-                suggestions = _llm_to_suggestions(llm_items, raw_places, nearby_events, lat, lon, now_str)
+                suggestions = _llm_to_suggestions(llm_items, persona_places, nearby_events, lat, lon, now_str)
                 if suggestions:
                     _save_cached_suggestions(
                         user_id,
@@ -1355,10 +1364,10 @@ def get_recommendations(
                     )
                     return suggestions
 
-        # Tier 2: Direct Places results without LLM enrichment
+        # Tier 2: Direct Places results without LLM enrichment (persona-filtered)
         place_suggestions = [
             s
-            for i, p in enumerate(raw_places)
+            for i, p in enumerate(persona_places)
             if (s := _place_to_suggestion(p, lat, lon, meta, i, now_str)) is not None
         ]
         if place_suggestions:

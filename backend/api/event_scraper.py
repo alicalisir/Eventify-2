@@ -482,37 +482,8 @@ def _parse_google_events(html: str, city: str) -> list[dict]:
             "_geocode_addr": full_address,
         })
 
-    # Strategy 3: legacy fallback (title only)
     if not events:
-        for container in soup.select("div[data-eventid], g-card.TBGc5c")[:20]:
-            title_el = container.find(
-                ["h3", "span", "div"], class_=re.compile(r"YOGjf|vlA7Fb|rZwiVb"))
-            if not title_el:
-                spans = container.find_all("span", string=True)
-                title_el = next(
-                    (s for s in spans if len(s.get_text(strip=True)) > 5), None)
-            if not title_el:
-                continue
-            title = title_el.get_text(strip=True)
-            if len(title) < 3:
-                continue
-            category = _classify_category(title)
-            events.append({
-                "title": title,
-                "description": None,
-                "category": category,
-                "subcategory": _get_subcategory(title, category=category),
-                "venue_name": None,
-                "address": None,
-                "city": city,
-                "starts_at": None,
-                "ends_at": None,
-                "ticket_url": None,
-                "price_min": None,
-                "price_max": None,
-                "is_ticketed": False,
-                "tags": _get_tags(title, category, None),
-            })
+        logger.warning("[scraper] %s — no structured event data found (datacenter IP?)", city)
 
     return events
 
