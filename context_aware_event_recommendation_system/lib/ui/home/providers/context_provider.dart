@@ -49,6 +49,13 @@ class DismissedSuggestions extends _$DismissedSuggestions {
     if (uid != null) await _repo.dismiss(id, uid);
   }
 
+  Future<void> undismiss(String id) async {
+    final updated = Set<String>.from(state.value ?? {})..remove(id);
+    state = AsyncData(updated);
+    final uid = ref.read(authProvider).user?.id;
+    if (uid != null) await _repo.undismiss(id, uid);
+  }
+
   Future<void> clear() async {
     state = const AsyncData({});
     final uid = ref.read(authProvider).user?.id;

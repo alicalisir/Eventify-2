@@ -101,6 +101,12 @@ class SuggestionRepository {
     await _prefs.setStringList(_dismissedKey(uid), [...current, id]);
   }
 
+  Future<void> undismiss(String id, String uid) async {
+    final current = await getDismissedIds(uid);
+    current.remove(id);
+    await _prefs.setStringList(_dismissedKey(uid), current.toList());
+  }
+
   Future<void> clearDismissed(String uid) async {
     await _prefs.remove(_dismissedKey(uid));
   }

@@ -397,25 +397,30 @@ class _InterestsPage extends StatelessWidget {
             runSpacing: AppSpacing.sm,
             children: _interestCategories.map((cat) {
               final isSelected = selected.contains(cat.label);
-              return FilterChip(
-                avatar: Icon(
-                  cat.icon,
-                  size: 18,
-                  color: isSelected
-                      ? theme.colorScheme.onSecondaryContainer
-                      : theme.colorScheme.onSurfaceVariant,
+              return AnimatedScale(
+                scale: isSelected ? 1.05 : 1.0,
+                duration: AppDurations.instant,
+                curve: Curves.easeOut,
+                child: FilterChip(
+                  avatar: Icon(
+                    cat.icon,
+                    size: AppSpacing.iconSizeSm,
+                    color: isSelected
+                        ? theme.colorScheme.onSecondaryContainer
+                        : theme.colorScheme.onSurfaceVariant,
+                  ),
+                  label: Text(cat.label),
+                  selected: isSelected,
+                  onSelected: (v) {
+                    final next = Set<String>.from(selected);
+                    if (v) {
+                      next.add(cat.label);
+                    } else {
+                      next.remove(cat.label);
+                    }
+                    onChanged(next);
+                  },
                 ),
-                label: Text(cat.label),
-                selected: isSelected,
-                onSelected: (v) {
-                  final next = Set<String>.from(selected);
-                  if (v) {
-                    next.add(cat.label);
-                  } else {
-                    next.remove(cat.label);
-                  }
-                  onChanged(next);
-                },
               );
             }).toList(),
           ),

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../config/constants/app_colors.dart';
 import '../../../config/constants/app_spacing.dart';
@@ -10,6 +10,7 @@ import '../../../di/providers.dart'
     show locationRepositoryProvider, llmServiceProvider, weatherServiceProvider;
 import '../../../utils/app_logger.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../core/motion/app_durations.dart';
 import '../../core/ui/app_snackbar.dart';
 import '../../core/ui/error_state_widget.dart';
 import '../../core/ui/shimmer_loading.dart';
@@ -125,42 +126,77 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
           sliver: SliverList.builder(
             itemCount: visible.length,
-            itemBuilder: (ctx, i) => Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.md),
-              child: Semantics(
-                customSemanticsActions: {
-                  const CustomSemanticsAction(label: 'Dismiss'): () {
-                    ref.read(dismissedSuggestionsProvider.notifier).dismiss(visible[i].id);
-                    AppSnackbar.show(
-                      context,
-                      message: "Got it — we'll suggest fewer like that",
-                      kind: SnackKind.info,
-                    );
-                  },
-                },
-                child: Dismissible(
-                  key: ValueKey(visible[i].id),
-                  direction: DismissDirection.endToStart,
-                  background: const _DismissBackground(),
-                  onDismissed: (_) {
-                    ref.read(dismissedSuggestionsProvider.notifier).dismiss(visible[i].id);
-                    AppSnackbar.show(
-                      context,
-                      message: "Got it — we'll suggest fewer like that",
-                      kind: SnackKind.info,
-                    );
-                  },
-                  child: RecommendationCard(
-                    suggestion: visible[i],
-                    priority: i == 0,
-                    onTap: () => context.pushNamed(
-                      'suggestion',
-                      pathParameters: {'id': visible[i].id},
+            itemBuilder: (ctx, i) {
+              final suggestion = visible[i];
+              return _EntranceCard(
+                key: ValueKey('entrance_${suggestion.id}'),
+                index: i,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                  child: Semantics(
+                    customSemanticsActions: {
+                      const CustomSemanticsAction(label: 'Dismiss'): () {
+                        ref
+                            .read(dismissedSuggestionsProvider.notifier)
+                            .dismiss(suggestion.id);
+                        ScaffoldMessenger.of(context)
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(
+                            SnackBar(
+                              content: const Text(
+                                "Got it — we'll suggest fewer like that",
+                              ),
+                              duration: const Duration(seconds: 4),
+                              action: SnackBarAction(
+                                label: 'Undo',
+                                onPressed: () => ref
+                                    .read(dismissedSuggestionsProvider.notifier)
+                                    .undismiss(suggestion.id),
+                              ),
+                            ),
+                          );
+                      },
+                    },
+                    child: Dismissible(
+                      key: ValueKey(suggestion.id),
+                      direction: DismissDirection.endToStart,
+                      movementDuration: AppDurations.slow,
+                      resizeDuration: AppDurations.slow,
+                      background: const _DismissBackground(),
+                      onDismissed: (_) {
+                        ref
+                            .read(dismissedSuggestionsProvider.notifier)
+                            .dismiss(suggestion.id);
+                        ScaffoldMessenger.of(context)
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(
+                            SnackBar(
+                              content: const Text(
+                                "Got it — we'll suggest fewer like that",
+                              ),
+                              duration: const Duration(seconds: 4),
+                              action: SnackBarAction(
+                                label: 'Undo',
+                                onPressed: () => ref
+                                    .read(dismissedSuggestionsProvider.notifier)
+                                    .undismiss(suggestion.id),
+                              ),
+                            ),
+                          );
+                      },
+                      child: RecommendationCard(
+                        suggestion: suggestion,
+                        priority: i == 0,
+                        onTap: () => context.pushNamed(
+                          'suggestion',
+                          pathParameters: {'id': suggestion.id},
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ),
         const SliverPadding(
@@ -258,31 +294,146 @@ class _DismissBackground extends StatelessWidget {
   }
 }
 
-class _SwipeHint extends StatelessWidget {
+// ── Entrance animation ───────────────────────────────────────────────────────
+
+class _EntranceCard extends StatefulWidget {
+  final int index;
+  final Widget child;
+
+  const _EntranceCard({super.key, required this.index, required this.child});
+
+  @override
+  State<_EntranceCard> createState() => _EntranceCardState();
+}
+
+class _EntranceCardState extends State<_EntranceCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _fade;
+  late final Animation<Offset> _slide;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      duration: AppDurations.standard,
+      vsync: this,
+    );
+    _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
+    _slide = Tween(begin: const Offset(0, 0.08), end: Offset.zero).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeOut),
+    );
+
+    final stagger = Duration(
+      milliseconds: (widget.index * 80).clamp(0, 200),
+    );
+    if (stagger == Duration.zero) {
+      _ctrl.forward();
+    } else {
+      Future.delayed(stagger, () {
+        if (mounted) _ctrl.forward();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.disableAnimationsOf(context)) return widget.child;
+    return FadeTransition(
+      opacity: _fade,
+      child: SlideTransition(position: _slide, child: widget.child),
+    );
+  }
+}
+
+// ── Swipe hint ───────────────────────────────────────────────────────────────
+
+class _SwipeHint extends StatefulWidget {
   const _SwipeHint();
+
+  @override
+  State<_SwipeHint> createState() => _SwipeHintState();
+}
+
+class _SwipeHintState extends State<_SwipeHint>
+    with SingleTickerProviderStateMixin {
+  static const _prefsKey = 'swipe_hint_seen';
+  AnimationController? _shakeCtrl;
+  Animation<double>? _shake;
+
+  @override
+  void initState() {
+    super.initState();
+    SharedPreferences.getInstance().then((prefs) {
+      if (!mounted) return;
+      if (prefs.getBool(_prefsKey) ?? false) return;
+      _shakeCtrl = AnimationController(
+        duration: const Duration(milliseconds: 700),
+        vsync: this,
+      );
+      _shake = TweenSequence<double>([
+        TweenSequenceItem(tween: Tween(begin: 0.0, end: -5.0), weight: 1),
+        TweenSequenceItem(tween: Tween(begin: -5.0, end: 5.0), weight: 2),
+        TweenSequenceItem(tween: Tween(begin: 5.0, end: -5.0), weight: 2),
+        TweenSequenceItem(tween: Tween(begin: -5.0, end: 0.0), weight: 1),
+      ]).animate(_shakeCtrl!);
+      setState(() {});
+      Future.delayed(const Duration(milliseconds: 600), () {
+        if (mounted) {
+          _shakeCtrl!.forward().then(
+            (_) => prefs.setBool(_prefsKey, true),
+          );
+        }
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _shakeCtrl?.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final iconColor = theme.colorScheme.onSurfaceVariant;
+
+    Widget iconWidget = ExcludeSemantics(
+      child: Icon(
+        Icons.swipe_left,
+        size: AppSpacing.iconSizeXxs,
+        color: iconColor,
+      ),
+    );
+    if (_shake != null && !MediaQuery.disableAnimationsOf(context)) {
+      iconWidget = AnimatedBuilder(
+        animation: _shake!,
+        builder: (_, child) => Transform.translate(
+          offset: Offset(_shake!.value, 0),
+          child: child,
+        ),
+        child: iconWidget,
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          ExcludeSemantics(
-            child: Icon(
-              Icons.swipe_left,
-              size: 14,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
+          iconWidget,
           const SizedBox(width: AppSpacing.xxs),
           Flexible(
             child: Text(
               'Swipe a card to dismiss · Pull down to refresh',
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+              style: theme.textTheme.labelSmall?.copyWith(color: iconColor),
               overflow: TextOverflow.ellipsis,
             ),
           ),

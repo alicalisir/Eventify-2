@@ -22,7 +22,7 @@ abstract final class AppTransitions {
     key: pageKey,
     child: child,
     transitionDuration: AppDurations.standard,
-    reverseTransitionDuration: AppDurations.quick,
+    reverseTransitionDuration: AppDurations.standard,
     transitionsBuilder: _fadeThrough,
   );
 
@@ -33,7 +33,7 @@ abstract final class AppTransitions {
     key: pageKey,
     child: child,
     transitionDuration: AppDurations.standard,
-    reverseTransitionDuration: AppDurations.quick,
+    reverseTransitionDuration: AppDurations.standard,
     transitionsBuilder: _sharedAxisX,
   );
 
