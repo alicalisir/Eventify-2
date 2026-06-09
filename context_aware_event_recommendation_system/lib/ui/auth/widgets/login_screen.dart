@@ -85,13 +85,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       const SizedBox(height: AppSpacing.xl),
                       Text(
                         AppStrings.welcomeBack,
-                        style: theme.textTheme.displayLarge?.copyWith(
-                          fontSize: 30,
-                        ),
+                        style: theme.textTheme.headlineMedium,
                       ),
                       const SizedBox(height: AppSpacing.xs),
                       Text(
-                        'Your context is ready when you are.',
+                        AppStrings.loginSubtitle,
                         style: theme.textTheme.bodyLarge?.copyWith(
                           color: secondaryText,
                         ),
@@ -156,7 +154,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               horizontal: AppSpacing.sm,
                             ),
                             child: Text(
-                              'OR',
+                              AppStrings.orDivider,
                               style: theme.textTheme.labelSmall?.copyWith(
                                 color: secondaryText,
                               ),
@@ -167,7 +165,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                       const SizedBox(height: AppSpacing.lg),
                       AppButton(
-                        text: 'Continue with Apple',
+                        text: AppStrings.continueWithApple,
                         leadingIcon: Icons.apple,
                         isOutlined: true,
                         foregroundColor: AppColors.textPrimaryLight,
@@ -184,7 +182,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    'New here?',
+                    AppStrings.newHere,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: secondaryText,
                     ),

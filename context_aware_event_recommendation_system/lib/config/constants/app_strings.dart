@@ -112,8 +112,23 @@ abstract final class AppStrings {
       'Deletion request submitted. You will receive a confirmation email.';
   static const String personaActive = 'Persona active';
 
+  // Auth Screen Copy
+  static const String loginSubtitle = 'Your context is ready when you are.';
+  static const String registerSubtitle =
+      'A few details to set up your computational persona.';
+  static const String orDivider = 'OR';
+  static const String continueWithApple = 'Continue with Apple';
+  static const String newHere = 'New here?';
+  static const String acceptTermsPrompt =
+      'Please accept the Terms to continue';
+
   // Error States
   static const String somethingWentWrong = 'Something went wrong';
+  static const String somethingWentWrongRetry =
+      'Something went wrong. Please try again.';
+  static const String noResults = 'No Results';
+  static const String noSuggestionsAvailable =
+      'No suggestions available at the moment.';
   static const String tryAgain = 'Try Again';
   static const String noInternet = 'Lost in the void';
   static const String noInternetDesc =

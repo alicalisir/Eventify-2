@@ -11,6 +11,7 @@ import '../../core/ui/app_button.dart';
 import '../../core/ui/app_pressable.dart';
 import '../../core/ui/app_snackbar.dart';
 import '../../core/ui/error_state_widget.dart';
+import '../../core/ui/tag.dart';
 import '../../home/providers/context_provider.dart';
 import 'map_hero.dart';
 import 'meta_tile.dart';
@@ -194,7 +195,7 @@ class _SuggestionDetailScreenState
                             children: [
                               Icon(
                                 suggestion.category.categoryIcon,
-                                size: 14,
+                                size: AppSpacing.iconSizeXs,
                                 color: AppColors.primary,
                               ),
                               const SizedBox(width: AppSpacing.xxs),
@@ -402,7 +403,7 @@ class _SuggestionDetailScreenState
                             spacing: 6,
                             runSpacing: 6,
                             children: suggestion.tags
-                                .map((t) => Chip(label: Text(t)))
+                                .map((t) => Tag(label: t))
                                 .toList(),
                           ),
                         ],

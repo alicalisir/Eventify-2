@@ -28,7 +28,7 @@ class _ShimmerSuggestionCardState extends State<ShimmerSuggestionCard>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(seconds: 2),
+      duration: AppSpacing.shimmerDuration,
       vsync: this,
     )..repeat();
     _animation = Tween<double>(begin: -2, end: 2).animate(

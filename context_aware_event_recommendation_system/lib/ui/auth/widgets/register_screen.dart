@@ -52,7 +52,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     if (!_agreedToTerms) {
       AppSnackbar.show(
         context,
-        message: 'Please accept the Terms to continue',
+        message: AppStrings.acceptTermsPrompt,
         kind: SnackKind.warning,
       );
       return;
@@ -112,7 +112,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       ),
                       const SizedBox(height: AppSpacing.xs),
                       Text(
-                        'A few details to set up your computational persona.',
+                        AppStrings.registerSubtitle,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: secondaryText,
                         ),
@@ -252,7 +252,11 @@ class _TermsCheckbox extends StatelessWidget {
                   ),
                 ),
                 child: value
-                    ? const Icon(Icons.check, size: 14, color: Colors.white)
+                    ? const Icon(
+                        Icons.check,
+                        size: AppSpacing.iconSizeXs,
+                        color: Colors.white,
+                      )
                     : null,
               ),
               const SizedBox(width: AppSpacing.sm),

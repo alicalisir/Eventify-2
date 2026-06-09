@@ -29,7 +29,7 @@ class MetaTile extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, size: 12, color: secondaryText),
+              Icon(icon, size: AppSpacing.iconSizeXxs, color: secondaryText),
               const SizedBox(width: AppSpacing.xxs),
               Flexible(
                 child: Text(
@@ -48,6 +48,7 @@ class MetaTile extends StatelessWidget {
             style: theme.textTheme.bodyMedium?.copyWith(
               fontWeight: FontWeight.w600,
             ),
+            maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
         ],

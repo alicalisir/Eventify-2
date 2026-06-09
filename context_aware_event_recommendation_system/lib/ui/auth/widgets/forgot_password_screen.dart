@@ -80,7 +80,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 const SizedBox(height: AppSpacing.xl),
                 Text(
                   AppStrings.forgotPasswordTitle,
-                  style: theme.textTheme.displayLarge?.copyWith(fontSize: 30),
+                  style: theme.textTheme.headlineMedium,
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
@@ -148,7 +148,7 @@ class _SuccessView extends StatelessWidget {
         const SizedBox(height: AppSpacing.lg),
         Text(
           'Check your inbox',
-          style: theme.textTheme.displayLarge?.copyWith(fontSize: 28),
+          style: theme.textTheme.headlineMedium,
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: AppSpacing.sm),
