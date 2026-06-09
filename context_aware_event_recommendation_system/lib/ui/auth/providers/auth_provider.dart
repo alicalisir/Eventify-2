@@ -42,18 +42,26 @@ class Auth extends _$Auth {
   }
 
   Future<void> restoreSession() async {
-    final user = await ref.read(authRepositoryProvider).restoreSession();
-    if (user != null) {
-      AppLogger.i('[Auth] Session restored → ${user.email}');
-    } else {
-      AppLogger.i('[Auth] No persisted session found');
+    try {
+      final user = await ref
+          .read(authRepositoryProvider)
+          .restoreSession()
+          .timeout(const Duration(seconds: 3));
+      if (user != null) {
+        AppLogger.i('[Auth] Session restored → ${user.email}');
+      } else {
+        AppLogger.i('[Auth] No persisted session found');
+      }
+      state = AuthState(
+        status: user != null
+            ? AuthStatus.authenticated
+            : AuthStatus.unauthenticated,
+        user: user,
+      );
+    } catch (e, s) {
+      AppLogger.e('[Auth] Session restore failed or timed out', e, s);
+      state = const AuthState(status: AuthStatus.unauthenticated);
     }
-    state = AuthState(
-      status: user != null
-          ? AuthStatus.authenticated
-          : AuthStatus.unauthenticated,
-      user: user,
-    );
   }
 
   Future<bool> signIn(String email, String password) async {

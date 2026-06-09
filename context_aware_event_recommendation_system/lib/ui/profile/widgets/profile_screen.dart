@@ -6,6 +6,7 @@ import '../../../config/constants/app_colors.dart';
 import '../../../config/constants/app_spacing.dart';
 import '../../../config/constants/app_strings.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../core/ui/app_back_button.dart';
 import '../../core/ui/app_button.dart';
 import '../../core/ui/app_pressable.dart';
 import '../../core/ui/app_snackbar.dart';
@@ -31,11 +32,7 @@ class ProfileScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-          tooltip: 'Back',
-        ),
+        leading: const AppBackButton(),
         title: const Text(AppStrings.profile),
       ),
       body: ListView(

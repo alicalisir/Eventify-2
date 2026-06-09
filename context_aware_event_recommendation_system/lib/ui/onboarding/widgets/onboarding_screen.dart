@@ -130,7 +130,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           consentAt: _consentGiven ? DateTime.now() : null,
         );
       } catch (_) {
-        // non-blocking — don't prevent onboarding completion
+        if (mounted) {
+          AppSnackbar.show(
+            context,
+            message: 'Preferences could not be saved — you can update them from Profile.',
+            kind: SnackKind.warning,
+          );
+        }
       }
     }
     await ref.read(authProvider.notifier).completeOnboarding();
@@ -445,7 +451,7 @@ class _ConsentPage extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
+          const Icon(
             Icons.privacy_tip_outlined,
             size: 48,
             color: AppColors.primary,
@@ -461,7 +467,7 @@ class _ConsentPage extends StatelessWidget {
             style: theme.textTheme.bodyLarge?.copyWith(color: secondaryText),
           ),
           const SizedBox(height: AppSpacing.lg),
-          _InfoTile(
+          const _InfoTile(
             icon: Icons.location_on_outlined,
             title: 'Location data',
             body: 'Used to suggest nearby events and places. '

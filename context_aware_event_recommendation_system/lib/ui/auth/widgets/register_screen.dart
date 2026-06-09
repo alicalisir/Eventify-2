@@ -6,6 +6,7 @@ import '../../../config/constants/app_colors.dart';
 import '../../../config/constants/app_spacing.dart';
 import '../../../config/constants/app_strings.dart';
 import '../../../utils/validators.dart';
+import '../../core/ui/app_back_button.dart';
 import '../../core/ui/app_button.dart';
 import '../../core/ui/app_pressable.dart';
 import '../../core/ui/app_snackbar.dart';
@@ -116,11 +117,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-          tooltip: 'Back',
-        ),
+        leading: const AppBackButton(),
         title: const Text(AppStrings.createAccountTitle),
       ),
       body: SafeArea(

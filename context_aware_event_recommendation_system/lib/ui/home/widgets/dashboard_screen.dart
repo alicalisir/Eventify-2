@@ -128,7 +128,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                 userName: user?.name.split(' ').first ?? 'there',
               ),
               loading: () => const _HeroShimmer(),
-              error: (_, _) => const SizedBox.shrink(),
+              error: (_, _) => _ContextErrorCard(
+                onRetry: () => ref.invalidate(ambientContextProvider),
+              ),
             ),
             const SizedBox(height: AppSpacing.lg),
             // Suggestions — streamed card by card
@@ -306,6 +308,48 @@ class _SuggestionListShimmer extends StatelessWidget {
           ),
         );
       }),
+    );
+  }
+}
+
+class _ContextErrorCard extends StatelessWidget {
+  final VoidCallback onRetry;
+
+  const _ContextErrorCard({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final secondary = theme.colorScheme.onSurfaceVariant;
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.md,
+      ),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppSpacing.borderRadiusLg),
+        border: Border.all(color: theme.dividerColor),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.cloud_off_outlined, color: secondary, size: 22),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Context unavailable', style: theme.textTheme.titleSmall),
+                Text(
+                  'Could not load your current context.',
+                  style: theme.textTheme.labelSmall?.copyWith(color: secondary),
+                ),
+              ],
+            ),
+          ),
+          TextButton(onPressed: onRetry, child: const Text('Retry')),
+        ],
+      ),
     );
   }
 }
