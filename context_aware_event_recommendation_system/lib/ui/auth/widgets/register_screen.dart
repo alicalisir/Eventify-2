@@ -29,7 +29,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
   bool _obscurePassword = true;
-  bool _agreedToTerms = false;
+  bool _obscureConfirm = true;
   bool _isLoading = false;
 
   @override
@@ -49,14 +49,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   Future<void> _handleSignUp() async {
     if (!_formKey.currentState!.validate()) return;
-    if (!_agreedToTerms) {
-      AppSnackbar.show(
-        context,
-        message: AppStrings.acceptTermsPrompt,
-        kind: SnackKind.warning,
-      );
-      return;
-    }
     setState(() => _isLoading = true);
     final success = await ref
         .read(authProvider.notifier)
@@ -169,17 +161,62 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       AppTextField(
                         controller: _confirmController,
                         label: AppStrings.confirmPassword,
-                        obscureText: _obscurePassword,
+                        obscureText: _obscureConfirm,
                         textInputAction: TextInputAction.done,
                         validator: (v) => Validators.confirmPassword(
                           v,
                           _passwordController.text,
                         ),
+                        suffixIcon: AppPressable(
+                          semanticLabel: 'Toggle confirm password visibility',
+                          onTap: () => setState(
+                            () => _obscureConfirm = !_obscureConfirm,
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(AppSpacing.sm),
+                            child: Icon(
+                              _obscureConfirm
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                              size: AppSpacing.iconSizeSm,
+                              color: secondaryText,
+                            ),
+                          ),
+                        ),
                       ),
                       const SizedBox(height: AppSpacing.lg),
-                      _TermsCheckbox(
-                        value: _agreedToTerms,
-                        onChanged: (v) => setState(() => _agreedToTerms = v),
+                      FormField<bool>(
+                        initialValue: false,
+                        autovalidateMode: AutovalidateMode.onUserInteraction,
+                        validator: (v) =>
+                            (v != true) ? AppStrings.acceptTermsPrompt : null,
+                        builder: (field) => Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _TermsCheckbox(
+                              value: field.value ?? false,
+                              onChanged: field.didChange,
+                            ),
+                            if (field.hasError)
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  AppSpacing.xs,
+                                  4,
+                                  0,
+                                  0,
+                                ),
+                                child: Text(
+                                  field.errorText!,
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.bodySmall?.copyWith(
+                                    color:
+                                        Theme.of(context).colorScheme.error,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -210,7 +247,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
 class _TermsCheckbox extends StatelessWidget {
   final bool value;
-  final ValueChanged<bool> onChanged;
+  final ValueChanged<bool?> onChanged;
 
   const _TermsCheckbox({required this.value, required this.onChanged});
 

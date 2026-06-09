@@ -109,7 +109,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         label: AppStrings.password,
                         obscureText: _obscurePassword,
                         textInputAction: TextInputAction.done,
-                        validator: Validators.password,
+                        validator: Validators.loginPassword,
                         onEditingComplete: _handleSignIn,
                         suffixIcon: AppPressable(
                           semanticLabel: _obscurePassword
