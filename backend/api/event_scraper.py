@@ -32,6 +32,7 @@ logger = logging.getLogger("caers.scraper")
 SUPABASE_URL = os.environ["SUPABASE_URL"].strip()
 SUPABASE_KEY = (os.environ.get("SUPABASE_SERVICE_KEY") or os.environ["SUPABASE_ANON_KEY"]).strip()
 GOOGLE_PLACES_KEY = os.environ.get("GOOGLE_PLACES_API_KEY", "")
+TICKETMASTER_API_KEY = os.environ.get("TICKETMASTER_API_KEY", "")
 
 _SUPA_HEADERS = {
     "apikey": SUPABASE_KEY,
@@ -525,49 +526,50 @@ def upsert_events(events: list[dict]) -> int:
     now_iso = now.isoformat()
     rows = []
     for ev in events:
-        title    = ev["title"]
-        city     = ev.get("city", "")
+        title     = ev["title"]
+        city      = ev.get("city", "")
         starts_at = ev.get("starts_at")
         ends_at   = ev.get("ends_at")
 
-        # expires_at: event should disappear from recommendations after it ends
-        if ends_at:
-            expires_at = ends_at
-        elif starts_at:
-            # assume event lasts at most 8 hours if no end time
-            try:
-                st = datetime.fromisoformat(starts_at)
-                expires_at = (st + timedelta(hours=8)).isoformat()
-            except Exception:
-                expires_at = None
-        else:
-            expires_at = None
+        # Use pre-computed expires_at if provided, otherwise derive it
+        expires_at = ev.get("expires_at")
+        if not expires_at:
+            if ends_at:
+                expires_at = ends_at
+            elif starts_at:
+                try:
+                    st = datetime.fromisoformat(starts_at.replace("Z", "+00:00"))
+                    expires_at = (st + timedelta(hours=8)).isoformat()
+                except Exception:
+                    expires_at = None
 
         ticket_url = ev.get("ticket_url")
         rows.append({
-            "source":       "scraped",
-            "external_id":  _make_external_id(title, city, starts_at),
-            "title":        title,
-            "description":  ev.get("description"),
-            "category":     ev.get("category", "workshop"),
-            "subcategory":  ev.get("subcategory"),
-            "venue_name":   ev.get("venue_name"),
-            "address":      ev.get("address"),
-            "city":         city,
-            "lat":          ev.get("lat"),
-            "lng":          ev.get("lng"),
-            "starts_at":    starts_at,
-            "ends_at":      ends_at,
-            "is_ticketed":  bool(ticket_url or ev.get("price_min")),
-            "price_min":    ev.get("price_min"),
-            "price_max":    ev.get("price_max"),
-            "currency":     "TRY",
-            "ticket_url":   ticket_url,
-            "tags":         ev.get("tags") or [],
-            "language":     "en",
-            "popularity_score": 0.5 if ticket_url else 0.0,
-            "expires_at":   expires_at,
-            "updated_at":   now_iso,
+            "source":           ev.get("source", "scraped"),
+            "external_id":      ev.get("external_id") or _make_external_id(title, city, starts_at),
+            "title":            title,
+            "description":      ev.get("description"),
+            "category":         ev.get("category", "workshop"),
+            "subcategory":      ev.get("subcategory"),
+            "venue_name":       ev.get("venue_name"),
+            "address":          ev.get("address"),
+            "city":             city,
+            "lat":              ev.get("lat"),
+            "lng":              ev.get("lng"),
+            "is_recurring":     ev.get("is_recurring", False),
+            "starts_at":        starts_at,
+            "ends_at":          ends_at,
+            "is_ticketed":      ev.get("is_ticketed", bool(ticket_url or ev.get("price_min"))),
+            "price_min":        ev.get("price_min"),
+            "price_max":        ev.get("price_max"),
+            "currency":         ev.get("currency", "TRY"),
+            "ticket_url":       ticket_url,
+            "image_url":        ev.get("image_url"),
+            "tags":             ev.get("tags") or [],
+            "language":         ev.get("language", "en"),
+            "popularity_score": ev.get("popularity_score", 0.5 if ticket_url else 0.0),
+            "expires_at":       expires_at,
+            "updated_at":       now_iso,
         })
     try:
         with httpx.Client(timeout=15) as client:
@@ -588,14 +590,206 @@ def upsert_events(events: list[dict]) -> int:
         return 0
 
 
-def scrape_all_cities() -> None:
-    logger.info("[scraper] starting cycle for cities: %s", SCRAPER_CITIES)
+# ─── Ticketmaster Discovery API ───────────────────────────────────────────────
+
+_TM_BASE = "https://app.ticketmaster.com/discovery/v2/events.json"
+
+_TM_SEGMENT_TO_CATEGORY: dict[str, str] = {
+    "music":           "music",
+    "sports":          "sports",
+    "arts & theatre":  "culture",
+    "film":            "culture",
+    "family":          "family",
+    "miscellaneous":   "workshop",
+}
+
+# Ticketmaster city name overrides (our name → TM query name)
+_TM_CITY_MAP: dict[str, str] = {
+    "Kocaeli": "Izmit",
+    "Izmir":   "Izmir",
+}
+
+
+def _tm_parse_event(ev: dict) -> Optional[dict]:
+    """Convert a Ticketmaster event dict into our DB row format."""
+    title = ev.get("name", "").strip()
+    if not title:
+        return None
+
+    tm_id = ev.get("id", "")
+
+    # Dates
+    dates = ev.get("dates", {})
+    start = dates.get("start", {})
+    starts_at: Optional[str] = start.get("dateTime")  # ISO with Z
+    if not starts_at:
+        local_date = start.get("localDate")
+        local_time = start.get("localTime", "20:00:00")
+        if local_date:
+            starts_at = f"{local_date}T{local_time}+03:00"
+
+    end = dates.get("end", {})
+    ends_at: Optional[str] = end.get("dateTime")
+
+    # expires_at: day after event ends (or starts if no end)
+    expires_at: Optional[str] = None
+    if ends_at:
+        expires_at = ends_at
+    elif starts_at:
+        try:
+            from datetime import datetime, timezone, timedelta
+            dt = datetime.fromisoformat(starts_at.replace("Z", "+00:00"))
+            expires_at = (dt + timedelta(hours=4)).isoformat()
+        except Exception:
+            pass
+
+    # Venue
+    venues = ev.get("_embedded", {}).get("venues", [])
+    venue = venues[0] if venues else {}
+    venue_name = venue.get("name", "")
+    city_obj = venue.get("city", {})
+    city = city_obj.get("name", "Istanbul")
+    address_obj = venue.get("address", {})
+    address = address_obj.get("line1", "")
+    if venue.get("postalCode"):
+        address = f"{address}, {venue.get('postalCode', '')}".strip(", ")
+
+    # Category from Ticketmaster segment
+    classifications = ev.get("classifications", [])
+    segment_name = ""
+    genre_name = ""
+    if classifications:
+        seg = classifications[0].get("segment", {})
+        segment_name = seg.get("name", "").lower()
+        gen = classifications[0].get("genre", {})
+        genre_name = gen.get("name", "").lower()
+
+    category = _TM_SEGMENT_TO_CATEGORY.get(segment_name)
+    if not category:
+        category = _classify_category(title, venue=venue_name)
+
+    subcategory = _get_subcategory(title, venue=venue_name, category=category)
+    if not subcategory and genre_name and genre_name not in ("undefined", "other"):
+        subcategory = genre_name[:40]
+
+    # Price
+    price_ranges = ev.get("priceRanges", [])
+    price_min: Optional[float] = None
+    price_max: Optional[float] = None
+    currency = "TRY"
+    if price_ranges:
+        pr = price_ranges[0]
+        price_min = pr.get("min")
+        price_max = pr.get("max")
+        currency = pr.get("currency", "TRY")
+
+    # Ticket URL
+    ticket_url = ev.get("url", "")
+
+    # Image
+    images = ev.get("images", [])
+    image_url: Optional[str] = None
+    for img in images:
+        if img.get("ratio") == "16_9" and img.get("width", 0) >= 640:
+            image_url = img.get("url")
+            break
+    if not image_url and images:
+        image_url = images[0].get("url")
+
+    tags = [t for t in [segment_name, genre_name] if t and t not in ("undefined", "other")]
+
+    now = datetime.now(timezone.utc)
+    return {
+        "source":           "ticketmaster",
+        "external_id":      f"tm_{tm_id}",
+        "title":            title,
+        "description":      None,
+        "category":         category,
+        "subcategory":      subcategory,
+        "venue_name":       venue_name or None,
+        "address":          address or None,
+        "city":             city,
+        "is_recurring":     False,
+        "is_ticketed":      True,
+        "price_min":        price_min,
+        "price_max":        price_max,
+        "currency":         currency,
+        "ticket_url":       ticket_url or None,
+        "image_url":        image_url,
+        "tags":             tags,
+        "language":         "en",
+        "popularity_score": 0.70,
+        "starts_at":        starts_at,
+        "ends_at":          ends_at,
+        "expires_at":       expires_at,
+        "updated_at":       now.isoformat(),
+    }
+
+
+def fetch_ticketmaster_city(city: str, page_size: int = 50) -> list[dict]:
+    """Fetch upcoming events from Ticketmaster Discovery API for one city."""
+    if not TICKETMASTER_API_KEY:
+        return []
+
+    tm_city = _TM_CITY_MAP.get(city, city)
+    now = datetime.now(timezone.utc)
+    start_dt = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    end_dt = (now + timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    params = {
+        "apikey":       TICKETMASTER_API_KEY,
+        "city":         tm_city,
+        "countryCode":  "TR",
+        "size":         str(page_size),
+        "sort":         "date,asc",
+        "startDateTime": start_dt,
+        "endDateTime":   end_dt,
+    }
+
+    try:
+        with httpx.Client(timeout=15) as client:
+            r = client.get(_TM_BASE, params=params)
+        if r.status_code != 200:
+            logger.warning("[ticketmaster] %s status=%s", city, r.status_code)
+            return []
+        data = r.json()
+        raw_events = data.get("_embedded", {}).get("events", [])
+        logger.info("[ticketmaster] %s → %d raw events", city, len(raw_events))
+        rows = []
+        for ev in raw_events:
+            row = _tm_parse_event(ev)
+            if row:
+                rows.append(row)
+        return rows
+    except Exception as e:
+        logger.warning("[ticketmaster] fetch failed city=%s: %s", city, e)
+        return []
+
+
+def fetch_all_ticketmaster() -> None:
+    """Fetch Ticketmaster events for all configured cities and upsert."""
+    logger.info("[ticketmaster] starting cycle for cities: %s", SCRAPER_CITIES)
     total = 0
     for city in SCRAPER_CITIES:
-        events = scrape_city(city)
-        total += upsert_events(events)
-        time.sleep(1.0)
-    logger.info("[scraper] cycle complete -- %d events upserted", total)
+        rows = fetch_ticketmaster_city(city)
+        if rows:
+            total += upsert_events(rows)
+        time.sleep(0.5)
+    logger.info("[ticketmaster] cycle complete — %d events upserted", total)
+
+
+def scrape_all_cities() -> None:
+    if TICKETMASTER_API_KEY:
+        fetch_all_ticketmaster()
+    else:
+        logger.info("[scraper] no Ticketmaster key, falling back to Google scraper")
+        logger.info("[scraper] starting cycle for cities: %s", SCRAPER_CITIES)
+        total = 0
+        for city in SCRAPER_CITIES:
+            events = scrape_city(city)
+            total += upsert_events(events)
+            time.sleep(1.0)
+        logger.info("[scraper] cycle complete -- %d events upserted", total)
 
 
 # ─── Demo seed ────────────────────────────────────────────────────────────────
