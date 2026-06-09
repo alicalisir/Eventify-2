@@ -598,6 +598,122 @@ def scrape_all_cities() -> None:
     logger.info("[scraper] cycle complete -- %d events upserted", total)
 
 
+# ─── Demo seed ────────────────────────────────────────────────────────────────
+# Hard-coded recurring events inserted at startup when the DB is sparse.
+# is_recurring=True means no starts_at required — they always surface in queries.
+
+_DEMO_EVENTS: list[dict] = [
+    {"title": "Jazz Night — Nardis Jazz Club", "category": "music", "subcategory": "jazz",
+     "venue_name": "Nardis Jazz Club", "address": "Kuledibi Sok. No:14, Beyoğlu",
+     "city": "Istanbul", "is_ticketed": True, "price_min": 250, "price_max": 400,
+     "tags": ["jazz", "live music", "Beyoğlu"], "popularity_score": 0.82},
+    {"title": "Babylon Live Music Night", "category": "music", "subcategory": "concert",
+     "venue_name": "Babylon", "address": "Şehbender Sok. No:3, Asmalımescit",
+     "city": "Istanbul", "is_ticketed": True, "price_min": 200, "price_max": 350,
+     "tags": ["live music", "Beyoğlu", "nightlife"], "popularity_score": 0.79},
+    {"title": "Istanbul Modern — Contemporary Art Exhibition", "category": "culture", "subcategory": "museum",
+     "venue_name": "İstanbul Modern", "address": "Meclis-i Mebusan Cad., Karaköy",
+     "city": "Istanbul", "is_ticketed": True, "price_min": 100, "price_max": 200,
+     "tags": ["contemporary art", "museum", "Karaköy"], "popularity_score": 0.91},
+    {"title": "Pera Museum — Orientalist Painting Collection", "category": "culture", "subcategory": "museum",
+     "venue_name": "Pera Müzesi", "address": "Meşrutiyet Cad. No:65, Tepebaşı",
+     "city": "Istanbul", "is_ticketed": True, "price_min": 75, "price_max": 150,
+     "tags": ["museum", "art", "Beyoğlu"], "popularity_score": 0.88},
+    {"title": "Bosphorus Sunset Boat Tour", "category": "outdoor", "subcategory": "boat",
+     "venue_name": "Beşiktaş İskelesi", "address": "Beşiktaş Meydanı",
+     "city": "Istanbul", "is_ticketed": True, "price_min": 200, "price_max": 350,
+     "tags": ["boat", "Bosphorus", "sunset"], "popularity_score": 0.89},
+    {"title": "Kadıköy Food Tour", "category": "food", "subcategory": "food-tasting",
+     "venue_name": "Kadıköy Çarşısı", "address": "Mühürdar Cad., Kadıköy",
+     "city": "Istanbul", "is_ticketed": True, "price_min": 300, "price_max": 300,
+     "tags": ["food", "tour", "Kadıköy"], "popularity_score": 0.83},
+    {"title": "Maçka Park Outdoor Yoga", "category": "outdoor", "subcategory": "open-air",
+     "venue_name": "Maçka Demokrasi Parkı", "address": "Maçka, Beşiktaş",
+     "city": "Istanbul", "is_ticketed": False, "price_min": 0, "price_max": 0,
+     "tags": ["yoga", "morning", "park", "free"], "popularity_score": 0.72},
+    {"title": "Ceramics Workshop — Cihangir", "category": "workshop", "subcategory": "workshop",
+     "venue_name": "Cihangir Sanat Atölyesi", "address": "Akarsu Cad., Cihangir",
+     "city": "Istanbul", "is_ticketed": True, "price_min": 400, "price_max": 600,
+     "tags": ["ceramics", "workshop", "crafts"], "popularity_score": 0.71},
+    {"title": "Istanbul Marathon Training Run", "category": "sports", "subcategory": "marathon-run",
+     "venue_name": "Fenerbahçe Parkı", "address": "Bağdat Cad., Kadıköy",
+     "city": "Istanbul", "is_ticketed": False, "price_min": 0, "price_max": 0,
+     "tags": ["running", "marathon", "group", "free"], "popularity_score": 0.69},
+    {"title": "Topkapi Palace Guided Tour", "category": "culture", "subcategory": "exhibition",
+     "venue_name": "Topkapı Sarayı", "address": "Sultanahmet, Fatih",
+     "city": "Istanbul", "is_ticketed": True, "price_min": 150, "price_max": 400,
+     "tags": ["historic", "museum", "Ottoman"], "popularity_score": 0.93},
+    # Kocaeli
+    {"title": "Sapanca Lake Nature Walk", "category": "outdoor", "subcategory": "open-air",
+     "venue_name": "Sapanca Gölü", "address": "Sapanca, Kocaeli",
+     "city": "Kocaeli", "is_ticketed": False, "price_min": 0, "price_max": 0,
+     "tags": ["lake", "nature", "hiking", "free"], "popularity_score": 0.91},
+    {"title": "Jazz Night — Kocaeli Cultural Centre", "category": "music", "subcategory": "jazz",
+     "venue_name": "Kocaeli Kültür Merkezi", "address": "İzmit Meydan, İzmit",
+     "city": "Kocaeli", "is_ticketed": True, "price_min": 100, "price_max": 200,
+     "tags": ["jazz", "live music", "İzmit"], "popularity_score": 0.71},
+]
+
+
+def ensure_demo_events() -> None:
+    """Insert hard-coded demo events if the events table is nearly empty."""
+    try:
+        with httpx.Client(timeout=8) as client:
+            resp = client.get(
+                f"{SUPABASE_URL}/rest/v1/events",
+                headers=_SUPA_HEADERS,
+                params={"source": "eq.curated", "select": "id", "limit": "5"},
+            )
+        if resp.status_code == 200 and len(resp.json() or []) >= 5:
+            logger.info("[seed] curated events already present, skipping demo seed")
+            return
+    except Exception as e:
+        logger.warning("[seed] check failed: %s", e)
+        return
+
+    now = datetime.now(timezone.utc)
+    rows = []
+    for ev in _DEMO_EVENTS:
+        title, city = ev["title"], ev["city"]
+        rows.append({
+            "source":          "curated",
+            "external_id":     _make_external_id(title, city, None),
+            "title":           title,
+            "description":     None,
+            "category":        ev["category"],
+            "subcategory":     ev.get("subcategory"),
+            "venue_name":      ev.get("venue_name"),
+            "address":         ev.get("address"),
+            "city":            city,
+            "is_recurring":    True,
+            "is_ticketed":     ev.get("is_ticketed", False),
+            "price_min":       ev.get("price_min"),
+            "price_max":       ev.get("price_max"),
+            "currency":        "TRY",
+            "tags":            ev.get("tags", []),
+            "language":        "en",
+            "popularity_score": ev.get("popularity_score", 0.5),
+            "expires_at":      None,
+            "updated_at":      now.isoformat(),
+        })
+
+    try:
+        headers = {**_SUPA_HEADERS, "Prefer": "resolution=merge-duplicates,return=minimal"}
+        with httpx.Client(timeout=15) as client:
+            resp = client.post(
+                f"{SUPABASE_URL}/rest/v1/events",
+                params={"on_conflict": "external_id"},
+                headers=headers,
+                json=rows,
+            )
+        if resp.status_code in (200, 201):
+            logger.info("[seed] inserted %d demo events", len(rows))
+        else:
+            logger.warning("[seed] failed status=%s body=%s", resp.status_code, resp.text[:200])
+    except Exception as e:
+        logger.warning("[seed] insert failed: %s", e)
+
+
 if __name__ == "__main__":
     import sys
     logging.basicConfig(level=logging.INFO,

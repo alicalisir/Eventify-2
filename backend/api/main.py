@@ -559,7 +559,12 @@ from contextlib import asynccontextmanager  # noqa: E402
 @asynccontextmanager
 async def lifespan(app):
     from apscheduler.schedulers.background import BackgroundScheduler
-    from event_scraper import scrape_all_cities
+    from event_scraper import ensure_demo_events, scrape_all_cities
+    import threading
+
+    # Seed demo events immediately if table is sparse (no external API needed)
+    threading.Thread(target=ensure_demo_events, daemon=True).start()
+
     interval_h = int(os.environ.get("SCRAPER_INTERVAL_HOURS", "6"))
     scheduler = BackgroundScheduler()
     scheduler.add_job(scrape_all_cities, "interval", hours=interval_h, id="event_scraper")
@@ -942,16 +947,17 @@ Movement: {movement_pattern} ({dist_km} km traveled)
 Top apps last hour: {top_apps_str}
 Screen unlocks: {unlocks}
 
-## Nearby Venues (within 1.5 km)
-{places_str}
-
-## Upcoming Events (next 48h near you)
+## Upcoming Events near you — PICK FROM HERE FIRST (E0, E1, ...)
 {events_str}
 
+## Nearby Venues — use only if no events fit (V0, V1, ...)
+{places_str}
+
 ## Task
-Select the 3 most suitable options for this user right now.
-Prefer events (E-prefixed) when they match the persona and timing.
-For each selection use the ref code from the lists above: V0, V1, E0, E1, etc.
+Select exactly 3 recommendations for this user.
+RULE: If ANY event above matches the user's persona or current mood, pick it.
+Only fall back to venues when there are no suitable events at all.
+Use the ref codes: E0, E1, ... for events  |  V0, V1, ... for venues.
 Return ONLY a valid JSON array, no other text:
 [
   {{
@@ -1299,6 +1305,20 @@ def admin_scrape_events(x_admin_key: Optional[str] = Header(None)):
 def debug_realtime(user_id: str):
     ctx = _build_realtime_context(user_id)
     return {"user_id": user_id, "realtime_context": ctx}
+
+
+@app.get("/api/debug/events/{city}")
+def debug_events(city: str):
+    """Show what nearby_events RPC returns for a city (no auth required)."""
+    interests = ["music", "culture", "sports", "food", "outdoor", "workshop", "family"]
+    events = _supa_rpc("nearby_events", {"p_city": city, "p_interests": interests, "p_limit": 20})
+    total = _supa_get("events", {"city": f"eq.{city}", "select": "id", "limit": "1"})
+    return {
+        "city": city,
+        "rpc_events": len(events),
+        "events": events,
+        "total_in_db_note": "use city=eq.Istanbul exactly",
+    }
 
 
 @app.get("/api/persona/{user_id}", response_model=PersonaResponse)
