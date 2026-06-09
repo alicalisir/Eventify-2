@@ -1250,6 +1250,7 @@ def health():
         "status": "ok",
         "model": str(_MODEL_FILE.name),
         "personas": len(_label_classes),
+        "v": "20260609-events",
     }
 
 
