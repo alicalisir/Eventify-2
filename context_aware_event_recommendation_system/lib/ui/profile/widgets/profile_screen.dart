@@ -124,7 +124,7 @@ class ProfileScreen extends ConsumerWidget {
                             ),
                             const SizedBox(width: AppSpacing.xxs),
                             Text(
-                              'Persona active',
+                              AppStrings.personaActive,
                               style: theme.textTheme.labelSmall?.copyWith(
                                 color: AppColors.success,
                                 fontWeight: FontWeight.w600,
@@ -243,7 +243,7 @@ class ProfileScreen extends ConsumerWidget {
           ),
 
           // Privacy
-          const _SectionTitle(label: 'Privacy'),
+          const _SectionTitle(label: AppStrings.privacy),
           Container(
             decoration: _sectionCardDecoration(theme),
             clipBehavior: Clip.antiAlias,
@@ -252,22 +252,14 @@ class ProfileScreen extends ConsumerWidget {
                 _NavRow(
                   icon: Icons.shield_outlined,
                   title: AppStrings.privacyPolicy,
-                  onTap: () => AppSnackbar.show(
-                    context,
-                    message: 'Opened privacy policy',
-                    kind: SnackKind.info,
-                  ),
+                  onTap: () => context.pushNamed('privacy-policy'),
                 ),
                 _RowDivider(divider: divider),
                 _NavRow(
                   icon: Icons.delete_outline,
                   title: AppStrings.deleteMyData,
                   color: AppColors.error,
-                  onTap: () => AppSnackbar.show(
-                    context,
-                    message: 'Confirm in your inbox',
-                    kind: SnackKind.warning,
-                  ),
+                  onTap: () => _confirmDeleteData(context, ref),
                 ),
               ],
             ),
@@ -287,6 +279,38 @@ class ProfileScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  static Future<void> _confirmDeleteData(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text(AppStrings.deleteDataConfirmTitle),
+        content: const Text(AppStrings.deleteDataConfirmMessage),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text(AppStrings.cancel),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text(AppStrings.deleteDataButton),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && context.mounted) {
+      AppSnackbar.show(
+        context,
+        message: AppStrings.deleteDataRequested,
+        kind: SnackKind.info,
+        duration: const Duration(seconds: 5),
+      );
+    }
   }
 
   static String _initial(String? name) {

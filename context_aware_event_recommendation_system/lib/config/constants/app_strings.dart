@@ -94,6 +94,24 @@ abstract final class AppStrings {
   static const String confirmLogout = 'Are you sure you want to log out?';
   static const String cancel = 'Cancel';
 
+  // Suggestion Detail
+  static const String weather = 'Weather';
+  static const String location = 'Location';
+  static const String tags = 'Tags';
+  static const String tapForDirections = 'Tap for directions';
+  static const String openInMaps = 'Open in Maps';
+  static const String couldNotOpenMaps = 'Could not open maps app';
+
+  // Privacy & Account
+  static const String privacy = 'Privacy';
+  static const String deleteDataConfirmTitle = 'Delete All My Data?';
+  static const String deleteDataConfirmMessage =
+      'This will permanently delete your profile, activity history, and all inferred personas. This action cannot be undone.';
+  static const String deleteDataButton = 'Delete Everything';
+  static const String deleteDataRequested =
+      'Deletion request submitted. You will receive a confirmation email.';
+  static const String personaActive = 'Persona active';
+
   // Error States
   static const String somethingWentWrong = 'Something went wrong';
   static const String tryAgain = 'Try Again';
