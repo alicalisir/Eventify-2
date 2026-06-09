@@ -21,8 +21,8 @@ class EmptyDashboard extends StatelessWidget {
       child: Column(
         children: [
           Container(
-            width: 140,
-            height: 140,
+            width: AppSpacing.illustrationSize,
+            height: AppSpacing.illustrationSize,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: LinearGradient(

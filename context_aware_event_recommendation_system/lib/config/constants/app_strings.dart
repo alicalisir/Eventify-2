@@ -137,4 +137,16 @@ abstract final class AppStrings {
   static const String locationDisabledDesc =
       'Location services are disabled. Enable them to get personalized suggestions.';
   static const String checkSettings = 'Check Settings';
+
+  // Auth error messages
+  static const String tooManyRequests =
+      'Too many attempts. Please wait a moment before trying again.';
+  static const String emailNotVerified =
+      'Please verify your email before signing in. Check your inbox.';
+
+  // Profile edit
+  static const String editProfile = 'Edit Profile';
+  static const String saveChanges = 'Save Changes';
+  static const String profileUpdated = 'Profile updated successfully.';
+  static const String yourName = 'Your Name';
 }

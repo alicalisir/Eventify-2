@@ -37,4 +37,8 @@ class AuthRepository {
   Future<void> updatePassword(String newPassword) async {
     await _authService.updatePassword(newPassword);
   }
+
+  Future<void> updateProfileName(String userId, String name) async {
+    await _authService.updateProfileName(userId, name);
+  }
 }

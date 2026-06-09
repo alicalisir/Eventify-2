@@ -31,9 +31,21 @@ class Auth extends _$Auth {
   AuthState build() {
     final subscription = Supabase.instance.client.auth.onAuthStateChange.listen(
       (data) {
-        if (data.event == AuthChangeEvent.passwordRecovery) {
-          AppLogger.i('[Auth] Password recovery session detected');
-          state = state.copyWith(status: AuthStatus.passwordRecovery);
+        switch (data.event) {
+          case AuthChangeEvent.passwordRecovery:
+            AppLogger.i('[Auth] Password recovery session detected');
+            state = state.copyWith(status: AuthStatus.passwordRecovery);
+          case AuthChangeEvent.tokenRefreshed:
+            AppLogger.d('[Auth] Token refreshed');
+          case AuthChangeEvent.signedOut:
+            AppLogger.i('[Auth] Signed out via external event');
+            state = const AuthState(status: AuthStatus.unauthenticated);
+          // ignore: deprecated_member_use
+          case AuthChangeEvent.userDeleted:
+            AppLogger.w('[Auth] User deleted externally');
+            state = const AuthState(status: AuthStatus.unauthenticated);
+          default:
+            break;
         }
       },
     );
@@ -168,12 +180,34 @@ class Auth extends _$Auth {
     }
   }
 
+  Future<bool> updateName(String name) async {
+    final user = state.user;
+    if (user == null) return false;
+    try {
+      await ref.read(authRepositoryProvider).updateProfileName(user.id, name);
+      state = state.copyWith(user: user.copyWith(name: name));
+      AppLogger.i('[Auth] Profile name updated');
+      return true;
+    } catch (e, s) {
+      AppLogger.e('[Auth] updateName failed', e, s);
+      return false;
+    }
+  }
+
   static AppError _classify(Object e) {
     if (e is AuthException) {
       final msg = e.message.toLowerCase();
+      if (msg.contains('rate limit') ||
+          msg.contains('too many') ||
+          msg.contains('over_email_send_rate_limit')) {
+        return const TooManyRequestsError();
+      }
+      if (msg.contains('email not confirmed') ||
+          msg.contains('not confirmed')) {
+        return const EmailNotVerifiedError();
+      }
       if (msg.contains('invalid login') ||
-          msg.contains('invalid credentials') ||
-          msg.contains('email not confirmed')) {
+          msg.contains('invalid credentials')) {
         return const AuthError();
       }
       if (msg.contains('network') || msg.contains('timeout')) {

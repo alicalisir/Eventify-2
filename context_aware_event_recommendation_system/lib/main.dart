@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'config/app.dart';
+import 'config/app_env.dart';
 import 'data/services/background_service.dart';
 import 'ui/auth/providers/auth_provider.dart';
 
@@ -27,12 +28,28 @@ Future<void> main() async {
   await prefs.setString('supabase_url', dotenv.env['SUPABASE_URL']!);
   await prefs.setString('supabase_anon_key', dotenv.env['SUPABASE_ANON_KEY']!);
 
+  final sentryDsn = dotenv.env['SENTRY_DSN'] ?? '';
+  if (sentryDsn.isEmpty) {
+    debugPrint('[Sentry] DSN not configured — error reporting disabled');
+  }
   try {
     await SentryFlutter.init((options) {
-      options.dsn = dotenv.env['SENTRY_DSN'] ?? '';
-      options.environment = kDebugMode ? 'development' : 'production';
-      options.tracesSampleRate = 0.2;
+      options.dsn = sentryDsn;
+      options.environment = AppEnv.flavor;
+      options.tracesSampleRate =
+          kDebugMode ? 1.0 : AppEnv.sentryTracesSampleRate;
       options.debug = kDebugMode;
+      options.beforeSend = (event, hint) {
+        // Strip auth tokens and email from breadcrumbs to avoid PII leaks.
+        final sanitized = event.breadcrumbs?.map((b) {
+          final data = Map<String, dynamic>.from(b.data ?? {});
+          data.remove('token');
+          data.remove('access_token');
+          data.remove('email');
+          return b.copyWith(data: data);
+        }).toList();
+        return event.copyWith(breadcrumbs: sanitized);
+      };
     });
   } catch (_) {}
 
@@ -65,6 +82,8 @@ Future<void> _bootstrap() async {
 
   WidgetsBinding.instance.addPostFrameCallback((_) {
     container.read(authProvider.notifier).restoreSession();
-    initBackgroundService().ignore();
+    initBackgroundService().catchError(
+      (Object e) => debugPrint('[BackgroundService] Init failed: $e'),
+    );
   });
 }

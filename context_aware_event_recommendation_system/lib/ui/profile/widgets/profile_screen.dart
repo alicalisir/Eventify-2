@@ -34,6 +34,13 @@ class ProfileScreen extends ConsumerWidget {
       appBar: AppBar(
         leading: const AppBackButton(),
         title: const Text(AppStrings.profile),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: AppStrings.editProfile,
+            onPressed: () => _showEditProfileSheet(context, ref, user?.name ?? ''),
+          ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(
@@ -275,6 +282,38 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
+  static Future<void> _showEditProfileSheet(
+    BuildContext context,
+    WidgetRef ref,
+    String currentName,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppSpacing.borderRadiusLg),
+        ),
+      ),
+      builder: (ctx) => _ProfileEditSheet(
+        currentName: currentName,
+        onSave: (name) async {
+          final ok = await ref.read(authProvider.notifier).updateName(name);
+          if (ctx.mounted) {
+            Navigator.of(ctx).pop();
+            AppSnackbar.show(
+              context,
+              message: ok
+                  ? AppStrings.profileUpdated
+                  : AppStrings.somethingWentWrongRetry,
+              kind: ok ? SnackKind.success : SnackKind.error,
+            );
+          }
+        },
+      ),
+    );
+  }
+
   static Future<void> _confirmDeleteData(
     BuildContext context,
     WidgetRef ref,
@@ -466,6 +505,74 @@ class _SwitchRow extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ProfileEditSheet extends StatefulWidget {
+  final String currentName;
+  final Future<void> Function(String name) onSave;
+
+  const _ProfileEditSheet({required this.currentName, required this.onSave});
+
+  @override
+  State<_ProfileEditSheet> createState() => _ProfileEditSheetState();
+}
+
+class _ProfileEditSheetState extends State<_ProfileEditSheet> {
+  late final TextEditingController _nameCtrl;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameCtrl = TextEditingController(text: widget.currentName);
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final name = _nameCtrl.text.trim();
+    if (name.isEmpty) return;
+    setState(() => _saving = true);
+    await widget.onSave(name);
+    if (mounted) setState(() => _saving = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: EdgeInsets.only(
+        left: AppSpacing.lg,
+        right: AppSpacing.lg,
+        top: AppSpacing.lg,
+        bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.lg,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(AppStrings.editProfile, style: theme.textTheme.titleMedium),
+          const SizedBox(height: AppSpacing.md),
+          TextFormField(
+            controller: _nameCtrl,
+            decoration: InputDecoration(labelText: AppStrings.yourName),
+            textCapitalization: TextCapitalization.words,
+            autofocus: true,
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          AppButton(
+            text: AppStrings.saveChanges,
+            isLoading: _saving,
+            onPressed: _saving ? null : _save,
+          ),
+        ],
       ),
     );
   }

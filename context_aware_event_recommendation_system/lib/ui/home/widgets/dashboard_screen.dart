@@ -133,31 +133,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                 index: i,
                 child: Padding(
                   padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                  child: Semantics(
-                    customSemanticsActions: {
-                      const CustomSemanticsAction(label: 'Dismiss'): () {
-                        ref
-                            .read(dismissedSuggestionsProvider.notifier)
-                            .dismiss(suggestion.id);
-                        ScaffoldMessenger.of(context)
-                          ..hideCurrentSnackBar()
-                          ..showSnackBar(
-                            SnackBar(
-                              content: const Text(
-                                "Got it — we'll suggest fewer like that",
-                              ),
-                              duration: const Duration(seconds: 4),
-                              action: SnackBarAction(
-                                label: 'Undo',
-                                onPressed: () => ref
-                                    .read(dismissedSuggestionsProvider.notifier)
-                                    .undismiss(suggestion.id),
-                              ),
-                            ),
-                          );
-                      },
-                    },
-                    child: Dismissible(
+                  child: Dismissible(
                       key: ValueKey(suggestion.id),
                       direction: DismissDirection.endToStart,
                       movementDuration: AppDurations.slow,
@@ -194,7 +170,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                       ),
                     ),
                   ),
-                ),
               );
             },
           ),

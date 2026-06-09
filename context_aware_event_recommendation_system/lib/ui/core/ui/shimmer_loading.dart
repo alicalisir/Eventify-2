@@ -54,9 +54,9 @@ class _ShimmerLoadingState extends State<ShimmerLoading>
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
                   stops: [
-                    _controller.value - 0.3,
+                    _controller.value - AppSpacing.shimmerGradientSpread,
                     _controller.value,
-                    _controller.value + 0.3,
+                    _controller.value + AppSpacing.shimmerGradientSpread,
                   ],
                   colors: [
                     AppColors.shimmerBaseLight.withValues(alpha: 0.5),

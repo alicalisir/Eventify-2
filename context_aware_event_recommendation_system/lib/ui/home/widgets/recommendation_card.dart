@@ -92,7 +92,7 @@ class _RecommendationCardState extends ConsumerState<RecommendationCard> {
             children: [
               // Hero strip
               Container(
-                height: 110,
+                height: AppSpacing.cardHeroHeight,
                 padding: const EdgeInsets.all(AppSpacing.md),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(

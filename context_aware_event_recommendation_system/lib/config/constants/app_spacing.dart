@@ -24,4 +24,16 @@ abstract final class AppSpacing {
 
   /// Shimmer animation duration — used by all shimmer widgets for visual sync.
   static const Duration shimmerDuration = Duration(milliseconds: 1500);
+
+  /// Shimmer gradient spread — fraction on each side of the highlight center.
+  static const double shimmerGradientSpread = 0.3;
+
+  /// Hero strip height on RecommendationCard.
+  static const double cardHeroHeight = 110.0;
+
+  /// Illustration circle size on EmptyDashboard.
+  static const double illustrationSize = 140.0;
+
+  /// Dismiss/CTA circular button size on SuggestionDetailScreen.
+  static const double ctaButtonSize = 52.0;
 }

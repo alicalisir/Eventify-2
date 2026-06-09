@@ -435,8 +435,8 @@ class _SuggestionDetailScreenState
                     semanticLabel: AppStrings.dismiss,
                     onTap: () => context.pop(),
                     child: Container(
-                      width: 52,
-                      height: 52,
+                      width: AppSpacing.ctaButtonSize,
+                      height: AppSpacing.ctaButtonSize,
                       decoration: BoxDecoration(
                         border: Border.all(
                           color: theme.dividerColor,

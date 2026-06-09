@@ -78,6 +78,9 @@ class _HangingAuthRepository implements AuthRepository {
   Future<void> sendPasswordReset(String e) => throw UnimplementedError();
   @override
   Future<void> updatePassword(String p) => throw UnimplementedError();
+  @override
+  Future<void> updateProfileName(String u, String n) =>
+      throw UnimplementedError();
 }
 
 /// AuthService whose updateInterestsAndConsent always throws — simulates a
@@ -105,6 +108,9 @@ class _ThrowingAuthService implements AuthService {
   Future<UserModel?> getSessionUser() => throw UnimplementedError();
   @override
   Future<void> updateOnboardingCompleted(String u) =>
+      throw UnimplementedError();
+  @override
+  Future<void> updateProfileName(String u, String n) =>
       throw UnimplementedError();
 }
 
