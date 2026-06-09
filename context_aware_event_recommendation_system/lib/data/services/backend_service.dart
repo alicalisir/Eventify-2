@@ -72,6 +72,7 @@ class BackendService {
         final m = raw as Map<String, dynamic>;
         return SuggestionModel(
           id: m['id'] as String,
+          eventId: m['event_id'] as String?,
           title: m['title'] as String,
           description: m['description'] as String,
           rationale: m['rationale'] as String,

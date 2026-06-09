@@ -1,17 +1,75 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 
 import '../di/providers.dart';
 import '../routing/app_router.dart';
 import '../ui/auth/providers/auth_provider.dart';
 import '../ui/core/themes/app_theme.dart';
+import '../utils/app_logger.dart';
 import 'constants/app_strings.dart';
 
-class ContextAwareApp extends ConsumerWidget {
+class ContextAwareApp extends ConsumerStatefulWidget {
   const ContextAwareApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ContextAwareApp> createState() => _ContextAwareAppState();
+}
+
+class _ContextAwareAppState extends ConsumerState<ContextAwareApp>
+    with WidgetsBindingObserver {
+  DateTime? _sessionStart;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _sessionStart = DateTime.now();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _sessionStart = DateTime.now();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _flushSession();
+    }
+  }
+
+  void _flushSession() {
+    final start = _sessionStart;
+    if (start == null) return;
+    final durationMin = DateTime.now().difference(start).inSeconds / 60.0;
+    if (durationMin < 0.1) return; // ignore sub-6s blips
+    _sessionStart = null;
+
+    final userId =
+        ref.read(sharedPreferencesProvider).getString('current_user_id');
+    if (userId == null) return;
+
+    Supabase.instance.client.from('app_sessions').insert({
+      'user_id': userId,
+      'timestamp': start.toUtc().toIso8601String(),
+      'app_name': 'Eventify',
+      'category': 'recommendation',
+      'duration_min': durationMin,
+      'state': 'foreground',
+    }).then((_) {
+      AppLogger.d('[Session] ${durationMin.toStringAsFixed(1)} min logged');
+    }).catchError((e) {
+      AppLogger.w('[Session] flush failed', e);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
     final authState = ref.watch(authProvider);
     final prefs = ref.read(sharedPreferencesProvider);
@@ -20,7 +78,7 @@ class ContextAwareApp extends ConsumerWidget {
     // Sync current auth state on build (handles hot-restart / session restore)
     if (authState.status == AuthStatus.authenticated && authState.user != null) {
       prefs.setString('current_user_id', authState.user!.id);
-      screenEvents.start(); // starts native ScreenEventService.kt (screen on/off capture)
+      screenEvents.start();
     }
 
     // Handle auth state transitions (login / logout)

@@ -26,6 +26,9 @@ abstract class SuggestionModel with _$SuggestionModel {
     double? longitude,
     @Default(<String>[]) List<String> tags,
 
+    /// UUID from the events table. Set when the suggestion is event-based.
+    String? eventId,
+
     /// Optional context-weather summary (e.g. "21° • Clear").
     String? weather,
     required DateTime createdAt,

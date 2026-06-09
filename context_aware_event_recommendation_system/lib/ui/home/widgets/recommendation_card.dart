@@ -30,6 +30,19 @@ class RecommendationCard extends ConsumerStatefulWidget {
 class _RecommendationCardState extends ConsumerState<RecommendationCard> {
   bool _liked = false;
 
+  @override
+  void initState() {
+    super.initState();
+    // Log view once when the card first appears
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(feedbackServiceProvider).logAction(
+        suggestionId: widget.suggestion.id,
+        action: 'view',
+        suggestion: widget.suggestion,
+      );
+    });
+  }
+
   void _handleLike() {
     final next = !_liked;
     setState(() => _liked = next);

@@ -17,6 +17,7 @@ class FeedbackService {
       await _supabase.from('user_feedback').insert({
         'suggestion_id': suggestionId,
         'action': action,
+        if (suggestion.eventId != null) 'event_id': suggestion.eventId,
         'suggestion_snapshot': {
           'id': suggestion.id,
           'title': suggestion.title,

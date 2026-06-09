@@ -599,6 +599,7 @@ class PersonaResponse(BaseModel):
 
 class SuggestionResponse(BaseModel):
     id: str
+    event_id: Optional[str] = None   # UUID from events table, set for event-based suggestions
     title: str
     description: str
     rationale: str
@@ -881,6 +882,7 @@ def _build_llm_prompt(
     nearby_events: list[dict],
     realtime_ctx: dict,
     now: datetime,
+    category_score: Optional[dict] = None,
 ) -> str:
     hour = now.hour
     time_label = next((l for a, b, l in _TIME_LABELS if a <= hour < b), "Night")
@@ -936,10 +938,23 @@ def _build_llm_prompt(
         event_lines.append(f"E{i}. {title} — {cat} — {venue} — {starts}{price}{ticketed}")
     events_str = "\n".join(event_lines) if event_lines else "No upcoming events found nearby."
 
+    # Build feedback hints if available
+    feedback_section = ""
+    if category_score:
+        liked = [c for c, s in category_score.items() if s > 0]
+        disliked = [c for c, s in category_score.items() if s < 0]
+        parts = []
+        if liked:
+            parts.append(f"Enjoyed before: {', '.join(liked)}")
+        if disliked:
+            parts.append(f"Not interested in: {', '.join(disliked)} — avoid these")
+        if parts:
+            feedback_section = "\n## Past Feedback\n" + "\n".join(parts)
+
     return f"""## User Profile
 Persona: {meta['display']} ({persona_class})
 Traits: {traits_str}
-Preferences: {prefs_str}
+Preferences: {prefs_str}{feedback_section}
 
 ## Right Now (last hour)
 Time: {time_label} ({hour:02d}:{now.minute:02d}) — {day_type}
@@ -978,13 +993,14 @@ def _call_mistral(
     nearby_events: list[dict],
     realtime_ctx: dict,
     now: datetime,
+    category_score: Optional[dict] = None,
 ) -> Optional[tuple[list[dict], int, int, int]]:
     """Returns (items, prompt_tokens, completion_tokens, latency_ms) or None."""
     if not raw_places and not nearby_events:
         return None
     try:
         t0 = _time.monotonic()
-        prompt = _build_llm_prompt(persona_class, meta, raw_places, nearby_events, realtime_ctx, now)
+        prompt = _build_llm_prompt(persona_class, meta, raw_places, nearby_events, realtime_ctx, now, category_score)
         with httpx.Client(timeout=30) as client:
             resp = client.post(
                 f"{MISTRAL_URL}/v1/chat/completions",
@@ -1115,8 +1131,10 @@ def _llm_to_suggestions(
             if not (0 <= idx < len(nearby_events)):
                 idx = 0
             ev = nearby_events[idx]
+            raw_event_id = ev.get("event_id")
             results.append(SuggestionResponse(
-                id=f"event_{ev.get('event_id', str(idx))}",
+                id=f"event_{raw_event_id or idx}",
+                event_id=str(raw_event_id) if raw_event_id else None,
                 title=item.get("title") or ev.get("title", ""),
                 description=item.get("description", ""),
                 rationale=item.get("rationale", ""),
@@ -1335,6 +1353,45 @@ def get_persona(user_id: str, force: bool = Query(False)):
     )
 
 
+def _fetch_feedback_signals(user_id: str, days: int = 30) -> dict:
+    """Return disliked event UUIDs and category sentiment counts from recent feedback."""
+    since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    rows = _supa_get(
+        "user_feedback",
+        {
+            "user_id": f"eq.{user_id}",
+            "created_at": f"gte.{since}",
+            "select": "action,event_id,suggestion_snapshot",
+        },
+    )
+    disliked_event_ids: set[str] = set()
+    dismissed_event_ids: set[str] = set()
+    category_score: dict[str, int] = {}   # positive = liked, negative = disliked
+
+    for row in rows:
+        action = row.get("action", "")
+        event_id = row.get("event_id")
+        snap = row.get("suggestion_snapshot") or {}
+        category = snap.get("category", "")
+
+        if action in ("dislike",):
+            if event_id:
+                disliked_event_ids.add(str(event_id))
+            if category:
+                category_score[category] = category_score.get(category, 0) - 1
+        elif action == "dismiss":
+            if event_id:
+                dismissed_event_ids.add(str(event_id))
+        elif action == "like":
+            if category:
+                category_score[category] = category_score.get(category, 0) + 1
+
+    return {
+        "excluded_event_ids": disliked_event_ids | dismissed_event_ids,
+        "category_score": category_score,
+    }
+
+
 @app.get("/api/recommendations/{user_id}", response_model=list[SuggestionResponse])
 def get_recommendations(
     user_id: str,
@@ -1356,10 +1413,17 @@ def get_recommendations(
             except Exception as e:
                 logger.warning("[cache] payload parse error, skipping: %s", e)
 
+    feedback = _fetch_feedback_signals(user_id)
+    excluded_ids = feedback["excluded_event_ids"]
+    category_score = feedback["category_score"]
+
     # When GPS provided, fetch real nearby venues and generate LLM recommendations.
     if lat is not None and lon is not None and GOOGLE_PLACES_KEY:
         raw_places     = _fetch_google_places(lat, lon)
         nearby_events  = _fetch_nearby_events(lat, lon, persona_class)
+        # Remove events the user has disliked or dismissed
+        if excluded_ids:
+            nearby_events = [e for e in nearby_events if str(e.get("event_id", "")) not in excluded_ids]
         realtime_ctx   = _build_realtime_context(user_id)
 
         # Keep only venue types that match this persona's interests (relevance filter).
@@ -1373,7 +1437,7 @@ def get_recommendations(
 
         # Tier 1: LLM-enriched recommendations (persona + places + events + realtime)
         if persona_places or nearby_events:
-            llm_result = _call_mistral(persona_class, meta, persona_places, nearby_events, realtime_ctx, now)
+            llm_result = _call_mistral(persona_class, meta, persona_places, nearby_events, realtime_ctx, now, category_score)
             if llm_result:
                 llm_items, prompt_tokens, completion_tokens, latency_ms = llm_result
                 suggestions = _llm_to_suggestions(llm_items, persona_places, nearby_events, lat, lon, now_str)
