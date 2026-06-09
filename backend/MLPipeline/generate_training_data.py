@@ -46,9 +46,9 @@ log = logging.getLogger("gen_train")
 def balanced_persona_distribution() -> dict:
     """Uniform 1/12 across all 12 personas."""
     persona_ids = [
-        "GECE_KUSU", "ERKENCI", "SOSYAL", "OYUNCU", "ICERIK_TUKETICI",
-        "SPORCU", "OGRENCI", "PROFESYONEL", "EVCIMEN", "SEYYAH",
-        "KRIZ_DUZENSIZ", "HIBRIT",
+        "NIGHT_OWL", "EARLY_BIRD", "SOCIAL", "GAMER", "CONTENT_CONSUMER",
+        "ATHLETE", "STUDENT", "PROFESSIONAL", "HOMEBODY", "TRAVELER",
+        "IRREGULAR", "HYBRID",
     ]
     return {pid: 1.0 / len(persona_ids) for pid in persona_ids}
 

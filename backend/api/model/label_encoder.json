@@ -1,17 +1,17 @@
 {
   "classes": [
-    "EARLY_BIRD",
-    "HOMEBODY",
-    "NIGHT_OWL",
-    "HYBRID",
+    "ATHLETE",
     "CONTENT_CONSUMER",
-    "IRREGULAR",
-    "STUDENT",
+    "EARLY_BIRD",
     "GAMER",
+    "HOMEBODY",
+    "HYBRID",
+    "IRREGULAR",
+    "NIGHT_OWL",
     "PROFESSIONAL",
-    "TRAVELER",
     "SOCIAL",
-    "ATHLETE"
+    "STUDENT",
+    "TRAVELER"
   ],
-  "feature_set": "telemetry"
+  "feature_set": "with_episodes"
 }

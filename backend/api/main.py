@@ -910,12 +910,17 @@ def _classify(user_id: str, force: bool = False) -> tuple[str, dict, int, dict]:
     X = pd.DataFrame([row])[_feature_columns]
     X = X.fillna(0.0)
 
-    pred_idx = int(_model.predict(X)[0])
-    persona_class = _label_classes[pred_idx]
+    proba = _model.predict_proba(X)[0]
+    confidence = float(np.max(proba))
+    pred_idx = int(np.argmax(proba))
+    persona_class = _label_classes[pred_idx] if confidence >= 0.35 else "HYBRID"
     meta = _PERSONA_META.get(persona_class, _PERSONA_META["HYBRID"])
 
     # Build lightweight context summary for LLM prompt
-    context_summary: dict = {}
+    context_summary: dict = {
+        "model_confidence": round(confidence, 3),
+        "confidence_tier": "high" if confidence >= 0.55 else "low",
+    }
 
     # Latest movement state from most recent GPS ping
     if not gps.empty:

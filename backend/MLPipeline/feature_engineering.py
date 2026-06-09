@@ -292,23 +292,29 @@ def build_feature_matrix(
         DataFrame with one row per user.
     """
     # Normalize timestamps & extract derived columns once
+    def _is_datetime(series):
+        try:
+            return np.issubdtype(series.dtype, np.datetime64)
+        except TypeError:
+            return False
+
     if not apps.empty:
-        if not np.issubdtype(apps["timestamp"].dtype, np.datetime64):
+        if not _is_datetime(apps["timestamp"]):
             apps = apps.copy()
             apps["timestamp"] = pd.to_datetime(apps["timestamp"])
         apps["hour"] = apps["timestamp"].dt.hour
         apps["weekday"] = apps["timestamp"].dt.weekday
 
-    if not gps.empty and not np.issubdtype(gps["timestamp"].dtype, np.datetime64):
+    if not gps.empty and not _is_datetime(gps["timestamp"]):
         gps = gps.copy()
         gps["timestamp"] = pd.to_datetime(gps["timestamp"])
 
-    if not screen.empty and not np.issubdtype(screen["timestamp"].dtype, np.datetime64):
+    if not screen.empty and not _is_datetime(screen["timestamp"]):
         screen = screen.copy()
         screen["timestamp"] = pd.to_datetime(screen["timestamp"])
 
     if episode is not None and not episode.empty:
-        if not np.issubdtype(episode["timestamp"].dtype, np.datetime64):
+        if not _is_datetime(episode["timestamp"]):
             episode = episode.copy()
             episode["timestamp"] = pd.to_datetime(episode["timestamp"])
 
