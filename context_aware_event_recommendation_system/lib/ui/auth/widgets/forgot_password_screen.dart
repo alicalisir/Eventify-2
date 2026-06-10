@@ -68,7 +68,15 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
             AppSpacing.lg,
             AppSpacing.lg,
           ),
-          child: _emailSent ? _SuccessView(email: _emailController.text.trim()) : Form(
+          child: _emailSent
+              ? _SuccessView(
+                  email: _emailController.text.trim(),
+                  onResend: () => setState(() {
+                    _emailSent = false;
+                    _emailController.clear();
+                  }),
+                )
+              : Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -80,7 +88,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 const SizedBox(height: AppSpacing.xl),
                 Text(
                   AppStrings.forgotPasswordTitle,
-                  style: theme.textTheme.displayLarge?.copyWith(fontSize: 30),
+                  style: theme.textTheme.headlineMedium,
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
@@ -123,9 +131,10 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
 }
 
 class _SuccessView extends StatelessWidget {
-  const _SuccessView({required this.email});
+  const _SuccessView({required this.email, required this.onResend});
 
   final String email;
+  final VoidCallback onResend;
 
   @override
   Widget build(BuildContext context) {
@@ -148,12 +157,12 @@ class _SuccessView extends StatelessWidget {
         const SizedBox(height: AppSpacing.lg),
         Text(
           'Check your inbox',
-          style: theme.textTheme.displayLarge?.copyWith(fontSize: 28),
+          style: theme.textTheme.headlineMedium,
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: AppSpacing.sm),
         Text(
-          'If $email is registered, you\'ll receive a reset link shortly.',
+          'We\'ve sent a reset link to $email. Check your spam folder if you don\'t see it.',
           style: theme.textTheme.bodyLarge?.copyWith(color: secondaryText),
           textAlign: TextAlign.center,
         ),
@@ -161,6 +170,14 @@ class _SuccessView extends StatelessWidget {
         TextButton(
           onPressed: () => context.goNamed('login'),
           child: const Text(AppStrings.backToLogin),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        TextButton(
+          onPressed: onResend,
+          child: Text(
+            'Resend email',
+            style: TextStyle(color: secondaryText),
+          ),
         ),
       ],
     );

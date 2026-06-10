@@ -130,7 +130,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           consentAt: _consentGiven ? DateTime.now() : null,
         );
       } catch (_) {
-        // non-blocking — don't prevent onboarding completion
+        if (mounted) {
+          AppSnackbar.show(
+            context,
+            message: 'Preferences could not be saved — you can update them from Profile.',
+            kind: SnackKind.warning,
+          );
+        }
       }
     }
     await ref.read(authProvider.notifier).completeOnboarding();
@@ -251,20 +257,39 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(_totalPages, (i) {
                   final active = i == _page;
-                  return AnimatedContainer(
-                    duration: MediaQuery.disableAnimationsOf(context)
-                        ? Duration.zero
-                        : AppDurations.quick,
-                    curve: AppCurves.standard,
-                    margin: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.xxs,
-                    ),
-                    width: active ? 28 : 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color:
-                          active ? AppColors.primary : theme.dividerColor,
-                      borderRadius: BorderRadius.circular(AppSpacing.xxs),
+                  return Semantics(
+                    label:
+                        'Page ${i + 1} of $_totalPages${active ? ", current" : ""}',
+                    button: true,
+                    child: GestureDetector(
+                      onTap: () => _pageController.animateToPage(
+                        i,
+                        duration: AppDurations.quick,
+                        curve: AppCurves.standard,
+                      ),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          minWidth: 44,
+                          minHeight: 44,
+                        ),
+                        child: Center(
+                          child: AnimatedContainer(
+                            duration: MediaQuery.disableAnimationsOf(context)
+                                ? Duration.zero
+                                : AppDurations.quick,
+                            curve: AppCurves.standard,
+                            width: active ? 28 : 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: active
+                                  ? AppColors.primary
+                                  : theme.dividerColor,
+                              borderRadius:
+                                  BorderRadius.circular(AppSpacing.xxs),
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   );
                 }),
@@ -391,25 +416,36 @@ class _InterestsPage extends StatelessWidget {
             runSpacing: AppSpacing.sm,
             children: _interestCategories.map((cat) {
               final isSelected = selected.contains(cat.label);
-              return FilterChip(
-                avatar: Icon(
-                  cat.icon,
-                  size: 18,
-                  color: isSelected
-                      ? theme.colorScheme.onSecondaryContainer
-                      : theme.colorScheme.onSurfaceVariant,
+              return Semantics(
+                label:
+                    '${cat.label}, ${isSelected ? "selected" : "not selected"}',
+                button: true,
+                excludeSemantics: true,
+                child: AnimatedScale(
+                scale: isSelected ? 1.05 : 1.0,
+                duration: AppDurations.instant,
+                curve: Curves.easeOut,
+                child: FilterChip(
+                  avatar: Icon(
+                    cat.icon,
+                    size: AppSpacing.iconSizeSm,
+                    color: isSelected
+                        ? theme.colorScheme.onSecondaryContainer
+                        : theme.colorScheme.onSurfaceVariant,
+                  ),
+                  label: Text(cat.label),
+                  selected: isSelected,
+                  onSelected: (v) {
+                    final next = Set<String>.from(selected);
+                    if (v) {
+                      next.add(cat.label);
+                    } else {
+                      next.remove(cat.label);
+                    }
+                    onChanged(next);
+                  },
                 ),
-                label: Text(cat.label),
-                selected: isSelected,
-                onSelected: (v) {
-                  final next = Set<String>.from(selected);
-                  if (v) {
-                    next.add(cat.label);
-                  } else {
-                    next.remove(cat.label);
-                  }
-                  onChanged(next);
-                },
+              ),
               );
             }).toList(),
           ),
@@ -445,7 +481,7 @@ class _ConsentPage extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
+          const Icon(
             Icons.privacy_tip_outlined,
             size: 48,
             color: AppColors.primary,
@@ -461,7 +497,7 @@ class _ConsentPage extends StatelessWidget {
             style: theme.textTheme.bodyLarge?.copyWith(color: secondaryText),
           ),
           const SizedBox(height: AppSpacing.lg),
-          _InfoTile(
+          const _InfoTile(
             icon: Icons.location_on_outlined,
             title: 'Location data',
             body: 'Used to suggest nearby events and places. '

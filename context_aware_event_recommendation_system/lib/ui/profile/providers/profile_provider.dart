@@ -1,3 +1,4 @@
+import 'package:context_aware_event_recommendation_system/ui/auth/providers/auth_provider.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -25,42 +26,52 @@ abstract class ProfileState with _$ProfileState {
 
 @Riverpod(keepAlive: true)
 class Profile extends _$Profile {
+  // Keys are scoped to the current user so settings from user A
+  // never bleed into user B's session.
+  static String _kLocation(String uid) => 'profile_${uid}_location_tracking';
+  static String _kActivity(String uid) => 'profile_${uid}_activity_recognition';
+  static String _kNotifications(String uid) => 'profile_${uid}_notifications';
+  static String _kPaused(String uid) => 'profile_${uid}_tracking_paused';
+
   @override
-  ProfileState build() => const ProfileState();
+  ProfileState build() {
+    final uid = ref.watch(authProvider).user?.id;
+    // No authenticated user → return defaults without persisting.
+    if (uid == null) return const ProfileState();
 
-  void toggleLocationTracking() {
-    state = state.copyWith(
-      settings: state.settings.copyWith(
-        locationTrackingEnabled: !state.settings.locationTrackingEnabled,
+    final prefs = ref.read(sharedPreferencesProvider);
+    return ProfileState(
+      settings: ProfileSettings(
+        locationTrackingEnabled: prefs.getBool(_kLocation(uid)) ?? true,
+        activityRecognitionEnabled: prefs.getBool(_kActivity(uid)) ?? true,
+        notificationsEnabled: prefs.getBool(_kNotifications(uid)) ?? true,
+        trackingPaused: prefs.getBool(_kPaused(uid)) ?? false,
       ),
     );
   }
 
-  void toggleActivityRecognition() {
-    state = state.copyWith(
-      settings: state.settings.copyWith(
-        activityRecognitionEnabled: !state.settings.activityRecognitionEnabled,
-      ),
-    );
+  void _update(ProfileSettings s) {
+    state = state.copyWith(settings: s);
+    final uid = ref.read(authProvider).user?.id;
+    if (uid == null) return;
+    final prefs = ref.read(sharedPreferencesProvider);
+    prefs.setBool(_kLocation(uid), s.locationTrackingEnabled);
+    prefs.setBool(_kActivity(uid), s.activityRecognitionEnabled);
+    prefs.setBool(_kNotifications(uid), s.notificationsEnabled);
+    prefs.setBool(_kPaused(uid), s.trackingPaused);
   }
 
-  void toggleNotifications() {
-    state = state.copyWith(
-      settings: state.settings.copyWith(
-        notificationsEnabled: !state.settings.notificationsEnabled,
-      ),
-    );
-  }
+  void toggleLocationTracking() =>
+      _update(state.settings.copyWith(locationTrackingEnabled: !state.settings.locationTrackingEnabled));
 
-  void toggleTrackingPause() {
-    state = state.copyWith(
-      settings: state.settings.copyWith(
-        trackingPaused: !state.settings.trackingPaused,
-      ),
-    );
-  }
+  void toggleActivityRecognition() =>
+      _update(state.settings.copyWith(activityRecognitionEnabled: !state.settings.activityRecognitionEnabled));
 
-  void updateSettings(ProfileSettings settings) {
-    state = state.copyWith(settings: settings);
-  }
+  void toggleNotifications() =>
+      _update(state.settings.copyWith(notificationsEnabled: !state.settings.notificationsEnabled));
+
+  void toggleTrackingPause() =>
+      _update(state.settings.copyWith(trackingPaused: !state.settings.trackingPaused));
+
+  void updateSettings(ProfileSettings settings) => _update(settings);
 }

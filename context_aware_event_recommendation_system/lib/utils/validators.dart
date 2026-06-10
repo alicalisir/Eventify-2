@@ -24,6 +24,13 @@ abstract final class Validators {
     return null;
   }
 
+  /// Minimal validator for login — only checks the field is not empty.
+  /// Does not enforce strength rules; those would block existing accounts.
+  static String? loginPassword(String? value) {
+    if (value == null || value.isEmpty) return 'Password is required';
+    return null;
+  }
+
   static String? confirmPassword(String? value, String password) {
     if (value == null || value.isEmpty) {
       return 'Please confirm your password';

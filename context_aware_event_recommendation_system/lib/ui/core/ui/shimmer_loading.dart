@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../config/constants/app_colors.dart';
+import '../../../config/constants/app_spacing.dart';
 
 /// Shimmer loading placeholder widget
 class ShimmerLoading extends StatefulWidget {
@@ -26,7 +27,7 @@ class _ShimmerLoadingState extends State<ShimmerLoading>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 1500),
+      duration: AppSpacing.shimmerDuration,
       vsync: this,
     )..repeat();
   }
@@ -53,9 +54,9 @@ class _ShimmerLoadingState extends State<ShimmerLoading>
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
                   stops: [
-                    _controller.value - 0.3,
+                    _controller.value - AppSpacing.shimmerGradientSpread,
                     _controller.value,
-                    _controller.value + 0.3,
+                    _controller.value + AppSpacing.shimmerGradientSpread,
                   ],
                   colors: [
                     AppColors.shimmerBaseLight.withValues(alpha: 0.5),

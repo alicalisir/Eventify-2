@@ -7,6 +7,7 @@ import '../../../config/constants/app_spacing.dart';
 import '../../../config/constants/app_strings.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../core/ui/app_pressable.dart';
+import '../../core/ui/app_snackbar.dart';
 
 /// App-wide navigation drawer — gradient header with avatar + nav rows.
 class HomeDrawer extends ConsumerWidget {
@@ -99,14 +100,6 @@ class HomeDrawer extends ConsumerWidget {
                       context.pushNamed('profile');
                     },
                   ),
-                  _DrawerItem(
-                    icon: Icons.settings_outlined,
-                    label: AppStrings.settings,
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      context.pushNamed('profile');
-                    },
-                  ),
                 ],
               ),
             ),
@@ -119,8 +112,17 @@ class HomeDrawer extends ConsumerWidget {
                 color: AppColors.error,
                 onTap: () async {
                   Navigator.of(context).pop();
-                  await ref.read(authProvider.notifier).signOut();
-                  if (context.mounted) context.goNamed('login');
+                  try {
+                    await ref.read(authProvider.notifier).signOut();
+                  } catch (_) {
+                    if (context.mounted) {
+                      AppSnackbar.show(
+                        context,
+                        message: 'Sign out failed. Please try again.',
+                        kind: SnackKind.error,
+                      );
+                    }
+                  }
                 },
               ),
             ),

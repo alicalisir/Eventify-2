@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../config/constants/app_colors.dart';
 import '../../../config/constants/app_spacing.dart';
@@ -10,6 +11,7 @@ import '../../core/ui/app_button.dart';
 import '../../core/ui/app_pressable.dart';
 import '../../core/ui/app_snackbar.dart';
 import '../../core/ui/error_state_widget.dart';
+import '../../core/ui/tag.dart';
 import '../../home/providers/context_provider.dart';
 import 'map_hero.dart';
 import 'meta_tile.dart';
@@ -39,6 +41,36 @@ class _SuggestionDetailScreenState
   void dispose() {
     _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _openDirections({
+    required String? address,
+    double? latitude,
+    double? longitude,
+  }) async {
+    Uri url;
+    if (latitude != null && longitude != null) {
+      url = Uri.parse(
+        'https://www.google.com/maps/dir/?api=1&destination=$latitude,$longitude',
+      );
+    } else if (address != null) {
+      final encoded = Uri.encodeComponent(address);
+      url = Uri.parse(
+        'https://www.google.com/maps/search/?api=1&query=$encoded',
+      );
+    } else {
+      return;
+    }
+
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } else if (mounted) {
+      AppSnackbar.show(
+        context,
+        message: AppStrings.couldNotOpenMaps,
+        kind: SnackKind.error,
+      );
+    }
   }
 
   Future<void> _accept() async {
@@ -163,7 +195,7 @@ class _SuggestionDetailScreenState
                             children: [
                               Icon(
                                 suggestion.category.categoryIcon,
-                                size: 14,
+                                size: AppSpacing.iconSizeXs,
                                 color: AppColors.primary,
                               ),
                               const SizedBox(width: AppSpacing.xxs),
@@ -218,7 +250,7 @@ class _SuggestionDetailScreenState
                               Expanded(
                                 child: MetaTile(
                                   icon: Icons.wb_sunny,
-                                  label: 'Weather',
+                                  label: AppStrings.weather,
                                   value: suggestion.weather!,
                                 ),
                               ),
@@ -271,15 +303,14 @@ class _SuggestionDetailScreenState
                                 ),
                               ),
                               const SizedBox(height: AppSpacing.sm),
-                              const Wrap(
+                              Wrap(
                                 spacing: 6,
                                 runSpacing: 6,
-                                children: [
-                                  _SignalPill(label: 'Time of day'),
-                                  _SignalPill(label: 'Activity'),
-                                  _SignalPill(label: 'Location'),
-                                  _SignalPill(label: 'Weather'),
-                                ],
+                                children: (suggestion.signals.isNotEmpty
+                                        ? suggestion.signals
+                                        : const ['Time of day', 'Activity', 'Location', 'Weather'])
+                                    .map((s) => _SignalPill(label: s))
+                                    .toList(),
                               ),
                             ],
                           ),
@@ -287,7 +318,7 @@ class _SuggestionDetailScreenState
                         if (suggestion.address != null) ...[
                           const SizedBox(height: AppSpacing.lg),
                           Text(
-                            'Location',
+                            AppStrings.location,
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontSize: 15,
                             ),
@@ -295,8 +326,12 @@ class _SuggestionDetailScreenState
                           const SizedBox(height: AppSpacing.xs),
                           AppPressable(
                             semanticLabel:
-                                'Get directions to ${suggestion.address}',
-                            onTap: () {},
+                                '${AppStrings.openInMaps}: ${suggestion.address}',
+                            onTap: () => _openDirections(
+                              address: suggestion.address,
+                              latitude: suggestion.latitude,
+                              longitude: suggestion.longitude,
+                            ),
                             child: Container(
                               padding: const EdgeInsets.all(AppSpacing.md),
                               decoration: BoxDecoration(
@@ -338,7 +373,7 @@ class _SuggestionDetailScreenState
                                               ),
                                         ),
                                         Text(
-                                          'Tap for directions',
+                                          AppStrings.tapForDirections,
                                           style: theme.textTheme.labelSmall
                                               ?.copyWith(color: secondaryText),
                                         ),
@@ -358,7 +393,7 @@ class _SuggestionDetailScreenState
                         if (suggestion.tags.isNotEmpty) ...[
                           const SizedBox(height: AppSpacing.lg),
                           Text(
-                            'Tags',
+                            AppStrings.tags,
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontSize: 15,
                             ),
@@ -368,7 +403,7 @@ class _SuggestionDetailScreenState
                             spacing: 6,
                             runSpacing: 6,
                             children: suggestion.tags
-                                .map((t) => Chip(label: Text(t)))
+                                .map((t) => Tag(label: t))
                                 .toList(),
                           ),
                         ],
@@ -400,8 +435,8 @@ class _SuggestionDetailScreenState
                     semanticLabel: AppStrings.dismiss,
                     onTap: () => context.pop(),
                     child: Container(
-                      width: 52,
-                      height: 52,
+                      width: AppSpacing.ctaButtonSize,
+                      height: AppSpacing.ctaButtonSize,
                       decoration: BoxDecoration(
                         border: Border.all(
                           color: theme.dividerColor,

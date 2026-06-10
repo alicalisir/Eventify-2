@@ -43,6 +43,26 @@ class ContextAwareApp extends ConsumerWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system,
       routerConfig: router,
+      builder: (ctx, child) => Consumer(
+        builder: (context, watchRef, _) {
+          final isLoading = watchRef.watch(globalLoadingProvider);
+          final inner = child ?? const SizedBox.shrink();
+          if (!isLoading) return inner;
+          return Stack(
+            children: [
+              inner,
+              Semantics(
+                liveRegion: true,
+                label: 'Loading',
+                child: Container(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  child: const Center(child: CircularProgressIndicator()),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 }

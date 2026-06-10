@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../ui/auth/providers/auth_provider.dart';
 import '../ui/auth/widgets/forgot_password_screen.dart';
@@ -11,6 +12,7 @@ import '../ui/core/motion/app_transitions.dart';
 import '../ui/error/widgets/error_screen.dart';
 import '../ui/home/widgets/dashboard_screen.dart';
 import '../ui/onboarding/widgets/onboarding_screen.dart';
+import '../ui/profile/widgets/privacy_policy_screen.dart';
 import '../ui/profile/widgets/profile_screen.dart';
 import '../ui/suggestion/widgets/suggestion_detail_screen.dart';
 
@@ -21,6 +23,13 @@ final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/login',
     refreshListenable: authListenable,
+    errorPageBuilder: (context, state) => AppTransitions.fadeThroughPage(
+      pageKey: state.pageKey,
+      child: ErrorScreen(
+        kind: ErrorKind.offline,
+        onRetry: () => context.goNamed('dashboard'),
+      ),
+    ),
     redirect: (context, state) {
       final auth = ref.read(authProvider);
       final loc = state.matchedLocation;
@@ -132,10 +141,20 @@ final routerProvider = Provider<GoRouter>((ref) {
             pageKey: state.pageKey,
             child: ErrorScreen(
               kind: kind,
-              onRetry: () => context.goNamed('dashboard'),
+              onRetry: kind == ErrorKind.location
+                  ? () => openAppSettings()
+                  : () => context.goNamed('dashboard'),
             ),
           );
         },
+      ),
+      GoRoute(
+        path: '/privacy-policy',
+        name: 'privacy-policy',
+        pageBuilder: (context, state) => AppTransitions.sharedAxisXPage(
+          pageKey: state.pageKey,
+          child: const PrivacyPolicyScreen(),
+        ),
       ),
     ],
   );

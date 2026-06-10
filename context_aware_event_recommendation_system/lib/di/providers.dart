@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../config/app_env.dart';
+
 import '../data/repositories/auth_repository.dart';
 import '../data/repositories/context_repository.dart';
 import '../data/repositories/location_repository.dart';
@@ -28,6 +30,15 @@ final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
   );
 });
 
+/// Controls the app-wide blocking loading overlay (e.g. during auth transitions).
+final globalLoadingProvider =
+    NotifierProvider<_GlobalLoadingNotifier, bool>(_GlobalLoadingNotifier.new);
+
+class _GlobalLoadingNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+}
+
 final supabaseClientProvider = Provider<SupabaseClient>((ref) {
   return Supabase.instance.client;
 });
@@ -49,7 +60,8 @@ final locationRepositoryProvider = Provider<LocationRepository>((ref) {
 });
 
 final backendServiceProvider = Provider<BackendService>((ref) {
-  final url = dotenv.env['BACKEND_URL'] ?? '';
+  final url =
+      AppEnv.backendUrlOverride ?? dotenv.env['BACKEND_URL'] ?? '';
   return BackendService(url);
 });
 
