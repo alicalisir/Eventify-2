@@ -13,8 +13,14 @@ class FeedbackService {
     required String action,
     required SuggestionModel suggestion,
   }) async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) {
+      AppLogger.w('[FeedbackService] $action skipped — no authenticated user');
+      return;
+    }
     try {
       await _supabase.from('user_feedback').insert({
+        'user_id': userId,
         'suggestion_id': suggestionId,
         'action': action,
         if (suggestion.eventId != null) 'event_id': suggestion.eventId,

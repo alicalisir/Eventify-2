@@ -7,7 +7,11 @@ import '../../../config/constants/app_colors.dart';
 import '../../../config/constants/app_spacing.dart';
 import '../../../config/constants/app_strings.dart';
 import '../../../di/providers.dart'
-    show locationRepositoryProvider, llmServiceProvider, weatherServiceProvider;
+    show
+        feedbackServiceProvider,
+        locationRepositoryProvider,
+        llmServiceProvider,
+        weatherServiceProvider;
 import '../../../utils/app_logger.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../core/ui/app_snackbar.dart';
@@ -82,6 +86,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     final visible = ref.watch(visibleSuggestionsProvider);
     final contextAsync = ref.watch(ambientContextProvider);
     final user = ref.watch(authProvider).user;
+
+    // Auto-refresh when the user dismisses the last visible suggestion
+    ref.listen(visibleSuggestionsProvider, (prev, next) {
+      if (prev != null && prev.isNotEmpty && next.isEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _refresh();
+        });
+      }
+    });
 
     return Scaffold(
       appBar: AppBar(
@@ -160,9 +173,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                       Semantics(
                         customSemanticsActions: {
                           const CustomSemanticsAction(label: 'Dismiss'): () {
+                            final dismissed = visible[i];
                             ref
                                 .read(dismissedSuggestionsProvider.notifier)
-                                .dismiss(visible[i].id);
+                                .dismiss(dismissed.id);
+                            ref.read(feedbackServiceProvider).logAction(
+                              suggestionId: dismissed.id,
+                              action: 'dismiss',
+                              suggestion: dismissed,
+                            );
                             AppSnackbar.show(
                               context,
                               message: "Got it — we'll suggest fewer like that",
@@ -175,9 +194,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                           direction: DismissDirection.endToStart,
                           background: const _DismissBackground(),
                           onDismissed: (_) {
+                            final dismissed = visible[i];
                             ref
                                 .read(dismissedSuggestionsProvider.notifier)
-                                .dismiss(visible[i].id);
+                                .dismiss(dismissed.id);
+                            ref.read(feedbackServiceProvider).logAction(
+                              suggestionId: dismissed.id,
+                              action: 'dismiss',
+                              suggestion: dismissed,
+                            );
                             AppSnackbar.show(
                               context,
                               message: "Got it — we'll suggest fewer like that",
