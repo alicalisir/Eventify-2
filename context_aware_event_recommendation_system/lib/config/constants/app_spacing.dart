@@ -13,6 +13,7 @@ abstract final class AppSpacing {
   static const double borderRadius = 12.0;
   static const double borderRadiusLg = 16.0;
   static const double borderRadiusXl = 18.0;
+  static const double iconSizeXxs = 12.0;
   static const double iconSizeXs = 14.0;
   static const double iconSize = 24.0;
   static const double iconSizeSm = 20.0;
@@ -20,4 +21,19 @@ abstract final class AppSpacing {
 
   /// Fully-rounded "pill" shape — use instead of the magic number 999.
   static const double pill = 999.0;
+
+  /// Shimmer animation duration — used by all shimmer widgets for visual sync.
+  static const Duration shimmerDuration = Duration(milliseconds: 1500);
+
+  /// Shimmer gradient spread — fraction on each side of the highlight center.
+  static const double shimmerGradientSpread = 0.3;
+
+  /// Hero strip height on RecommendationCard.
+  static const double cardHeroHeight = 110.0;
+
+  /// Illustration circle size on EmptyDashboard.
+  static const double illustrationSize = 140.0;
+
+  /// Dismiss/CTA circular button size on SuggestionDetailScreen.
+  static const double ctaButtonSize = 52.0;
 }

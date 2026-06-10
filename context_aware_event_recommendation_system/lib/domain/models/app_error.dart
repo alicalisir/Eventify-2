@@ -24,6 +24,18 @@ final class PermissionError extends AppError {
   String get userMessage => AppStrings.permissionDeniedMessage;
 }
 
+final class TooManyRequestsError extends AppError {
+  const TooManyRequestsError();
+  @override
+  String get userMessage => AppStrings.tooManyRequests;
+}
+
+final class EmailNotVerifiedError extends AppError {
+  const EmailNotVerifiedError();
+  @override
+  String get userMessage => AppStrings.emailNotVerified;
+}
+
 final class UnknownError extends AppError {
   const UnknownError();
   @override

@@ -65,6 +65,10 @@ class AuthService {
         .update({'has_completed_onboarding': true}).eq('id', userId);
   }
 
+  Future<void> updateProfileName(String userId, String name) async {
+    await _client.from('users').update({'name': name}).eq('id', userId);
+  }
+
   Future<void> updateInterestsAndConsent({
     required String userId,
     required List<String> interests,

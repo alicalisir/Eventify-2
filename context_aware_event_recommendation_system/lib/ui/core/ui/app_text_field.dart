@@ -61,6 +61,9 @@ class AppTextField extends StatelessWidget {
           hintText: hint,
           errorText: errorText,
           suffixIcon: suffixIcon,
+          suffixIconConstraints: suffixIcon != null
+              ? const BoxConstraints(minWidth: 48, minHeight: 48)
+              : null,
           prefixIcon: prefixIcon,
         ),
       ),

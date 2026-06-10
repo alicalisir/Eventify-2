@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../config/constants/app_spacing.dart';
 import '../../../config/constants/app_strings.dart';
+import '../../core/ui/app_back_button.dart';
 import '../../core/ui/app_button.dart';
 
 /// Kind of error fallback the user is shown.
@@ -24,8 +25,7 @@ class ErrorScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+        leading: AppBackButton(
           onPressed: () =>
               context.canPop() ? context.pop() : context.goNamed('dashboard'),
         ),

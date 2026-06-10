@@ -31,6 +31,10 @@ abstract class SuggestionModel with _$SuggestionModel {
 
     /// Optional context-weather summary (e.g. "21° • Clear").
     String? weather,
+
+    /// Context signals that triggered this suggestion (e.g. "Time of day", "Weather").
+    /// Populated by the backend when available; falls back to default pills in the UI.
+    @Default(<String>[]) List<String> signals,
     required DateTime createdAt,
   }) = _SuggestionModel;
 }

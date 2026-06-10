@@ -88,7 +88,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                 const SizedBox(height: AppSpacing.xl),
                 Text(
                   AppStrings.resetPasswordTitle,
-                  style: theme.textTheme.displayLarge?.copyWith(fontSize: 30),
+                  style: theme.textTheme.headlineMedium,
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(

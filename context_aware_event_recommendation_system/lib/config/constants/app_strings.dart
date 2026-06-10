@@ -94,8 +94,41 @@ abstract final class AppStrings {
   static const String confirmLogout = 'Are you sure you want to log out?';
   static const String cancel = 'Cancel';
 
+  // Suggestion Detail
+  static const String weather = 'Weather';
+  static const String location = 'Location';
+  static const String tags = 'Tags';
+  static const String tapForDirections = 'Tap for directions';
+  static const String openInMaps = 'Open in Maps';
+  static const String couldNotOpenMaps = 'Could not open maps app';
+
+  // Privacy & Account
+  static const String privacy = 'Privacy';
+  static const String deleteDataConfirmTitle = 'Delete All My Data?';
+  static const String deleteDataConfirmMessage =
+      'This will permanently delete your profile, activity history, and all inferred personas. This action cannot be undone.';
+  static const String deleteDataButton = 'Delete Everything';
+  static const String deleteDataRequested =
+      'Deletion request submitted. You will receive a confirmation email.';
+  static const String personaActive = 'Persona active';
+
+  // Auth Screen Copy
+  static const String loginSubtitle = 'Your context is ready when you are.';
+  static const String registerSubtitle =
+      'A few details to set up your computational persona.';
+  static const String orDivider = 'OR';
+  static const String continueWithApple = 'Continue with Apple';
+  static const String newHere = 'New here?';
+  static const String acceptTermsPrompt =
+      'Please accept the Terms to continue';
+
   // Error States
   static const String somethingWentWrong = 'Something went wrong';
+  static const String somethingWentWrongRetry =
+      'Something went wrong. Please try again.';
+  static const String noResults = 'No Results';
+  static const String noSuggestionsAvailable =
+      'No suggestions available at the moment.';
   static const String tryAgain = 'Try Again';
   static const String noInternet = 'Lost in the void';
   static const String noInternetDesc =
@@ -104,4 +137,16 @@ abstract final class AppStrings {
   static const String locationDisabledDesc =
       'Location services are disabled. Enable them to get personalized suggestions.';
   static const String checkSettings = 'Check Settings';
+
+  // Auth error messages
+  static const String tooManyRequests =
+      'Too many attempts. Please wait a moment before trying again.';
+  static const String emailNotVerified =
+      'Please verify your email before signing in. Check your inbox.';
+
+  // Profile edit
+  static const String editProfile = 'Edit Profile';
+  static const String saveChanges = 'Save Changes';
+  static const String profileUpdated = 'Profile updated successfully.';
+  static const String yourName = 'Your Name';
 }

@@ -128,7 +128,7 @@ final class DismissedSuggestionsProvider
 }
 
 String _$dismissedSuggestionsHash() =>
-    r'57fec325bf61a80272375af4562866537be90633';
+    r'f931e64de9dd490f0a92184bd2eca994e8a55733';
 
 /// IDs of suggestions the user has dismissed.
 /// Loads persisted state on first access; persists every change.
