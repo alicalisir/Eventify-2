@@ -30,37 +30,33 @@ Future<PersonaModel> persona(Ref ref) {
 }
 
 /// IDs of suggestions the user has dismissed.
-/// Scoped to the current user — rebuilds automatically on login/logout.
+/// Backed by Supabase — survives app restarts.
 @Riverpod(keepAlive: true)
 class DismissedSuggestions extends _$DismissedSuggestions {
-  SuggestionRepository get _repo => ref.read(suggestionRepositoryProvider);
   String? get _uid => ref.watch(authProvider).user?.id;
 
   @override
   Future<Set<String>> build() async {
     final uid = _uid;
     if (uid == null) return {};
-    return _repo.getDismissedIds(uid);
+    return ref.read(feedbackServiceProvider).loadDismissedIds(uid);
   }
 
-  Future<void> dismiss(String id) async {
+  void dismiss(String id) {
     if (state.value?.contains(id) ?? false) return;
     state = AsyncData({...state.value ?? {}, id});
-    final uid = ref.read(authProvider).user?.id;
-    if (uid != null) await _repo.dismiss(id, uid);
+    // DB write happens at call site via feedbackService.logAction('dismiss')
   }
 
-  Future<void> undismiss(String id) async {
+  void undismiss(String id) {
+    // Session-only undo — dismiss persists across restarts by design
     final updated = Set<String>.from(state.value ?? {})..remove(id);
     state = AsyncData(updated);
-    final uid = ref.read(authProvider).user?.id;
-    if (uid != null) await _repo.undismiss(id, uid);
   }
 
-  Future<void> clear() async {
+  void clear() {
+    // Called only on logout to reset in-memory state
     state = const AsyncData({});
-    final uid = ref.read(authProvider).user?.id;
-    if (uid != null) await _repo.clearDismissed(uid);
   }
 }
 

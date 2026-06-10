@@ -75,7 +75,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   Future<void> _refresh() async {
     ref.read(suggestionRepositoryProvider).invalidateCache();
     ref.read(contextRepositoryProvider).invalidateContext();
-    await ref.read(dismissedSuggestionsProvider.notifier).clear();
     ref.invalidate(suggestionStreamProvider);
     ref.invalidate(ambientContextProvider);
     await ref.read(suggestionStreamProvider.future);

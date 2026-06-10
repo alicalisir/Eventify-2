@@ -12,6 +12,7 @@ import '../ui/core/motion/app_transitions.dart';
 import '../ui/error/widgets/error_screen.dart';
 import '../ui/home/widgets/dashboard_screen.dart';
 import '../ui/onboarding/widgets/onboarding_screen.dart';
+import '../ui/preferences/widgets/preferences_screen.dart';
 import '../ui/profile/widgets/privacy_policy_screen.dart';
 import '../ui/profile/widgets/profile_screen.dart';
 import '../ui/suggestion/widgets/suggestion_detail_screen.dart';
@@ -154,6 +155,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => AppTransitions.sharedAxisXPage(
           pageKey: state.pageKey,
           child: const PrivacyPolicyScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/preferences',
+        name: 'preferences',
+        pageBuilder: (context, state) => AppTransitions.sharedAxisXPage(
+          pageKey: state.pageKey,
+          child: const PreferencesScreen(),
         ),
       ),
     ],

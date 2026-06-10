@@ -1354,40 +1354,64 @@ def get_persona(user_id: str, force: bool = Query(False)):
 
 
 def _fetch_feedback_signals(user_id: str, days: int = 30) -> dict:
-    """Return disliked event UUIDs and category sentiment counts from recent feedback."""
+    """Return excluded event/venue IDs and category sentiment from recent feedback.
+
+    Uses chronological ordering so the latest action per suggestion wins —
+    a re-like after a dislike will un-exclude that suggestion.
+    """
     since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
     rows = _supa_get(
         "user_feedback",
         {
             "user_id": f"eq.{user_id}",
             "created_at": f"gte.{since}",
-            "select": "action,event_id,suggestion_snapshot",
+            "select": "action,event_id,suggestion_snapshot,created_at",
+            "order": "created_at.asc",
         },
     )
-    disliked_event_ids: set[str] = set()
-    dismissed_event_ids: set[str] = set()
-    category_score: dict[str, int] = {}   # positive = liked, negative = disliked
+    excluded_event_ids: set[str] = set()
+    excluded_venue_ids: set[str] = set()   # Google Places place_id values
+    category_score: dict[str, int] = {}
+
+    # suggestion_id → latest action (chronological, so later entries win)
+    suggestion_latest: dict[str, str] = {}
 
     for row in rows:
         action = row.get("action", "")
         event_id = row.get("event_id")
         snap = row.get("suggestion_snapshot") or {}
         category = snap.get("category", "")
+        suggestion_id = snap.get("id", "")
 
-        if action in ("dislike",):
-            if event_id:
-                disliked_event_ids.add(str(event_id))
-            if category:
-                category_score[category] = category_score.get(category, 0) - 1
-        elif action == "dismiss":
-            if event_id:
-                dismissed_event_ids.add(str(event_id))
-        elif action == "like":
+        if suggestion_id:
+            suggestion_latest[suggestion_id] = action
+
+        # Category sentiment (regardless of whether suggestion is later un-liked)
+        if action == "like":
             if category:
                 category_score[category] = category_score.get(category, 0) + 1
+        elif action in ("dislike", "dismiss"):
+            if category:
+                category_score[category] = category_score.get(category, 0) - 1
+            # Event-based exclusion via the dedicated FK column
+            if event_id:
+                excluded_event_ids.add(str(event_id))
+
+    # Apply latest-action-wins: only exclude if the most recent action is dislike/dismiss
+    for suggestion_id, latest_action in suggestion_latest.items():
+        if latest_action not in ("dislike", "dismiss"):
+            # Re-liked or other positive action — remove from exclusion sets
+            if suggestion_id.startswith("llm_"):
+                excluded_venue_ids.discard(suggestion_id[4:])
+            continue
+        if suggestion_id.startswith("llm_"):
+            excluded_venue_ids.add(suggestion_id[4:])   # strip "llm_" → place_id
+        elif suggestion_id.startswith("event_"):
+            excluded_event_ids.add(suggestion_id[6:])   # strip "event_" → event UUID
 
     return {
-        "excluded_event_ids": disliked_event_ids | dismissed_event_ids,
+        "excluded_event_ids": excluded_event_ids,
+        "excluded_venue_ids": excluded_venue_ids,
         "category_score": category_score,
     }
 
@@ -1415,6 +1439,7 @@ def get_recommendations(
 
     feedback = _fetch_feedback_signals(user_id)
     excluded_ids = feedback["excluded_event_ids"]
+    excluded_venue_ids = feedback["excluded_venue_ids"]
     category_score = feedback["category_score"]
 
     # When GPS provided, fetch real nearby venues and generate LLM recommendations.
@@ -1424,6 +1449,9 @@ def get_recommendations(
         # Remove events the user has disliked or dismissed
         if excluded_ids:
             nearby_events = [e for e in nearby_events if str(e.get("event_id", "")) not in excluded_ids]
+        # Remove venues the user has disliked or dismissed
+        if excluded_venue_ids:
+            raw_places = [p for p in raw_places if p.get("id") not in excluded_venue_ids]
         realtime_ctx   = _build_realtime_context(user_id)
 
         # Keep only venue types that match this persona's interests (relevance filter).

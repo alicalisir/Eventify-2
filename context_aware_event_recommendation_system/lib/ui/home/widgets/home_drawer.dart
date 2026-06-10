@@ -100,6 +100,14 @@ class HomeDrawer extends ConsumerWidget {
                       context.pushNamed('profile');
                     },
                   ),
+                  _DrawerItem(
+                    icon: Icons.favorite_border,
+                    label: 'My Preferences',
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      context.pushNamed('preferences');
+                    },
+                  ),
                 ],
               ),
             ),

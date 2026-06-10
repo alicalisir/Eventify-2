@@ -97,17 +97,17 @@ final class PersonaProvider
 String _$personaHash() => r'4e5dffacec43e7a98b3c0dc652f4ea23e38e0350';
 
 /// IDs of suggestions the user has dismissed.
-/// Scoped to the current user — rebuilds automatically on login/logout.
+/// Backed by Supabase — survives app restarts.
 
 @ProviderFor(DismissedSuggestions)
 final dismissedSuggestionsProvider = DismissedSuggestionsProvider._();
 
 /// IDs of suggestions the user has dismissed.
-/// Scoped to the current user — rebuilds automatically on login/logout.
+/// Backed by Supabase — survives app restarts.
 final class DismissedSuggestionsProvider
     extends $AsyncNotifierProvider<DismissedSuggestions, Set<String>> {
   /// IDs of suggestions the user has dismissed.
-  /// Scoped to the current user — rebuilds automatically on login/logout.
+  /// Backed by Supabase — survives app restarts.
   DismissedSuggestionsProvider._()
     : super(
         from: null,
@@ -128,10 +128,10 @@ final class DismissedSuggestionsProvider
 }
 
 String _$dismissedSuggestionsHash() =>
-    r'8de63f4be06efa39efe2870caa6eeb3643a4cc07';
+    r'966dc5dd524fe292f2bd084e4ad7ef7e5a9a4dc7';
 
 /// IDs of suggestions the user has dismissed.
-/// Scoped to the current user — rebuilds automatically on login/logout.
+/// Backed by Supabase — survives app restarts.
 
 abstract class _$DismissedSuggestions extends $AsyncNotifier<Set<String>> {
   FutureOr<Set<String>> build();
