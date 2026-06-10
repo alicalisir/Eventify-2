@@ -19,5 +19,5 @@ create policy "cached_sugg_read_own"
   on public.cached_suggestions for select
   using (auth.uid() = user_id);
 
-comment on table  public.cached_suggestions              is '30 dk TTL LLM öneri cache. cache_key = sha256(user_id+persona_version+lat3+lng3+hour_block+weather+dow)';
-comment on column public.cached_suggestions.llm_provider is 'mistral-nemo-12b | llama-3.3-8b | claude-sonnet-4-6';
+comment on table  public.cached_suggestions              is '1h TTL LLM suggestion cache. cache_key = sha1(user_id + hour_bucket)';
+comment on column public.cached_suggestions.llm_provider is 'LLM model name, e.g. qwen2.5:14b | mistral-nemo-12b | claude-sonnet-4-6';

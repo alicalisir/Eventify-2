@@ -23,10 +23,10 @@ class MainApplication : Application() {
             nm?.createNotificationChannel(
                 NotificationChannel(
                     "caers_tracking",
-                    "Bağlam Takibi",
+                    "Context Tracking",
                     NotificationManager.IMPORTANCE_MIN
                 ).apply {
-                    description = "Ekran ve konum verilerini toplar"
+                    description = "Collects screen and location data"
                     setShowBadge(false)
                 }
             )
@@ -34,10 +34,10 @@ class MainApplication : Application() {
             nm?.createNotificationChannel(
                 NotificationChannel(
                     "caers_bg_service",
-                    "Arka Plan Veri Servisi",
+                    "Background Data Service",
                     NotificationManager.IMPORTANCE_LOW
                 ).apply {
-                    description = "GPS ve uygulama verisi toplar"
+                    description = "Collects GPS and app usage data"
                     setShowBadge(false)
                 }
             )

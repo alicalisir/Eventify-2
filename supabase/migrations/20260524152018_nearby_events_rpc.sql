@@ -43,4 +43,4 @@ as $$
 $$;
 
 comment on function public.nearby_events is
-  'Sehir + ilgi alani filtreli, yaklasan etkinlikleri dondurur. distance_m V2de pgvector ile hesaplanacak.';
+  'Returns upcoming events filtered by city and interest categories. distance_m will use pgvector in V2.';

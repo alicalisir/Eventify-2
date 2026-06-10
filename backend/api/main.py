@@ -13,7 +13,8 @@ import logging
 import math as _math
 import os
 import sys
-from datetime import datetime, timezone
+import time as _time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -22,7 +23,7 @@ import numpy as np
 import pandas as pd
 from catboost import CatBoostClassifier
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -68,6 +69,19 @@ _SUPA_HEADERS = {
     "Content-Type": "application/json",
     "Prefer": "return=representation",
 }
+
+def _supa_rpc(fn_name: str, params: dict) -> list[dict]:
+    with httpx.Client(timeout=10) as client:
+        resp = client.post(
+            f"{SUPABASE_URL}/rest/v1/rpc/{fn_name}",
+            headers=_SUPA_HEADERS,
+            json=params,
+        )
+        if resp.status_code == 200:
+            return resp.json() or []
+        logger.warning("[supa_rpc] %s status=%s body=%s", fn_name, resp.status_code, resp.text[:200])
+        return []
+
 
 def _supa_get(table: str, params: dict) -> list[dict]:
     with httpx.Client(timeout=15) as client:
@@ -149,6 +163,20 @@ def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
         * _math.sin(dlon / 2) ** 2
     )
     return 2 * 6371.0 * _math.asin(_math.sqrt(a))
+
+
+_MAJOR_CITIES: list[tuple[str, float, float]] = [
+    ("Istanbul", 41.0082, 28.9784),
+    ("Ankara",   39.9334, 32.8597),
+    ("Izmir",    38.4192, 27.1287),
+    ("Bursa",    40.1826, 29.0665),
+    ("Antalya",  36.8969, 30.7133),
+    ("Kocaeli",  40.7654, 29.9408),
+    ("Adana",    37.0000, 35.3213),
+]
+
+def _nearest_city(lat: float, lon: float) -> str:
+    return min(_MAJOR_CITIES, key=lambda c: _haversine_km(lat, lon, c[1], c[2]))[0]
 
 
 def _fetch_google_places(lat: float, lon: float) -> list[dict]:
@@ -526,7 +554,28 @@ _PERSONA_META: dict[str, dict[str, Any]] = {
 
 # ─────────────────────────────────────────── FastAPI ─────────────────────────
 
-app = FastAPI(title="Context-Aware Recommendation API", version="2.0.0")
+from contextlib import asynccontextmanager  # noqa: E402
+
+@asynccontextmanager
+async def lifespan(app):
+    from apscheduler.schedulers.background import BackgroundScheduler
+    from event_scraper import ensure_demo_events, scrape_all_cities
+    import threading
+
+    # Seed demo events immediately if table is sparse (no external API needed)
+    threading.Thread(target=ensure_demo_events, daemon=True).start()
+
+    interval_h = int(os.environ.get("SCRAPER_INTERVAL_HOURS", "6"))
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(scrape_all_cities, "interval", hours=interval_h, id="event_scraper")
+    scheduler.start()
+    logger.info("[scheduler] event scraper started — interval=%dh", interval_h)
+    yield
+    scheduler.shutdown(wait=False)
+    logger.info("[scheduler] stopped")
+
+
+app = FastAPI(title="Context-Aware Recommendation API", version="2.0.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -660,23 +709,31 @@ def _save_persona_cache(user_id: str, persona_class: str, signals_today: int, ct
 
 # ─────────────────────────────────────────── data fetching ───────────────────
 
-def _fetch_gps(user_id: str) -> pd.DataFrame:
-    rows = _supa_get("gps_pings", {
+def _fetch_gps(user_id: str, since: Optional[datetime] = None) -> pd.DataFrame:
+    params: dict = {
         "user_id": f"eq.{user_id}",
         "order": "timestamp.desc",
         "limit": "2016",
         "select": "timestamp,latitude,longitude,speed_mps,movement_state,dwell_time_s",
-    })
+    }
+    if since is not None:
+        params["timestamp"] = f"gte.{since.isoformat()}"
+        params["limit"] = "500"
+    rows = _supa_get("gps_pings", params)
     return pd.DataFrame(rows) if rows else pd.DataFrame()
 
 
-def _fetch_app_sessions(user_id: str) -> pd.DataFrame:
-    rows = _supa_get("app_sessions", {
+def _fetch_app_sessions(user_id: str, since: Optional[datetime] = None) -> pd.DataFrame:
+    params: dict = {
         "user_id": f"eq.{user_id}",
         "order": "timestamp.desc",
         "limit": "5000",
         "select": "timestamp,app_name,category,duration_min",
-    })
+    }
+    if since is not None:
+        params["timestamp"] = f"gte.{since.isoformat()}"
+        params["limit"] = "200"
+    rows = _supa_get("app_sessions", params)
     if not rows:
         return pd.DataFrame()
     df = pd.DataFrame(rows)
@@ -687,22 +744,115 @@ def _fetch_app_sessions(user_id: str) -> pd.DataFrame:
     return df
 
 
-def _fetch_screen_events(user_id: str) -> pd.DataFrame:
-    rows = _supa_get("screen_events", {
+def _fetch_screen_events(user_id: str, since: Optional[datetime] = None) -> pd.DataFrame:
+    params: dict = {
         "user_id": f"eq.{user_id}",
         "order": "timestamp.desc",
         "limit": "10000",
         "select": "timestamp,event_type",
-    })
+    }
+    if since is not None:
+        params["timestamp"] = f"gte.{since.isoformat()}"
+        params["limit"] = "500"
+    rows = _supa_get("screen_events", params)
     return pd.DataFrame(rows) if rows else pd.DataFrame()
+
+# ─────────────────────────────────────────── real-time context ───────────────
+
+def _build_realtime_context(user_id: str) -> dict:
+    """Last-1-hour snapshot — always computed fresh, never cached."""
+    since = datetime.now(timezone.utc) - timedelta(hours=1)
+    gps    = _fetch_gps(user_id, since=since)
+    apps   = _fetch_app_sessions(user_id, since=since)
+    screen = _fetch_screen_events(user_id, since=since)
+
+    ctx: dict = {}
+
+    # Movement pattern + distance
+    if not gps.empty:
+        gps["ts"] = pd.to_datetime(gps["timestamp"], utc=True, errors="coerce")
+        gps = gps.sort_values("ts")
+        dist = 0.0
+        for i in range(1, len(gps)):
+            dist += _haversine_km(
+                float(gps.iloc[i - 1]["latitude"]), float(gps.iloc[i - 1]["longitude"]),
+                float(gps.iloc[i]["latitude"]),     float(gps.iloc[i]["longitude"]),
+            )
+        ctx["distance_last_hour_km"] = round(dist, 2)
+        if "movement_state" in gps.columns:
+            dominant = gps["movement_state"].value_counts().idxmax()
+            ctx["movement_pattern"] = (
+                "transit"    if dominant in ("vehicle", "transit") else
+                "moving"     if dominant in ("walking", "cycling") else
+                "stationary"
+            )
+        else:
+            ctx["movement_pattern"] = "stationary"
+    else:
+        ctx["distance_last_hour_km"] = 0.0
+        ctx["movement_pattern"] = "unknown"
+
+    # Top apps last hour
+    if not apps.empty and "category" in apps.columns and "duration_min" in apps.columns:
+        top = (apps.groupby("category")["duration_min"].sum()
+               .sort_values(ascending=False).head(3))
+        ctx["last_hour_top_apps"] = [
+            {"category": cat, "minutes": round(float(mins), 1)}
+            for cat, mins in top.items()
+        ]
+    else:
+        ctx["last_hour_top_apps"] = []
+
+    # Screen activity
+    if not screen.empty and "event_type" in screen.columns:
+        ctx["screen_unlocks"] = int((screen["event_type"] == "unlock").sum())
+    else:
+        ctx["screen_unlocks"] = 0
+
+    now = datetime.now(timezone.utc)
+    ctx["is_weekend"] = now.weekday() >= 5
+
+    return ctx
+
+
+# ─────────────────────────────────────────── event fetching ──────────────────
+
+# DB-valid categories: music, sports, culture, food, outdoor, workshop, family
+_PERSONA_INTERESTS: dict[str, list[str]] = {
+    "EARLY_BIRD":       ["sports", "outdoor", "food"],
+    "HOMEBODY":         ["culture", "music", "workshop"],
+    "NIGHT_OWL":        ["music", "culture", "food"],
+    "HYBRID":           ["music", "culture", "sports", "food"],
+    "CONTENT_CONSUMER": ["music", "culture"],
+    "IRREGULAR":        ["workshop", "food", "sports"],
+    "STUDENT":          ["workshop", "culture", "music"],
+    "GAMER":            ["workshop", "food", "music"],
+    "PROFESSIONAL":     ["workshop", "food", "culture"],
+    "TRAVELER":         ["culture", "music", "outdoor", "workshop"],
+    "SOCIAL":           ["music", "food", "workshop", "culture"],
+    "ATHLETE":          ["sports", "outdoor", "food"],
+}
+
+
+def _fetch_nearby_events(lat: float, lon: float, persona_class: str) -> list[dict]:
+    city = _nearest_city(lat, lon)
+    interests = _PERSONA_INTERESTS.get(persona_class, ["music", "culture", "sports", "food"])
+    return _supa_rpc("nearby_events", {
+        "p_city": city,
+        "p_interests": interests,
+        "p_limit": 8,
+    })
+
 
 # ─────────────────────────────────────────── LLM (local Mistral / Ollama) ────
 
 _LLM_SYSTEM = (
-    "You are a personalized event recommendation assistant. "
-    "Based on the given user profile, current context, and nearby venue list, "
-    "generate exactly 3 activity recommendations in English. "
-    "Return only a valid JSON array — no other text."
+    "You are a personalized activity recommendation assistant. "
+    "You will receive a user profile, real-time context, a list of nearby venues (V0, V1, ...) "
+    "and upcoming events (E0, E1, ...). "
+    "Select exactly 3 options and return ONLY a valid JSON array — no prose, no markdown, no explanation. "
+    "Each object must include item_ref (e.g. V2 or E1), title, description, rationale, "
+    "category, and estimated_minutes."
 )
 
 _MOV_LABELS = {
@@ -728,11 +878,13 @@ def _build_llm_prompt(
     persona_class: str,
     meta: dict,
     raw_places: list[dict],
-    ctx: dict,
+    nearby_events: list[dict],
+    realtime_ctx: dict,
     now: datetime,
 ) -> str:
     hour = now.hour
     time_label = next((l for a, b, l in _TIME_LABELS if a <= hour < b), "Night")
+    day_type = "Weekend" if realtime_ctx.get("is_weekend") else "Weekday"
 
     traits_str = ", ".join(
         f"{t['label']} (%{int(t['confidence'] * 100)})" for t in meta["traits"]
@@ -745,9 +897,16 @@ def _build_llm_prompt(
         f"culture={prefs.get('culture', 0):.1f}"
     )
 
-    movement = _MOV_LABELS.get(ctx.get("movement_state", "stationary"), "Stationary")
-    top_cat = _CAT_LABELS.get(ctx.get("top_app_category", ""), "unknown")
+    # Real-time context
+    movement_pattern = realtime_ctx.get("movement_pattern", "unknown")
+    dist_km = realtime_ctx.get("distance_last_hour_km", 0.0)
+    top_apps = realtime_ctx.get("last_hour_top_apps", [])
+    top_apps_str = ", ".join(
+        f"{a['category']} ({int(a['minutes'])} min)" for a in top_apps
+    ) or "no data"
+    unlocks = realtime_ctx.get("screen_unlocks", 0)
 
+    # Venues prefixed V0, V1… — Events prefixed E0, E1…
     places_lines = []
     for i, p in enumerate(raw_places[:8]):
         name = (p.get("displayName") or {}).get("text", "?")
@@ -756,49 +915,76 @@ def _build_llm_prompt(
         addr = p.get("shortFormattedAddress", "")
         rating = p.get("rating")
         r_str = f" ★{rating:.1f}" if rating else ""
-        places_lines.append(f"{i + 1}. {name} — {cat}{r_str} — {addr}")
-
+        places_lines.append(f"V{i}. {name} — {cat}{r_str} — {addr}")
     places_str = "\n".join(places_lines) or "No nearby venues found."
+
+    event_lines = []
+    for i, ev in enumerate(nearby_events[:8]):
+        title = ev.get("title", "?")
+        cat = ev.get("category", "event")
+        venue = ev.get("venue_name") or ev.get("address") or ""
+        starts = ev.get("starts_at", "")
+        try:
+            dt = datetime.fromisoformat(starts.replace("Z", "+00:00"))
+            starts = dt.strftime("%a %d %b %H:%M")
+        except Exception:
+            pass
+        ticketed = " (ticketed)" if ev.get("is_ticketed") else ""
+        price = ""
+        if ev.get("price_min") and ev.get("price_max"):
+            price = f" {int(ev['price_min'])}-{int(ev['price_max'])} {ev.get('currency', 'TRY')}"
+        event_lines.append(f"E{i}. {title} — {cat} — {venue} — {starts}{price}{ticketed}")
+    events_str = "\n".join(event_lines) if event_lines else "No upcoming events found nearby."
 
     return f"""## User Profile
 Persona: {meta['display']} ({persona_class})
 Traits: {traits_str}
 Preferences: {prefs_str}
 
-## Current Context
-Time: {time_label} ({hour:02d}:{now.minute:02d})
-Movement: {movement}
-Dominant app category in the last 24h: {top_cat}
+## Right Now (last hour)
+Time: {time_label} ({hour:02d}:{now.minute:02d}) — {day_type}
+Movement: {movement_pattern} ({dist_km} km traveled)
+Top apps last hour: {top_apps_str}
+Screen unlocks: {unlocks}
 
-## Nearby Venues (within 1.5 km)
+## Upcoming Events near you — PICK FROM HERE FIRST (E0, E1, ...)
+{events_str}
+
+## Nearby Venues — use only if no events fit (V0, V1, ...)
 {places_str}
 
 ## Task
-Select the 3 most suitable venues for this user and suggest an activity. Return as JSON:
+Select exactly 3 recommendations for this user.
+RULE: If ANY event above matches the user's persona or current mood, pick it.
+Only fall back to venues when there are no suitable events at all.
+Use the ref codes: E0, E1, ... for events  |  V0, V1, ... for venues.
+Return ONLY a valid JSON array, no other text:
 [
   {{
+    "item_ref": "E0",
     "title": "short activity title",
     "description": "1-2 sentence description",
-    "rationale": "why this fits the user (1 sentence)",
+    "rationale": "why this fits the user right now (1 sentence)",
     "category": "Movement|Recharge|Learning|Social|Health",
-    "venue_index": 0,
     "estimated_minutes": 30
   }}
-]
-venue_index refers to which venue from the numbered list above was selected (0-indexed)."""
+]"""
 
 
 def _call_mistral(
     persona_class: str,
     meta: dict,
     raw_places: list[dict],
-    ctx: dict,
+    nearby_events: list[dict],
+    realtime_ctx: dict,
     now: datetime,
-) -> Optional[list[dict]]:
-    if not raw_places:
+) -> Optional[tuple[list[dict], int, int, int]]:
+    """Returns (items, prompt_tokens, completion_tokens, latency_ms) or None."""
+    if not raw_places and not nearby_events:
         return None
     try:
-        prompt = _build_llm_prompt(persona_class, meta, raw_places, ctx, now)
+        t0 = _time.monotonic()
+        prompt = _build_llm_prompt(persona_class, meta, raw_places, nearby_events, realtime_ctx, now)
         with httpx.Client(timeout=30) as client:
             resp = client.post(
                 f"{MISTRAL_URL}/v1/chat/completions",
@@ -812,54 +998,163 @@ def _call_mistral(
                     "stream": False,
                 },
             )
+        latency_ms = int((_time.monotonic() - t0) * 1000)
         if resp.status_code != 200:
             return None
-        text = resp.json()["choices"][0]["message"]["content"].strip()
+        body = resp.json()
+        usage = body.get("usage") or {}
+        prompt_tokens = int(usage.get("prompt_tokens", 0))
+        completion_tokens = int(usage.get("completion_tokens", 0))
+        text = body["choices"][0]["message"]["content"].strip()
         start, end = text.find("["), text.rfind("]") + 1
         if start == -1 or end == 0:
             return None
         parsed = json.loads(text[start:end])
-        return parsed if isinstance(parsed, list) else None
+        if not isinstance(parsed, list):
+            return None
+        return parsed, prompt_tokens, completion_tokens, latency_ms
     except httpx.ConnectError as e:
-        logger.warning("[mistral] Connection failed → %s: %s", MISTRAL_URL, e)
+        logger.warning("[mistral] Connection failed -> %s: %s", MISTRAL_URL, e)
         return None
     except Exception:
         return None
 
 
+def _cache_key_for(user_id: str) -> str:
+    import hashlib
+    hour_bucket = datetime.now(timezone.utc).strftime("%Y%m%d%H")
+    return hashlib.sha1(f"{user_id}:{hour_bucket}".encode()).hexdigest()
+
+
+def _read_cached_suggestions(user_id: str) -> Optional[list[dict]]:
+    """Return cached LLM payload if it exists and hasn't expired, else None."""
+    cache_key = _cache_key_for(user_id)
+    rows = _supa_get("cached_suggestions", {
+        "cache_key": f"eq.{cache_key}",
+        "select": "payload,expires_at",
+        "limit": "1",
+    })
+    if not rows:
+        return None
+    row = rows[0]
+    try:
+        expires_at = datetime.fromisoformat(row["expires_at"].replace("Z", "+00:00"))
+        if expires_at > datetime.now(timezone.utc):
+            return row["payload"]
+    except Exception:
+        pass
+    return None
+
+
+def _save_cached_suggestions(
+    user_id: str,
+    payload: list[dict],
+    prompt_tokens: int = 0,
+    completion_tokens: int = 0,
+    latency_ms: int = 0,
+) -> None:
+    """Persist LLM recommendation output to the cached_suggestions table."""
+    now = datetime.now(timezone.utc)
+    cache_key = _cache_key_for(user_id)
+    expires_at = (now + timedelta(hours=1)).isoformat()
+    cache_headers = {**_SUPA_HEADERS, "Prefer": "resolution=merge-duplicates,return=minimal"}
+    try:
+        with httpx.Client(timeout=10) as client:
+            resp = client.post(
+                f"{SUPABASE_URL}/rest/v1/cached_suggestions",
+                headers=cache_headers,
+                json={
+                    "cache_key": cache_key,
+                    "user_id": user_id,
+                    "payload": payload,
+                    "llm_provider": LLM_MODEL,
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                    "latency_ms": latency_ms,
+                    "expires_at": expires_at,
+                },
+            )
+        if resp.status_code in (200, 201):
+            logger.info("[cache] saved suggestions for user %s (latency=%dms)", user_id, latency_ms)
+        else:
+            logger.warning("[cache] save failed status=%s body=%s", resp.status_code, resp.text[:200])
+    except Exception as e:
+        logger.warning("[cache] save error: %s", e)
+
+
 def _llm_to_suggestions(
     llm_items: list[dict],
     raw_places: list[dict],
+    nearby_events: list[dict],
     user_lat: float,
     user_lon: float,
     now_str: str,
 ) -> list[SuggestionResponse]:
     results = []
     for item in llm_items[:3]:
-        idx = item.get("venue_index") or 0
-        if not (0 <= idx < len(raw_places)):
-            idx = 0
-        place = raw_places[idx]
-        loc = place.get("location") or {}
-        place_lat = float(loc.get("latitude", 0))
-        place_lon = float(loc.get("longitude", 0))
-        distance_km = _haversine_km(user_lat, user_lon, place_lat, place_lon)
-        addr = place.get("shortFormattedAddress") or ""
-        walking_min = item.get("estimated_minutes") or max(1, int((distance_km / 5.0) * 60))
-        results.append(SuggestionResponse(
-            id=f"llm_{place.get('id', str(idx))}",
-            title=item.get("title", ""),
-            description=item.get("description", ""),
-            rationale=item.get("rationale", ""),
-            category=item.get("category", "Recharge"),
-            distance=round(distance_km, 1),
-            estimated_minutes=walking_min,
-            address=addr or None,
-            latitude=place_lat,
-            longitude=place_lon,
-            tags=[],
-            created_at=now_str,
-        ))
+        # Parse item_ref (new format: "V0", "E2"). Fall back to legacy source+index.
+        ref = item.get("item_ref", "")
+        if ref.upper().startswith("E"):
+            source = "event"
+            try:
+                idx = int(ref[1:])
+            except ValueError:
+                idx = 0
+        elif ref.upper().startswith("V"):
+            source = "venue"
+            try:
+                idx = int(ref[1:])
+            except ValueError:
+                idx = 0
+        else:
+            # Legacy fallback
+            source = item.get("source", "venue")
+            idx = item.get("index", item.get("venue_index", 0)) or 0
+
+        if source == "event" and nearby_events:
+            if not (0 <= idx < len(nearby_events)):
+                idx = 0
+            ev = nearby_events[idx]
+            results.append(SuggestionResponse(
+                id=f"event_{ev.get('event_id', str(idx))}",
+                title=item.get("title") or ev.get("title", ""),
+                description=item.get("description", ""),
+                rationale=item.get("rationale", ""),
+                category=item.get("category", "Social"),
+                distance=None,
+                estimated_minutes=item.get("estimated_minutes"),
+                address=ev.get("address") or ev.get("venue_name") or None,
+                latitude=None,
+                longitude=None,
+                tags=[ev.get("category", "")] if ev.get("category") else [],
+                created_at=now_str,
+            ))
+        else:
+            if not raw_places:
+                continue
+            if not (0 <= idx < len(raw_places)):
+                idx = 0
+            place = raw_places[idx]
+            loc = place.get("location") or {}
+            place_lat = float(loc.get("latitude", 0))
+            place_lon = float(loc.get("longitude", 0))
+            distance_km = _haversine_km(user_lat, user_lon, place_lat, place_lon)
+            addr = place.get("shortFormattedAddress") or ""
+            walking_min = item.get("estimated_minutes") or max(1, int((distance_km / 5.0) * 60))
+            results.append(SuggestionResponse(
+                id=f"llm_{place.get('id', str(idx))}",
+                title=item.get("title", ""),
+                description=item.get("description", ""),
+                rationale=item.get("rationale", ""),
+                category=item.get("category", "Recharge"),
+                distance=round(distance_km, 1),
+                estimated_minutes=walking_min,
+                address=addr or None,
+                latitude=place_lat,
+                longitude=place_lon,
+                tags=[],
+                created_at=now_str,
+            ))
     return results
 
 
@@ -955,6 +1250,7 @@ def health():
         "status": "ok",
         "model": str(_MODEL_FILE.name),
         "personas": len(_label_classes),
+        "v": "20260609-events",
     }
 
 
@@ -994,6 +1290,38 @@ def debug_episodes(user_id: str):
     }
 
 
+_ADMIN_SECRET = os.environ.get("ADMIN_SECRET", "")
+
+@app.post("/api/admin/scrape-events")
+def admin_scrape_events(x_admin_key: Optional[str] = Header(None)):
+    if not _ADMIN_SECRET or x_admin_key != _ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    from event_scraper import scrape_all_cities
+    import threading
+    threading.Thread(target=scrape_all_cities, daemon=True).start()
+    return {"status": "scrape started in background"}
+
+
+@app.get("/api/debug/realtime/{user_id}")
+def debug_realtime(user_id: str):
+    ctx = _build_realtime_context(user_id)
+    return {"user_id": user_id, "realtime_context": ctx}
+
+
+@app.get("/api/debug/events/{city}")
+def debug_events(city: str):
+    """Show what nearby_events RPC returns for a city (no auth required)."""
+    interests = ["music", "culture", "sports", "food", "outdoor", "workshop", "family"]
+    events = _supa_rpc("nearby_events", {"p_city": city, "p_interests": interests, "p_limit": 20})
+    total = _supa_get("events", {"city": f"eq.{city}", "select": "id", "limit": "1"})
+    return {
+        "city": city,
+        "rpc_events": len(events),
+        "events": events,
+        "total_in_db_note": "use city=eq.Istanbul exactly",
+    }
+
+
 @app.get("/api/persona/{user_id}", response_model=PersonaResponse)
 def get_persona(user_id: str, force: bool = Query(False)):
     persona_class, meta, signals_today, _ = _classify(user_id, force=force)
@@ -1014,26 +1342,53 @@ def get_recommendations(
     lon: Optional[float] = Query(None),
     force: bool = Query(False),
 ):
-    persona_class, meta, _, ctx = _classify(user_id, force=force)
+    persona_class, meta, _, _ = _classify(user_id, force=force)
     now = datetime.now(timezone.utc)
     now_str = now.isoformat()
 
+    # Tier 0: Return cached LLM output if still valid (1h TTL), unless force=True.
+    if not force:
+        cached_payload = _read_cached_suggestions(user_id)
+        if cached_payload:
+            logger.info("[cache] hit for user %s", user_id)
+            try:
+                return [SuggestionResponse(**s) for s in cached_payload]
+            except Exception as e:
+                logger.warning("[cache] payload parse error, skipping: %s", e)
+
     # When GPS provided, fetch real nearby venues and generate LLM recommendations.
     if lat is not None and lon is not None and GOOGLE_PLACES_KEY:
-        raw_places = _fetch_google_places(lat, lon)
+        raw_places     = _fetch_google_places(lat, lon)
+        nearby_events  = _fetch_nearby_events(lat, lon, persona_class)
+        realtime_ctx   = _build_realtime_context(user_id)
 
-        # Tier 1: LLM-enriched recommendations (persona + places + app context → Mistral)
-        if raw_places:
-            llm_items = _call_mistral(persona_class, meta, raw_places, ctx, now)
-            if llm_items:
-                suggestions = _llm_to_suggestions(llm_items, raw_places, lat, lon, now_str)
+        # Keep only venue types that match this persona's interests (relevance filter).
+        preferred_types = set(_PERSONA_PLACE_TYPES.get(persona_class, _ALL_PLACE_TYPES))
+        persona_places = [
+            p for p in raw_places
+            if any(t in preferred_types for t in (p.get("types") or []))
+        ]
+        if not persona_places:
+            persona_places = raw_places  # fallback: send all if nothing matched
+
+        # Tier 1: LLM-enriched recommendations (persona + places + events + realtime)
+        if persona_places or nearby_events:
+            llm_result = _call_mistral(persona_class, meta, persona_places, nearby_events, realtime_ctx, now)
+            if llm_result:
+                llm_items, prompt_tokens, completion_tokens, latency_ms = llm_result
+                suggestions = _llm_to_suggestions(llm_items, persona_places, nearby_events, lat, lon, now_str)
                 if suggestions:
+                    _save_cached_suggestions(
+                        user_id,
+                        [s.model_dump() for s in suggestions],
+                        prompt_tokens, completion_tokens, latency_ms,
+                    )
                     return suggestions
 
-        # Tier 2: Direct Places results without LLM enrichment
+        # Tier 2: Direct Places results without LLM enrichment (persona-filtered)
         place_suggestions = [
             s
-            for i, p in enumerate(raw_places)
+            for i, p in enumerate(persona_places)
             if (s := _place_to_suggestion(p, lat, lon, meta, i, now_str)) is not None
         ]
         if place_suggestions:
