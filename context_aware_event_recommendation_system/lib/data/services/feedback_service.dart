@@ -8,6 +8,23 @@ class FeedbackService {
 
   final SupabaseClient _supabase;
 
+  /// Returns the set of suggestion IDs the user has disliked (persisted in DB).
+  Future<Set<String>> loadDislikedIds() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return {};
+    try {
+      final rows = await _supabase
+          .from('user_feedback')
+          .select('suggestion_id')
+          .eq('user_id', userId)
+          .eq('action', 'dislike');
+      return {for (final r in rows as List) r['suggestion_id'] as String};
+    } catch (e) {
+      AppLogger.w('[FeedbackService] loadDislikedIds failed', e);
+      return {};
+    }
+  }
+
   Future<void> logAction({
     required String suggestionId,
     required String action,

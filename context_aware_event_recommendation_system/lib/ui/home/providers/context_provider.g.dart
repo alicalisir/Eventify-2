@@ -97,17 +97,17 @@ final class PersonaProvider
 String _$personaHash() => r'4e5dffacec43e7a98b3c0dc652f4ea23e38e0350';
 
 /// IDs of suggestions the user has dismissed.
-/// Loads persisted state on first access; persists every change.
+/// Scoped to the current user — rebuilds automatically on login/logout.
 
 @ProviderFor(DismissedSuggestions)
 final dismissedSuggestionsProvider = DismissedSuggestionsProvider._();
 
 /// IDs of suggestions the user has dismissed.
-/// Loads persisted state on first access; persists every change.
+/// Scoped to the current user — rebuilds automatically on login/logout.
 final class DismissedSuggestionsProvider
     extends $AsyncNotifierProvider<DismissedSuggestions, Set<String>> {
   /// IDs of suggestions the user has dismissed.
-  /// Loads persisted state on first access; persists every change.
+  /// Scoped to the current user — rebuilds automatically on login/logout.
   DismissedSuggestionsProvider._()
     : super(
         from: null,
@@ -128,12 +128,67 @@ final class DismissedSuggestionsProvider
 }
 
 String _$dismissedSuggestionsHash() =>
-    r'f931e64de9dd490f0a92184bd2eca994e8a55733';
+    r'8de63f4be06efa39efe2870caa6eeb3643a4cc07';
 
 /// IDs of suggestions the user has dismissed.
-/// Loads persisted state on first access; persists every change.
+/// Scoped to the current user — rebuilds automatically on login/logout.
 
 abstract class _$DismissedSuggestions extends $AsyncNotifier<Set<String>> {
+  FutureOr<Set<String>> build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<AsyncValue<Set<String>>, Set<String>>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<AsyncValue<Set<String>>, Set<String>>,
+              AsyncValue<Set<String>>,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
+/// IDs of suggestions the user has explicitly disliked.
+/// Loaded from Supabase on startup — persists across sessions.
+
+@ProviderFor(DislikedSuggestions)
+final dislikedSuggestionsProvider = DislikedSuggestionsProvider._();
+
+/// IDs of suggestions the user has explicitly disliked.
+/// Loaded from Supabase on startup — persists across sessions.
+final class DislikedSuggestionsProvider
+    extends $AsyncNotifierProvider<DislikedSuggestions, Set<String>> {
+  /// IDs of suggestions the user has explicitly disliked.
+  /// Loaded from Supabase on startup — persists across sessions.
+  DislikedSuggestionsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'dislikedSuggestionsProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$dislikedSuggestionsHash();
+
+  @$internal
+  @override
+  DislikedSuggestions create() => DislikedSuggestions();
+}
+
+String _$dislikedSuggestionsHash() =>
+    r'd65d0e3eff0462dad7fa9d7f3560511319e4481e';
+
+/// IDs of suggestions the user has explicitly disliked.
+/// Loaded from Supabase on startup — persists across sessions.
+
+abstract class _$DislikedSuggestions extends $AsyncNotifier<Set<String>> {
   FutureOr<Set<String>> build();
   @$mustCallSuper
   @override

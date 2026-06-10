@@ -51,6 +51,13 @@ class _RecommendationCardState extends ConsumerState<RecommendationCard> {
       action: next ? 'like' : 'dislike',
       suggestion: widget.suggestion,
     );
+    if (!next) {
+      // User disliked — remove from visible list immediately and persist
+      ref.read(dislikedSuggestionsProvider.notifier).dislike(widget.suggestion.id);
+    } else {
+      // User re-liked — remove from disliked set
+      ref.read(dislikedSuggestionsProvider.notifier).undislike(widget.suggestion.id);
+    }
   }
 
   void _handleDismiss() {

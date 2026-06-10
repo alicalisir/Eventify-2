@@ -10,6 +10,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 export 'package:context_aware_event_recommendation_system/di/providers.dart'
     show
         contextRepositoryProvider,
+        feedbackServiceProvider,
         suggestionRepositoryProvider,
         suggestionStreamProvider,
         SuggestionStreamNotifier;
@@ -63,12 +64,37 @@ class DismissedSuggestions extends _$DismissedSuggestions {
   }
 }
 
-/// Visible suggestions = stream results minus dismissed IDs.
+/// IDs of suggestions the user has explicitly disliked.
+/// Loaded from Supabase on startup — persists across sessions.
+@Riverpod(keepAlive: true)
+class DislikedSuggestions extends _$DislikedSuggestions {
+  String? get _uid => ref.watch(authProvider).user?.id;
+
+  @override
+  Future<Set<String>> build() async {
+    final uid = _uid;
+    if (uid == null) return {};
+    return ref.read(feedbackServiceProvider).loadDislikedIds();
+  }
+
+  void dislike(String id) {
+    state = AsyncData({...state.value ?? {}, id});
+  }
+
+  void undislike(String id) {
+    final updated = Set<String>.from(state.value ?? {})..remove(id);
+    state = AsyncData(updated);
+  }
+}
+
+/// Visible suggestions = stream results minus dismissed AND disliked IDs.
 /// Plain synchronous Provider — no loading flicker when new suggestions arrive.
 final visibleSuggestionsProvider = Provider<List<SuggestionModel>>((ref) {
   final allAsync = ref.watch(suggestionStreamProvider);
   final dismissedAsync = ref.watch(dismissedSuggestionsProvider);
+  final dislikedAsync = ref.watch(dislikedSuggestionsProvider);
   final all = allAsync.value ?? const [];
   final dismissed = dismissedAsync.value ?? const <String>{};
-  return all.where((s) => !dismissed.contains(s.id)).toList();
+  final disliked = dislikedAsync.value ?? const <String>{};
+  return all.where((s) => !dismissed.contains(s.id) && !disliked.contains(s.id)).toList();
 });
