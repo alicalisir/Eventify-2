@@ -205,3 +205,58 @@ abstract class _$DislikedSuggestions extends $AsyncNotifier<Set<String>> {
     element.handleCreate(ref, build);
   }
 }
+
+/// IDs of suggestions the user has liked.
+/// Loaded from Supabase on startup — persists across sessions.
+
+@ProviderFor(LikedSuggestions)
+final likedSuggestionsProvider = LikedSuggestionsProvider._();
+
+/// IDs of suggestions the user has liked.
+/// Loaded from Supabase on startup — persists across sessions.
+final class LikedSuggestionsProvider
+    extends $AsyncNotifierProvider<LikedSuggestions, Set<String>> {
+  /// IDs of suggestions the user has liked.
+  /// Loaded from Supabase on startup — persists across sessions.
+  LikedSuggestionsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'likedSuggestionsProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$likedSuggestionsHash();
+
+  @$internal
+  @override
+  LikedSuggestions create() => LikedSuggestions();
+}
+
+String _$likedSuggestionsHash() =>
+    r'b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0';
+
+/// IDs of suggestions the user has liked.
+/// Loaded from Supabase on startup — persists across sessions.
+
+abstract class _$LikedSuggestions extends $AsyncNotifier<Set<String>> {
+  FutureOr<Set<String>> build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<AsyncValue<Set<String>>, Set<String>>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<AsyncValue<Set<String>>, Set<String>>,
+              AsyncValue<Set<String>>,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}

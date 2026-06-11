@@ -7,8 +7,9 @@ import '../../../domain/models/suggestion_category.dart' show SuggestionCategory
 import '../../../domain/models/suggestion_model.dart';
 import '../../home/providers/context_provider.dart';
 
+// Bug 2 fix: use ref.watch (not ref.read) so the provider tracks dependencies properly.
 final _feedbackHistoryProvider = FutureProvider.autoDispose(
-  (ref) => ref.read(feedbackServiceProvider).loadFeedbackHistory(),
+  (ref) => ref.watch(feedbackServiceProvider).loadFeedbackHistory(),
 );
 
 class PreferencesScreen extends ConsumerWidget {
@@ -17,40 +18,116 @@ class PreferencesScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final historyAsync = ref.watch(_feedbackHistoryProvider);
+    final theme = Theme.of(context);
 
     return DefaultTabController(
       length: 2,
       child: Scaffold(
+        backgroundColor: theme.colorScheme.surfaceContainerHighest,
         appBar: AppBar(
-          title: const Text('My Preferences'),
-          bottom: const TabBar(
-            tabs: [
-              Tab(icon: Icon(Icons.favorite, size: 18), text: 'Liked'),
-              Tab(icon: Icon(Icons.thumb_down_outlined, size: 18), text: 'Disliked'),
-            ],
-            indicatorColor: AppColors.primary,
-            labelColor: AppColors.primary,
+          backgroundColor: theme.colorScheme.surface,
+          elevation: 0,
+          surfaceTintColor: Colors.transparent,
+          title: Text(
+            'My Preferences',
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.5,
+            ),
+          ),
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(56),
+            child: Container(
+              color: theme.colorScheme.surface,
+              child: TabBar(
+                indicatorSize: TabBarIndicatorSize.tab,
+                indicator: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(AppSpacing.pill),
+                ),
+                labelColor: Colors.white,
+                unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
+                labelStyle: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+                unselectedLabelStyle: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                  fontSize: 13,
+                ),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  AppSpacing.xs,
+                  AppSpacing.md,
+                  AppSpacing.xs,
+                ),
+                tabs: const [
+                  Tab(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.favorite_rounded, size: 16),
+                        SizedBox(width: 6),
+                        Text('Liked'),
+                      ],
+                    ),
+                  ),
+                  Tab(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.thumb_down_rounded, size: 16),
+                        SizedBox(width: 6),
+                        Text('Disliked'),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
         body: historyAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, _) => const Center(child: Text('Could not load preferences.')),
+          loading: () => const Center(
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          error: (_, _) => Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.cloud_off_rounded,
+                  size: 48,
+                  color: theme.colorScheme.onSurfaceVariant.withValues(
+                    alpha: 0.4,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  'Could not load preferences.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
           data: (history) => TabBarView(
             children: [
               _FeedbackList(
                 items: history.liked,
                 currentAction: 'like',
                 emptyMessage: "You haven't liked any suggestions yet.",
-                icon: Icons.favorite,
-                iconColor: Colors.redAccent,
+                emptyIcon: Icons.favorite_border_rounded,
+                emptyColor: Colors.redAccent,
                 onChanged: () => ref.invalidate(_feedbackHistoryProvider),
               ),
               _FeedbackList(
                 items: history.disliked,
                 currentAction: 'dislike',
                 emptyMessage: "You haven't disliked any suggestions yet.",
-                icon: Icons.thumb_down_outlined,
-                iconColor: AppColors.error,
+                emptyIcon: Icons.thumb_down_outlined,
+                emptyColor: AppColors.error,
                 onChanged: () => ref.invalidate(_feedbackHistoryProvider),
               ),
             ],
@@ -61,134 +138,245 @@ class PreferencesScreen extends ConsumerWidget {
   }
 }
 
+// ─── Feedback list ────────────────────────────────────────────────────────────
+
 class _FeedbackList extends StatelessWidget {
   final List<Map<String, dynamic>> items;
   final String currentAction;
   final String emptyMessage;
-  final IconData icon;
-  final Color iconColor;
+  final IconData emptyIcon;
+  final Color emptyColor;
   final VoidCallback onChanged;
 
   const _FeedbackList({
     required this.items,
     required this.currentAction,
     required this.emptyMessage,
-    required this.icon,
-    required this.iconColor,
+    required this.emptyIcon,
+    required this.emptyColor,
     required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     if (items.isEmpty) {
       return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 48, color: iconColor.withValues(alpha: 0.3)),
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              emptyMessage,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: emptyColor.withValues(alpha: 0.10),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  emptyIcon,
+                  size: 36,
+                  color: emptyColor.withValues(alpha: 0.50),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                emptyMessage,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+    return ListView.builder(
+      padding: const EdgeInsets.all(AppSpacing.md),
       itemCount: items.length,
-      separatorBuilder: (_, _) => const Divider(height: 1, indent: 56),
       itemBuilder: (context, i) {
         final item = items[i];
-        final snap = (item['suggestion_snapshot'] as Map?)?.cast<String, dynamic>() ?? {};
+        final snap =
+            (item['suggestion_snapshot'] as Map?)?.cast<String, dynamic>() ??
+                {};
         final title = snap['title'] as String? ?? 'Unknown suggestion';
         final category = snap['category'] as String? ?? '';
         final createdAt = item['created_at'] as String? ?? '';
         final suggestionId = item['suggestion_id'] as String? ?? '';
+        final isLiked = currentAction == 'like';
 
-        final hue = category.categoryHue;
-        final iconTint = HSLColor.fromAHSL(1, hue, 0.55, 0.50).toColor();
-
-        return ListTile(
-          onTap: () => _showPreferenceSheet(
-            context,
+        return Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+          child: _FeedbackCard(
             suggestionId: suggestionId,
             title: title,
             category: category,
+            createdAt: createdAt,
             snap: snap,
+            isLiked: isLiked,
             currentAction: currentAction,
             onChanged: onChanged,
-          ),
-          leading: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: HSLColor.fromAHSL(1, hue, 0.55, 0.92).toColor(),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(category.categoryIcon, size: 20, color: iconTint),
-          ),
-          title: Text(title, style: Theme.of(context).textTheme.bodyLarge),
-          subtitle: category.isNotEmpty
-              ? Text(
-                  category,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                )
-              : null,
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                _formatDate(createdAt),
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-              ),
-              const SizedBox(width: 4),
-              Icon(
-                Icons.chevron_right,
-                size: 16,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ],
           ),
         );
       },
     );
   }
+}
+
+// ─── Individual feedback card ─────────────────────────────────────────────────
+
+class _FeedbackCard extends StatelessWidget {
+  final String suggestionId;
+  final String title;
+  final String category;
+  final String createdAt;
+  final Map<String, dynamic> snap;
+  final bool isLiked;
+  final String currentAction;
+  final VoidCallback onChanged;
+
+  const _FeedbackCard({
+    required this.suggestionId,
+    required this.title,
+    required this.category,
+    required this.createdAt,
+    required this.snap,
+    required this.isLiked,
+    required this.currentAction,
+    required this.onChanged,
+  });
 
   String _formatDate(String iso) {
     try {
       final dt = DateTime.parse(iso).toLocal();
-      return '${dt.day}/${dt.month}/${dt.year}';
+      const months = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      ];
+      return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
     } catch (_) {
       return '';
     }
   }
 
-  void _showPreferenceSheet(
-    BuildContext context, {
-    required String suggestionId,
-    required String title,
-    required String category,
-    required Map<String, dynamic> snap,
-    required String currentAction,
-    required VoidCallback onChanged,
-  }) {
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hue = category.categoryHue;
+    final iconBg = HSLColor.fromAHSL(1, hue, 0.55, 0.92).toColor();
+    final iconTint = HSLColor.fromAHSL(1, hue, 0.55, 0.42).toColor();
+    final actionColor = isLiked ? Colors.redAccent : AppColors.error;
+    final actionIcon =
+        isLiked ? Icons.favorite_rounded : Icons.thumb_down_rounded;
+
+    return Material(
+      color: theme.colorScheme.surface,
+      borderRadius: BorderRadius.circular(AppSpacing.borderRadiusLg),
+      child: InkWell(
+        onTap: () => _showPreferenceSheet(context),
+        borderRadius: BorderRadius.circular(AppSpacing.borderRadiusLg),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppSpacing.borderRadiusLg),
+            border: Border.all(
+              color: theme.dividerColor.withValues(alpha: 0.60),
+            ),
+          ),
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Row(
+            children: [
+              // Category icon
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: iconBg,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(category.categoryIcon, size: 22, color: iconTint),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              // Text
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        if (category.isNotEmpty) ...[
+                          Text(
+                            category,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          Text(
+                            ' · ',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                        Text(
+                          _formatDate(createdAt),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              // Action badge + chevron
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: actionColor.withValues(alpha: 0.10),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(actionIcon, size: 15, color: actionColor),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 18,
+                    color: theme.colorScheme.onSurfaceVariant
+                        .withValues(alpha: 0.50),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showPreferenceSheet(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => _PreferenceSheet(
+      backgroundColor: Colors.transparent,
+      builder: (_) => _PreferenceSheet(
         suggestionId: suggestionId,
         title: title,
         category: category,
@@ -200,7 +388,10 @@ class _FeedbackList extends StatelessWidget {
   }
 }
 
-class _PreferenceSheet extends ConsumerWidget {
+// ─── Preference bottom sheet ──────────────────────────────────────────────────
+// Bug 3 fix: ConsumerStatefulWidget with proper mounted check and direct invalidation.
+
+class _PreferenceSheet extends ConsumerStatefulWidget {
   final String suggestionId;
   final String title;
   final String category;
@@ -217,226 +408,303 @@ class _PreferenceSheet extends ConsumerWidget {
     required this.onChanged,
   });
 
+  @override
+  ConsumerState<_PreferenceSheet> createState() => _PreferenceSheetState();
+}
+
+class _PreferenceSheetState extends ConsumerState<_PreferenceSheet> {
+  bool _loading = false;
+
   SuggestionModel _buildStub() => SuggestionModel(
-        id: suggestionId,
-        title: snap['title'] as String? ?? title,
+        id: widget.suggestionId,
+        title: widget.snap['title'] as String? ?? widget.title,
         description: '',
-        rationale: snap['rationale'] as String? ?? '',
-        category: category,
+        rationale: widget.snap['rationale'] as String? ?? '',
+        category: widget.category,
         tags: [],
         signals: [],
         createdAt: DateTime.now(),
       );
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final hue = category.categoryHue;
-    final iconTint = HSLColor.fromAHSL(1, hue, 0.55, 0.50).toColor();
-    final iconBg = HSLColor.fromAHSL(1, hue, 0.55, 0.92).toColor();
-    final isLiked = currentAction == 'like';
+  Future<void> _setLike() async {
+    if (_loading) return;
+    setState(() => _loading = true);
+    await ref.read(feedbackServiceProvider).logAction(
+      suggestionId: widget.suggestionId,
+      action: 'like',
+      suggestion: _buildStub(),
+    );
+    if (!mounted) return;
+    // Update in-memory notifiers so home screen reflects change immediately
+    ref.read(dislikedSuggestionsProvider.notifier).undislike(widget.suggestionId);
+    ref.read(likedSuggestionsProvider.notifier).like(widget.suggestionId);
+    // Bug 3 fix: invalidate BEFORE pop so provider rebuilds while still mounted
+    ref.invalidate(_feedbackHistoryProvider);
+    Navigator.of(context).pop();
+    widget.onChanged();
+  }
 
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.lg,
-          AppSpacing.md,
-          AppSpacing.lg,
-          AppSpacing.lg,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Drag handle
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: theme.dividerColor,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            // Suggestion header
-            Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
+  Future<void> _setDislike() async {
+    if (_loading) return;
+    setState(() => _loading = true);
+    await ref.read(feedbackServiceProvider).logAction(
+      suggestionId: widget.suggestionId,
+      action: 'dislike',
+      suggestion: _buildStub(),
+    );
+    if (!mounted) return;
+    ref.read(dislikedSuggestionsProvider.notifier).dislike(widget.suggestionId);
+    ref.read(likedSuggestionsProvider.notifier).unlike(widget.suggestionId);
+    ref.invalidate(_feedbackHistoryProvider);
+    Navigator.of(context).pop();
+    widget.onChanged();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hue = widget.category.categoryHue;
+    final iconBg = HSLColor.fromAHSL(1, hue, 0.55, 0.92).toColor();
+    final iconTint = HSLColor.fromAHSL(1, hue, 0.55, 0.42).toColor();
+    final isLiked = widget.currentAction == 'like';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.sm,
+            AppSpacing.lg,
+            AppSpacing.lg,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Drag handle
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
                   decoration: BoxDecoration(
-                    color: iconBg,
-                    borderRadius: BorderRadius.circular(12),
+                    color: theme.dividerColor,
+                    borderRadius: BorderRadius.circular(2),
                   ),
-                  child: Icon(category.categoryIcon, size: 24, color: iconTint),
                 ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      if (category.isNotEmpty)
+              ),
+              const SizedBox(height: AppSpacing.lg),
+
+              // Suggestion header row
+              Row(
+                children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: iconBg,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(
+                      widget.category.categoryIcon,
+                      size: 26,
+                      color: iconTint,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          category,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
+                          widget.title,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.2,
                           ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                    ],
+                        if (widget.category.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            widget.category,
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            const Divider(),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              'Change your preference',
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+                ],
               ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            // Action buttons
-            Row(
-              children: [
-                Expanded(
-                  child: _SheetButton(
-                    icon: Icons.favorite_rounded,
-                    label: 'Like',
-                    color: Colors.redAccent,
-                    selected: isLiked,
-                    onTap: () async {
-                      if (!isLiked) {
-                        await ref.read(feedbackServiceProvider).logAction(
-                          suggestionId: suggestionId,
-                          action: 'like',
-                          suggestion: _buildStub(),
-                        );
-                        ref.read(dislikedSuggestionsProvider.notifier).undislike(suggestionId);
-                      }
-                      if (context.mounted) {
-                        Navigator.of(context).pop();
-                        onChanged();
-                      }
-                    },
+
+              const SizedBox(height: AppSpacing.lg),
+              Divider(color: theme.dividerColor, height: 1),
+              const SizedBox(height: AppSpacing.md),
+
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Update preference',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: _SheetButton(
-                    icon: Icons.thumb_down_rounded,
-                    label: 'Dislike',
-                    color: AppColors.error,
-                    selected: !isLiked,
-                    onTap: () async {
-                      if (isLiked) {
-                        await ref.read(feedbackServiceProvider).logAction(
-                          suggestionId: suggestionId,
-                          action: 'dislike',
-                          suggestion: _buildStub(),
-                        );
-                        ref.read(dislikedSuggestionsProvider.notifier).dislike(suggestionId);
-                      }
-                      if (context.mounted) {
-                        Navigator.of(context).pop();
-                        onChanged();
-                      }
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            // Remove entirely
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.delete_outline, size: 18),
-                label: const Text('Remove from history'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: theme.colorScheme.onSurfaceVariant,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppSpacing.borderRadius),
-                  ),
-                ),
-                onPressed: () {
-                  // Dismiss the bottom sheet — history is read-only from DB;
-                  // "remove from history" just closes (no hard-delete by design).
-                  Navigator.of(context).pop();
-                },
               ),
-            ),
-          ],
+              const SizedBox(height: AppSpacing.md),
+
+              // Action buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: _OptionButton(
+                      icon: Icons.favorite_rounded,
+                      label: 'Like',
+                      color: Colors.redAccent,
+                      selected: isLiked,
+                      loading: _loading,
+                      onTap: isLiked ? null : _setLike,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: _OptionButton(
+                      icon: Icons.thumb_down_rounded,
+                      label: 'Dislike',
+                      color: AppColors.error,
+                      selected: !isLiked,
+                      loading: _loading,
+                      onTap: !isLiked ? null : _setDislike,
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: AppSpacing.sm),
+
+              // Remove from history (no-op — history is read-only from DB)
+              SizedBox(
+                width: double.infinity,
+                child: TextButton.icon(
+                  icon: Icon(
+                    Icons.delete_outline_rounded,
+                    size: 16,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  label: Text(
+                    'Remove from history',
+                    style: TextStyle(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontSize: 13,
+                    ),
+                  ),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(
+                        AppSpacing.borderRadius,
+                      ),
+                      side: BorderSide(
+                        color: theme.dividerColor,
+                      ),
+                    ),
+                  ),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _SheetButton extends StatelessWidget {
+// ─── Option button (Like / Dislike toggle) ────────────────────────────────────
+
+class _OptionButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
   final bool selected;
-  final VoidCallback onTap;
+  final bool loading;
+  final VoidCallback? onTap;
 
-  const _SheetButton({
+  const _OptionButton({
     required this.icon,
     required this.label,
     required this.color,
     required this.selected,
+    required this.loading,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: selected ? color.withValues(alpha: 0.12) : Colors.transparent,
-      borderRadius: BorderRadius.circular(AppSpacing.borderRadius),
-      child: InkWell(
-        onTap: onTap,
+    final theme = Theme.of(context);
+    final bg = selected ? color.withValues(alpha: 0.10) : Colors.transparent;
+    final borderColor = selected
+        ? color.withValues(alpha: 0.45)
+        : theme.dividerColor;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      decoration: BoxDecoration(
+        color: bg,
         borderRadius: BorderRadius.circular(AppSpacing.borderRadius),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: selected ? color.withValues(alpha: 0.4) : Theme.of(context).dividerColor,
-              width: selected ? 1.5 : 1,
-            ),
-            borderRadius: BorderRadius.circular(AppSpacing.borderRadius),
-          ),
+        border: Border.all(color: borderColor, width: selected ? 1.5 : 1.0),
+      ),
+      child: InkWell(
+        onTap: loading ? null : onTap,
+        borderRadius: BorderRadius.circular(AppSpacing.borderRadius),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: color, size: 24),
-              const SizedBox(height: 4),
+              Icon(
+                icon,
+                size: 26,
+                color: selected
+                    ? color
+                    : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+              ),
+              const SizedBox(height: 6),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 13,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  color: color,
+                  fontWeight:
+                      selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected
+                      ? color
+                      : theme.colorScheme.onSurfaceVariant,
                 ),
               ),
               if (selected) ...[
-                const SizedBox(height: 2),
-                Text(
-                  'current',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: color.withValues(alpha: 0.7),
+                const SizedBox(height: 3),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(AppSpacing.pill),
+                  ),
+                  child: Text(
+                    'current',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: color,
+                    ),
                   ),
                 ),
               ],

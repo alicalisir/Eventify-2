@@ -33,7 +33,7 @@ class FeedbackService {
           .select('suggestion_id, action')
           .eq('user_id', userId)
           .inFilter('action', ['like', 'dislike'])
-          .order('created_at');
+          .order('created_at', ascending: true);
       final Set<String> disliked = {};
       for (final r in rows as List) {
         final id = r['suggestion_id'] as String;
@@ -50,6 +50,33 @@ class FeedbackService {
     }
   }
 
+  /// Returns suggestion IDs the user has liked, respecting re-dislikes (latest action wins).
+  Future<Set<String>> loadLikedIds() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return {};
+    try {
+      final rows = await _supabase
+          .from('user_feedback')
+          .select('suggestion_id, action')
+          .eq('user_id', userId)
+          .inFilter('action', ['like', 'dislike'])
+          .order('created_at', ascending: true);
+      final Set<String> liked = {};
+      for (final r in rows as List) {
+        final id = r['suggestion_id'] as String;
+        if (r['action'] == 'like') {
+          liked.add(id);
+        } else if (r['action'] == 'dislike') {
+          liked.remove(id);
+        }
+      }
+      return liked;
+    } catch (e) {
+      AppLogger.w('[FeedbackService] loadLikedIds failed', e);
+      return {};
+    }
+  }
+
   /// Returns liked and disliked history for the preferences screen.
   /// Latest action per suggestion wins.
   Future<({List<Map<String, dynamic>> liked, List<Map<String, dynamic>> disliked})>
@@ -62,7 +89,7 @@ class FeedbackService {
           .select('suggestion_id, action, suggestion_snapshot, created_at')
           .eq('user_id', userId)
           .inFilter('action', ['like', 'dislike'])
-          .order('created_at');
+          .order('created_at', ascending: true);
       // Latest action per suggestion_id wins
       final Map<String, Map<String, dynamic>> latest = {};
       for (final r in rows as List) {

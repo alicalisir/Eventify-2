@@ -26,22 +26,10 @@ class RecommendationCard extends ConsumerStatefulWidget {
   ConsumerState<RecommendationCard> createState() => _RecommendationCardState();
 }
 
-class _RecommendationCardState extends ConsumerState<RecommendationCard>
-    with SingleTickerProviderStateMixin {
-  bool _liked = false;
-  late final AnimationController _likeCtrl;
-  late final Animation<double> _likeScale;
-
+class _RecommendationCardState extends ConsumerState<RecommendationCard> {
   @override
   void initState() {
     super.initState();
-    _likeCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 200),
-    );
-    _likeScale = Tween<double>(begin: 1, end: 1.35).animate(
-      CurvedAnimation(parent: _likeCtrl, curve: Curves.elasticOut),
-    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(feedbackServiceProvider).logAction(
         suggestionId: widget.suggestion.id,
@@ -51,26 +39,13 @@ class _RecommendationCardState extends ConsumerState<RecommendationCard>
     });
   }
 
-  @override
-  void dispose() {
-    _likeCtrl.dispose();
-    super.dispose();
-  }
-
   void _handleLike() {
-    final next = !_liked;
-    setState(() => _liked = next);
-    _likeCtrl.forward(from: 0);
     ref.read(feedbackServiceProvider).logAction(
       suggestionId: widget.suggestion.id,
-      action: next ? 'like' : 'dislike',
+      action: 'like',
       suggestion: widget.suggestion,
     );
-    if (!next) {
-      ref.read(dislikedSuggestionsProvider.notifier).dislike(widget.suggestion.id);
-    } else {
-      ref.read(dislikedSuggestionsProvider.notifier).undislike(widget.suggestion.id);
-    }
+    ref.read(likedSuggestionsProvider.notifier).like(widget.suggestion.id);
   }
 
   void _handleDislike() {
@@ -102,97 +77,114 @@ class _RecommendationCardState extends ConsumerState<RecommendationCard>
       semanticLabel: 'Open suggestion: ${s.title}',
       onTap: widget.onTap,
       child: Container(
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(AppSpacing.borderRadiusLg),
-          border: Border.all(
-            color: widget.priority
-                ? AppColors.featuredCardBorder
-                : theme.dividerColor.withValues(alpha: 0.7),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(AppSpacing.borderRadiusXl),
+            border: Border.all(
+              color: widget.priority
+                  ? AppColors.accent.withValues(alpha: 0.30)
+                  : theme.dividerColor.withValues(alpha: 0.60),
+              width: widget.priority ? 1.5 : 1.0,
+            ),
+            boxShadow: widget.priority
+                ? [
+                    BoxShadow(
+                      color: AppColors.accent.withValues(alpha: 0.14),
+                      blurRadius: 28,
+                      offset: const Offset(0, 10),
+                    ),
+                  ]
+                : [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.07),
+                      blurRadius: 14,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
           ),
-          boxShadow: widget.priority
-              ? [
-                  BoxShadow(
-                    color: AppColors.featuredCardShadow,
-                    blurRadius: 32,
-                    offset: const Offset(0, 12),
-                  ),
-                ]
-              : [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 16,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(AppSpacing.borderRadiusLg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // ── Header: real map or gradient ─────────────────────────────
-              if (hasCoords)
-                StaticMapThumbnail(suggestion: s, height: 140)
-              else
-                _GradientBanner(suggestion: s, priority: widget.priority),
-
-              // ── Body ─────────────────────────────────────────────────────
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.md,
-                  AppSpacing.md,
-                  AppSpacing.md,
-                  AppSpacing.xs,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(AppSpacing.borderRadiusXl),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // ── Hero ─────────────────────────────────────────────────
+                Stack(
                   children: [
-                    // Category badge
-                    _CategoryBadge(category: s.category, hue: hue),
-                    const SizedBox(height: AppSpacing.xs),
-                    // Title
-                    Text(
-                      s.title,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        height: 1.25,
+                    if (hasCoords)
+                      StaticMapThumbnail(suggestion: s, height: 162)
+                    else
+                      _HeroGradient(suggestion: s, priority: widget.priority),
+                    // Floating badges over hero
+                    Positioned(
+                      left: AppSpacing.md,
+                      right: AppSpacing.md,
+                      bottom: AppSpacing.sm,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          _FloatingCategoryBadge(
+                            category: s.category,
+                            hue: hue,
+                          ),
+                          if (widget.priority) const _FloatingTopPickBadge(),
+                        ],
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: AppSpacing.xxs),
-                    // Description
-                    Text(
-                      s.description,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                        height: 1.45,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    // AI rationale
-                    _RationaleBand(rationale: s.rationale),
-                    const SizedBox(height: AppSpacing.sm),
-                    // Signal chips
-                    if (s.tags.isNotEmpty) RationaleChipRow(signals: s.tags),
                   ],
                 ),
-              ),
 
-              // ── Action bar ───────────────────────────────────────────────
-              _ActionBar(
-                liked: _liked,
-                likeScale: _likeScale,
-                distance: s.distance,
-                estimatedMinutes: s.estimatedMinutes,
-                onLike: _handleLike,
-                onDislike: _handleDislike,
-                onDismiss: _handleDismiss,
-              ),
-            ],
+                // ── Body ──────────────────────────────────────────────────
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.md,
+                    AppSpacing.md,
+                    AppSpacing.md,
+                    AppSpacing.xs,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        s.title,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          height: 1.25,
+                          letterSpacing: -0.3,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        s.description,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          height: 1.5,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      _AiRationaleBand(rationale: s.rationale),
+                      if (s.tags.isNotEmpty) ...[
+                        const SizedBox(height: AppSpacing.sm),
+                        RationaleChipRow(signals: s.tags),
+                      ],
+                    ],
+                  ),
+                ),
+
+                // ── Action bar ────────────────────────────────────────────
+                _ActionBar(
+                  distance: s.distance,
+                  estimatedMinutes: s.estimatedMinutes,
+                  onLike: _handleLike,
+                  onDislike: _handleDislike,
+                  onDismiss: _handleDismiss,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -200,143 +192,172 @@ class _RecommendationCardState extends ConsumerState<RecommendationCard>
   }
 }
 
-// ─── Gradient banner (events without coords) ─────────────────────────────────
+// ─── Hero gradient banner ─────────────────────────────────────────────────────
 
-class _GradientBanner extends StatelessWidget {
+class _HeroGradient extends StatelessWidget {
   final SuggestionModel suggestion;
   final bool priority;
 
-  const _GradientBanner({required this.suggestion, required this.priority});
+  const _HeroGradient({required this.suggestion, required this.priority});
 
   @override
   Widget build(BuildContext context) {
     final hue = suggestion.category.categoryHue;
-    final base = HSLColor.fromAHSL(1, hue, 0.52, 0.80).toColor();
-    final deep = HSLColor.fromAHSL(1, (hue + 28) % 360, 0.60, 0.64).toColor();
-    final iconTint = HSLColor.fromAHSL(1, hue, 0.55, 0.40).toColor();
+    final topLeft = HSLColor.fromAHSL(1, hue, 0.52, 0.72).toColor();
+    final bottomRight =
+        HSLColor.fromAHSL(1, (hue + 35) % 360, 0.60, 0.56).toColor();
 
     return Container(
-      height: 100,
+      height: 162,
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [base, deep],
+          colors: [topLeft, bottomRight],
         ),
       ),
       child: Stack(
         children: [
-          // Decorative circles
+          // Background circles
           Positioned(
-            right: -20,
-            top: -20,
+            right: -50,
+            bottom: -50,
             child: Container(
-              width: 110,
-              height: 110,
+              width: 190,
+              height: 190,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.10),
+                color: Colors.white.withValues(alpha: 0.07),
               ),
             ),
           ),
           Positioned(
-            right: 24,
-            top: 12,
+            left: -30,
+            top: -30,
             child: Container(
-              width: 56,
-              height: 56,
+              width: 140,
+              height: 140,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.85),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.10),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
+                color: Colors.white.withValues(alpha: 0.06),
+              ),
+            ),
+          ),
+          // Centered icon
+          Center(
+            child: Container(
+              width: 68,
+              height: 68,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.18),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.35),
+                  width: 1.5,
+                ),
               ),
               child: Icon(
                 suggestion.category.categoryIcon,
-                size: 26,
-                color: iconTint,
+                size: 32,
+                color: Colors.white,
               ),
             ),
           ),
-          if (priority)
-            Positioned(
-              left: AppSpacing.md,
-              bottom: AppSpacing.sm,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.sm,
-                  vertical: 3,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.92),
-                  borderRadius: BorderRadius.circular(AppSpacing.pill),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.auto_awesome, size: 10, color: AppColors.accent),
-                    SizedBox(width: 3),
-                    Text(
-                      'TOP PICK',
-                      style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.accent,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
         ],
       ),
     );
   }
 }
 
-// ─── Category badge ───────────────────────────────────────────────────────────
+// ─── Floating category badge (over hero) ────────────────────────────────────
 
-class _CategoryBadge extends StatelessWidget {
+class _FloatingCategoryBadge extends StatelessWidget {
   final String category;
   final double hue;
 
-  const _CategoryBadge({required this.category, required this.hue});
+  const _FloatingCategoryBadge({required this.category, required this.hue});
 
   @override
   Widget build(BuildContext context) {
-    final bg = HSLColor.fromAHSL(1, hue, 0.70, 0.93).toColor();
-    final fg = HSLColor.fromAHSL(1, hue, 0.55, 0.38).toColor();
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: bg,
+        color: Colors.black.withValues(alpha: 0.42),
         borderRadius: BorderRadius.circular(AppSpacing.pill),
-      ),
-      child: Text(
-        category.toUpperCase(),
-        style: TextStyle(
-          fontSize: 9,
-          fontWeight: FontWeight.w700,
-          color: fg,
-          letterSpacing: 0.6,
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.18),
         ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            category.categoryIcon,
+            size: 11,
+            color: Colors.white.withValues(alpha: 0.90),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            category.toUpperCase(),
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+              letterSpacing: 0.7,
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-// ─── AI rationale band ────────────────────────────────────────────────────────
+// ─── Floating "TOP PICK" badge ────────────────────────────────────────────────
 
-class _RationaleBand extends StatelessWidget {
+class _FloatingTopPickBadge extends StatelessWidget {
+  const _FloatingTopPickBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(AppSpacing.pill),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.auto_awesome_rounded, size: 11, color: AppColors.accent),
+          SizedBox(width: 4),
+          Text(
+            'TOP PICK',
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
+              color: AppColors.accent,
+              letterSpacing: 0.6,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── AI rationale band ───────────────────────────────────────────────────────
+
+class _AiRationaleBand extends StatelessWidget {
   final String rationale;
 
-  const _RationaleBand({required this.rationale});
+  const _AiRationaleBand({required this.rationale});
 
   @override
   Widget build(BuildContext context) {
@@ -348,9 +369,9 @@ class _RationaleBand extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: AppColors.accent50,
-        borderRadius: BorderRadius.circular(AppSpacing.borderRadiusSm),
+        borderRadius: BorderRadius.circular(AppSpacing.borderRadius),
         border: Border.all(
-          color: AppColors.accent.withValues(alpha: 0.18),
+          color: AppColors.accent.withValues(alpha: 0.15),
         ),
       ),
       child: Row(
@@ -358,15 +379,20 @@ class _RationaleBand extends StatelessWidget {
         children: [
           const Padding(
             padding: EdgeInsets.only(top: 1),
-            child: Icon(Icons.auto_awesome, size: 12, color: AppColors.accent),
+            child: Icon(
+              Icons.auto_awesome_rounded,
+              size: 13,
+              color: AppColors.accent,
+            ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 7),
           Expanded(
             child: Text(
               rationale,
               style: theme.textTheme.labelSmall?.copyWith(
                 color: AppColors.accent,
                 height: 1.5,
+                fontStyle: FontStyle.italic,
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -378,11 +404,9 @@ class _RationaleBand extends StatelessWidget {
   }
 }
 
-// ─── Action bar ───────────────────────────────────────────────────────────────
+// ─── Action bar ──────────────────────────────────────────────────────────────
 
 class _ActionBar extends StatelessWidget {
-  final bool liked;
-  final Animation<double> likeScale;
   final double? distance;
   final int? estimatedMinutes;
   final VoidCallback onLike;
@@ -390,8 +414,6 @@ class _ActionBar extends StatelessWidget {
   final VoidCallback onDismiss;
 
   const _ActionBar({
-    required this.liked,
-    required this.likeScale,
     required this.distance,
     required this.estimatedMinutes,
     required this.onLike,
@@ -402,84 +424,163 @@ class _ActionBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final secondary = theme.colorScheme.onSurfaceVariant;
+    final muted = theme.colorScheme.onSurfaceVariant;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.xs, AppSpacing.xs),
-      child: Row(
-        children: [
-          // Distance / time meta
-          if (distance != null || estimatedMinutes != null) ...[
-            Icon(Icons.place_outlined, size: 13, color: secondary),
-            const SizedBox(width: 3),
-            Text(
-              [
-                if (distance != null) '${distance!.toStringAsFixed(1)} km',
-                if (estimatedMinutes != null) '$estimatedMinutes min',
-              ].join(' · '),
-              style: TextStyle(
-                fontSize: 11,
-                color: secondary,
-                fontWeight: FontWeight.w500,
+    return Column(
+      children: [
+        Divider(
+          height: 1,
+          thickness: 1,
+          color: theme.dividerColor.withValues(alpha: 0.50),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: 10,
+          ),
+          child: Row(
+            children: [
+              // Meta chip
+              if (distance != null || estimatedMinutes != null)
+                _MetaInfo(
+                  distance: distance,
+                  estimatedMinutes: estimatedMinutes,
+                  color: muted,
+                ),
+              const Spacer(),
+              // Pass button
+              _GhostActionBtn(
+                icon: Icons.close_rounded,
+                label: 'Pass',
+                color: muted,
+                onTap: onDismiss,
               ),
-            ),
-          ],
-          const Spacer(),
-          // Dismiss (X) – session only
-          _ActionBtn(
-            icon: Icons.close_rounded,
-            color: secondary,
-            tooltip: 'Dismiss',
-            onTap: onDismiss,
+              const SizedBox(width: 6),
+              // Dislike button
+              _GhostActionBtn(
+                icon: Icons.thumb_down_outlined,
+                label: 'Nope',
+                color: AppColors.error.withValues(alpha: 0.85),
+                onTap: onDislike,
+              ),
+              const SizedBox(width: 8),
+              // Save (like) button — primary filled pill
+              _SaveBtn(onTap: onLike),
+            ],
           ),
-          const SizedBox(width: 2),
-          // Dislike (👎) – permanent
-          _ActionBtn(
-            icon: Icons.thumb_down_outlined,
-            color: secondary,
-            tooltip: 'Not for me',
-            onTap: onDislike,
-          ),
-          const SizedBox(width: 2),
-          // Like (❤️) – toggle
-          ScaleTransition(
-            scale: likeScale,
-            child: _ActionBtn(
-              icon: liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-              color: liked ? Colors.redAccent : secondary,
-              tooltip: liked ? 'Liked' : 'Like',
-              onTap: onLike,
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
 
-class _ActionBtn extends StatelessWidget {
-  final IconData icon;
+class _MetaInfo extends StatelessWidget {
+  final double? distance;
+  final int? estimatedMinutes;
   final Color color;
-  final String tooltip;
+
+  const _MetaInfo({
+    required this.distance,
+    required this.estimatedMinutes,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final parts = [
+      if (distance != null) '${distance!.toStringAsFixed(1)} km',
+      if (estimatedMinutes != null) '$estimatedMinutes min',
+    ];
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.place_outlined, size: 13, color: color),
+        const SizedBox(width: 3),
+        Text(
+          parts.join(' · '),
+          style: TextStyle(
+            fontSize: 12,
+            color: color,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _GhostActionBtn extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
   final VoidCallback onTap;
 
-  const _ActionBtn({
+  const _GhostActionBtn({
     required this.icon,
+    required this.label,
     required this.color,
-    required this.tooltip,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppSpacing.borderRadius),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 15, color: color),
+            const SizedBox(width: 3),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SaveBtn extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _SaveBtn({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.primary,
+      borderRadius: BorderRadius.circular(AppSpacing.borderRadius),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Icon(icon, size: 20, color: color),
+        borderRadius: BorderRadius.circular(AppSpacing.borderRadius),
+        splashColor: Colors.white.withValues(alpha: 0.20),
+        child: const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.favorite_rounded, size: 14, color: Colors.white),
+              SizedBox(width: 5),
+              Text(
+                'Save',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
