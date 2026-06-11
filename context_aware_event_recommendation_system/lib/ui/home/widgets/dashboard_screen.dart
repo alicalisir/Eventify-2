@@ -87,9 +87,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     final contextAsync = ref.watch(ambientContextProvider);
     final user = ref.watch(authProvider).user;
 
-    // Auto-refresh when the user dismisses the last visible suggestion
+    // Auto-refresh when the user runs out of visible suggestions.
+    // Guard against firing during the loading phase when visible temporarily
+    // drops to [] — only trigger after suggestions have fully loaded.
     ref.listen(visibleSuggestionsProvider, (prev, next) {
-      if (prev != null && prev.isNotEmpty && next.isEmpty) {
+      final isLoading = ref.read(suggestionStreamProvider).isLoading;
+      if (!isLoading && prev != null && prev.isNotEmpty && next.isEmpty) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) _refresh();
         });

@@ -1,4 +1,3 @@
-import 'package:context_aware_event_recommendation_system/data/repositories/suggestion_repository.dart';
 import 'package:context_aware_event_recommendation_system/di/providers.dart';
 import 'package:context_aware_event_recommendation_system/domain/models/context_state.dart';
 import 'package:context_aware_event_recommendation_system/domain/models/persona_model.dart';
@@ -83,18 +82,15 @@ class DislikedSuggestions extends _$DislikedSuggestions {
   }
 }
 
-/// IDs of suggestions the user has liked.
-/// Loaded from Supabase on startup — persists across sessions.
+/// IDs of suggestions the user has liked this session.
+/// Session-only — liked cards are hidden until app restart, but the like is
+/// persisted to Supabase via feedbackService.logAction so it shows in
+/// Preferences history. We intentionally don't pre-load from Supabase here
+/// so previously liked venues can reappear as recommendations in future sessions.
 @Riverpod(keepAlive: true)
 class LikedSuggestions extends _$LikedSuggestions {
-  String? get _uid => ref.watch(authProvider).user?.id;
-
   @override
-  Future<Set<String>> build() async {
-    final uid = _uid;
-    if (uid == null) return {};
-    return ref.read(feedbackServiceProvider).loadLikedIds();
-  }
+  Future<Set<String>> build() async => {};
 
   void like(String id) {
     state = AsyncData({...state.value ?? {}, id});
