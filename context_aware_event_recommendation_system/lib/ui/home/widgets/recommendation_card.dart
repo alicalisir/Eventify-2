@@ -187,8 +187,7 @@ class _RecommendationCardState extends ConsumerState<RecommendationCard> {
             ),
           ),
         ),
-      ),
-    );
+      );
   }
 }
 

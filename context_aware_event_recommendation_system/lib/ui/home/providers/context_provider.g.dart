@@ -237,8 +237,7 @@ final class LikedSuggestionsProvider
   LikedSuggestions create() => LikedSuggestions();
 }
 
-String _$likedSuggestionsHash() =>
-    r'b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0';
+String _$likedSuggestionsHash() => r'ecaf589d7294a269fa19a37afb8255a7d286a4d9';
 
 /// IDs of suggestions the user has liked.
 /// Loaded from Supabase on startup — persists across sessions.
