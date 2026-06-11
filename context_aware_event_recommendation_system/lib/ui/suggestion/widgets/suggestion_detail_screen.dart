@@ -32,10 +32,10 @@ class SuggestionDetailScreen extends ConsumerStatefulWidget {
 class _SuggestionDetailScreenState
     extends ConsumerState<SuggestionDetailScreen> {
   static const _heroHeight = 240.0;
-  // Bottom padding to clear the fixed action bar (button + padding + safe area).
   static const _actionBarClearance = 120.0;
   final _scrollController = ScrollController();
   bool _accepted = false;
+  bool _liked = false;
 
   @override
   void dispose() {
@@ -431,23 +431,49 @@ class _SuggestionDetailScreenState
               padding: const EdgeInsets.all(AppSpacing.md),
               child: Row(
                 children: [
-                  AppPressable(
-                    semanticLabel: AppStrings.dismiss,
-                    onTap: () => context.pop(),
-                    child: Container(
-                      width: AppSpacing.ctaButtonSize,
-                      height: AppSpacing.ctaButtonSize,
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: theme.dividerColor,
-                          width: 1.5,
-                        ),
-                        borderRadius: BorderRadius.circular(
-                          AppSpacing.borderRadius,
-                        ),
-                      ),
-                      child: Icon(Icons.close, color: secondaryText),
-                    ),
+                  // Dislike button
+                  _DetailActionBtn(
+                    icon: Icons.thumb_down_outlined,
+                    tooltip: 'Not for me',
+                    color: secondaryText,
+                    onTap: () {
+                      ref.read(feedbackServiceProvider).logAction(
+                        suggestionId: suggestion.id,
+                        action: 'dislike',
+                        suggestion: suggestion,
+                      );
+                      ref
+                          .read(dislikedSuggestionsProvider.notifier)
+                          .dislike(suggestion.id);
+                      context.pop();
+                    },
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  // Like / un-like button
+                  _DetailActionBtn(
+                    icon: _liked
+                        ? Icons.favorite_rounded
+                        : Icons.favorite_border_rounded,
+                    tooltip: _liked ? 'Liked' : 'Like',
+                    color: _liked ? Colors.redAccent : secondaryText,
+                    onTap: () {
+                      final next = !_liked;
+                      setState(() => _liked = next);
+                      ref.read(feedbackServiceProvider).logAction(
+                        suggestionId: suggestion.id,
+                        action: next ? 'like' : 'dislike',
+                        suggestion: suggestion,
+                      );
+                      if (next) {
+                        ref
+                            .read(dislikedSuggestionsProvider.notifier)
+                            .undislike(suggestion.id);
+                      } else {
+                        ref
+                            .read(dislikedSuggestionsProvider.notifier)
+                            .dislike(suggestion.id);
+                      }
+                    },
                   ),
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
@@ -468,6 +494,41 @@ class _SuggestionDetailScreenState
           ),
         );
       },
+    );
+  }
+}
+
+class _DetailActionBtn extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _DetailActionBtn({
+    required this.icon,
+    required this.tooltip,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppSpacing.borderRadius),
+        child: Container(
+          width: AppSpacing.ctaButtonSize,
+          height: AppSpacing.ctaButtonSize,
+          decoration: BoxDecoration(
+            border: Border.all(color: theme.dividerColor, width: 1.5),
+            borderRadius: BorderRadius.circular(AppSpacing.borderRadius),
+          ),
+          child: Icon(icon, color: color, size: 22),
+        ),
+      ),
     );
   }
 }
